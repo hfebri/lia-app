@@ -18,6 +18,12 @@ export function ProtectedRoute({
   redirectTo = "/auth/signin",
   requireActive = true,
 }: ProtectedRouteProps) {
+  // TEMPORARY: Bypass authentication for testing
+  // Remove this and uncomment the code below to re-enable authentication
+  return <>{children}</>;
+
+  /* 
+  // Original authentication code - uncomment to re-enable
   const { isAuthenticated, isLoading, user } = useAuth();
   const router = useRouter();
 
@@ -74,4 +80,5 @@ export function ProtectedRoute({
   }
 
   return <>{children}</>;
+  */
 }

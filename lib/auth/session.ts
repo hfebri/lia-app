@@ -7,7 +7,7 @@ import type { User } from "../../db/types";
 
 // Server-side session management
 export async function getCurrentUser(): Promise<AuthUser | null> {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
 
   try {
     const {
@@ -34,7 +34,12 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
 }
 
 export async function getCurrentSession() {
-  const supabase = createServerClient();
+  // TEMPORARY: Skip Supabase session in testing mode
+  if (process.env.NODE_ENV === "development") {
+    return null;
+  }
+
+  const supabase = await createServerClient();
 
   try {
     const {

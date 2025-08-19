@@ -89,7 +89,12 @@ const adminItems: NavItem[] = [
 
 export function Sidebar({ className }: SidebarProps) {
   const pathname = usePathname();
-  const { user, hasRole } = useAuth();
+  const { user } = useAuth();
+
+  // Helper function to check user role
+  const hasRole = (role: string) => {
+    return user?.role === role;
+  };
 
   return (
     <div className={cn("pb-12 w-64", className)}>

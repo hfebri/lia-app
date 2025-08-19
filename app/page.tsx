@@ -24,9 +24,16 @@ import {
 import Link from "next/link";
 
 function HomePage() {
-  const { user, status, hasRole } = useAuth();
+  const { user, status } = useAuth();
 
-  if (status === "authenticated" && user) {
+  // Helper function to check user role
+  const hasRole = (role: string) => {
+    return user?.role === role;
+  };
+
+  // TEMPORARY: Show dashboard for everyone (bypass authentication)
+  // Change this condition back to `if (status === "authenticated" && user) {` to re-enable authentication
+  if (true) {
     // Show dashboard for authenticated users
     return (
       <div className="space-y-12">
@@ -35,18 +42,16 @@ function HomePage() {
           <div className="flex items-center justify-center space-x-2 mb-4">
             <Bot className="h-12 w-12 text-primary" />
             <h1 className="text-4xl font-bold tracking-tight">
-              Welcome back, {user.name || user.email}!
+              Welcome to LIA App!
             </h1>
           </div>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
             Continue your AI-powered journey. Start a conversation, explore
             templates, or upload files for analysis.
           </p>
-          {hasRole("admin") && (
-            <Badge variant="secondary" className="text-lg py-2 px-4">
-              🔧 Admin Access Available
-            </Badge>
-          )}
+          <Badge variant="secondary" className="text-lg py-2 px-4">
+            🚀 Testing Mode - Authentication Disabled
+          </Badge>
         </div>
 
         {/* Quick Actions */}

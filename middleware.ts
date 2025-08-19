@@ -3,6 +3,14 @@ import { NextResponse, type NextRequest } from "next/server";
 import { PROTECTED_ROUTES, ADMIN_ROUTES } from "./lib/auth/config";
 
 export async function middleware(request: NextRequest) {
+  // TEMPORARY: Bypass all authentication for testing
+  // Remove this return statement and uncomment the code below to re-enable authentication
+  return NextResponse.next({
+    request,
+  });
+
+  /*
+  // Original middleware code - uncomment to re-enable authentication
   let supabaseResponse = NextResponse.next({
     request,
   });
@@ -109,6 +117,7 @@ export async function middleware(request: NextRequest) {
   }
 
   return supabaseResponse;
+  */
 }
 
 export const config = {

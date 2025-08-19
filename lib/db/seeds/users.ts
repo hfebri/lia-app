@@ -9,6 +9,13 @@ export async function seedUsers() {
   // Default admin user data
   const adminUsers: NewUser[] = [
     {
+      id: "12345678-1234-1234-1234-123456789abc", // Add the temp user UUID we're using for testing
+      email: "temp@lia-app.com",
+      name: "Temp Test User",
+      role: "user",
+      isActive: true,
+    },
+    {
       email: "admin@lia-app.com",
       name: "Admin User",
       role: "admin",

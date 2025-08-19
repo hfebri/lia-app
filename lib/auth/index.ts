@@ -7,7 +7,7 @@ import type { User } from "../../db/types";
 
 // Server-side authentication utilities
 export async function getAuthUser(): Promise<AuthUser | null> {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
 
   try {
     const {
