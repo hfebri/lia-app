@@ -55,31 +55,33 @@
 
 ## Authentication & User Management
 
-- [ ] Step 5: Setup simple authentication system
+- [x] Step 5: Setup Supabase authentication with Google OAuth
 
-  - **Task**: Implement basic authentication using NextAuth.js with Google OAuth, user session management
+  - **Task**: Configure Supabase Auth with Google OAuth provider and implement authentication flow
   - **Files**:
-    - `lib/auth/config.ts`: NextAuth configuration
-    - `app/api/auth/[...nextauth]/route.ts`: NextAuth API routes
+    - `lib/supabase/client.ts`: Supabase client configuration
+    - `lib/supabase/server.ts`: Server-side Supabase client
+    - `lib/auth/config.ts`: Supabase Auth configuration
     - `lib/auth/index.ts`: Authentication utilities
     - `lib/auth/types.ts`: Auth-related TypeScript types
-    - `components/auth/login-button.tsx`: Login component
+    - `components/auth/login-button.tsx`: Google login component
     - `components/auth/logout-button.tsx`: Logout component
-    - `components/auth/auth-provider.tsx`: Authentication context provider
-    - `package.json`: Add NextAuth dependencies
+    - `components/auth/auth-provider.tsx`: Supabase Auth context provider
+    - `package.json`: Add Supabase dependencies
   - **Step Dependencies**: Step 4
-  - **User Instructions**: Install NextAuth.js: `npm install next-auth @auth/drizzle-adapter`, add Google OAuth credentials to `.env.local`
+  - **User Instructions**: Install Supabase: `npm install @supabase/supabase-js @supabase/ssr`, configure Google OAuth in Supabase dashboard, add Supabase credentials to `.env.local`
 
-- [ ] Step 6: Implement user session management and role-based access
-  - **Task**: Create session handling, user profile management, and admin role checking utilities
+- [x] Step 6: Implement user session management and role-based access
+  - **Task**: Create Supabase session handling, user profile management, and admin role checking utilities
   - **Files**:
-    - `lib/auth/session.ts`: Session management functions
+    - `lib/auth/session.ts`: Supabase session management functions
     - `lib/auth/permissions.ts`: Role-based access control
-    - `hooks/use-auth.ts`: Custom authentication hook
+    - `hooks/use-auth.ts`: Custom Supabase authentication hook
     - `hooks/use-user.ts`: User data management hook
     - `components/auth/protected-route.tsx`: Route protection component
     - `components/auth/admin-guard.tsx`: Admin access guard
-    - `middleware.ts`: Authentication middleware
+    - `middleware.ts`: Supabase Auth middleware
+    - `app/auth/callback/route.ts`: OAuth callback handler
   - **Step Dependencies**: Step 5
   - **User Instructions**: None
 
