@@ -87,20 +87,7 @@
 
 ## Core UI Components & Layout
 
-- [ ] Step 7: Install and setup shadcn/ui components
-  - **Task**: Install core shadcn/ui components needed for the application
-  - **Files**:
-    - `components/ui/button.tsx`: Button component
-    - `components/ui/input.tsx`: Input component
-    - `components/ui/card.tsx`: Card component
-    - `components/ui/avatar.tsx`: Avatar component
-    - `components/ui/dialog.tsx`: Dialog component
-    - `components/ui/dropdown-menu.tsx`: Dropdown menu
-    - `components/ui/sidebar.tsx`: Sidebar component
-    - `components/ui/toast.tsx`: Toast notifications
-    - `components/ui/badge.tsx`: Badge component
-    - `components/ui/separator.tsx`: Separator component
-- [ ] Step 7: Install and setup shadcn/ui components
+- [x] Step 7: Install and setup shadcn/ui components
 
   - **Task**: Install core shadcn/ui components needed for the application
   - **Files**:
@@ -117,7 +104,7 @@
   - **Step Dependencies**: Step 6
   - **User Instructions**: Run shadcn/ui commands: `npx shadcn@latest add button input card avatar dialog dropdown-menu sidebar toast badge separator`
 
-- [ ] Step 8: Create shared UI components and layout structure
+- [x] Step 8: Create shared UI components and layout structure
 
   - **Task**: Implement reusable UI components and main application layout
   - **Files**:
@@ -132,7 +119,7 @@
   - **Step Dependencies**: Step 7
   - **User Instructions**: None
 
-- [ ] Step 9: Implement main application layout and routing structure
+- [x] Step 9: Implement main application layout and routing structure
   - **Task**: Create main layout with navigation, implement routing structure for different sections
   - **Files**:
     - `app/(dashboard)/layout.tsx`: Dashboard layout with sidebar

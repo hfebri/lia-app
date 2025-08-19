@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useAuthContext } from "./auth-provider";
+import { useAuth } from "./auth-provider";
 import { Button } from "../ui/button";
 
 interface LoginButtonProps {
@@ -23,15 +23,11 @@ export function LoginButton({
   variant = "default",
   size = "default",
 }: LoginButtonProps) {
-  const {
-    signInWithGoogle,
-    isAuthenticated,
-    isLoading: authLoading,
-  } = useAuthContext();
+  const { signInWithGoogle, user, isLoading: authLoading } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSignIn = async () => {
-    if (authLoading || isLoading || isAuthenticated) return;
+    if (authLoading || isLoading || !!user) return;
 
     try {
       setIsLoading(true);
@@ -45,7 +41,7 @@ export function LoginButton({
   };
 
   // Don't show login button if already authenticated
-  if (isAuthenticated) {
+  if (!!user) {
     return null;
   }
 
