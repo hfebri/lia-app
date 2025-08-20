@@ -57,7 +57,7 @@ export function useUser(options: UseUserOptions = {}) {
         setIsUpdating(false);
       }
     },
-    [user?.id, refreshSession, options]
+    [user?.id, refreshSession, options.onSuccess, options.onError]
   );
 
   // Change user role (admin only)
@@ -93,7 +93,7 @@ export function useUser(options: UseUserOptions = {}) {
         setIsUpdating(false);
       }
     },
-    [options]
+    [options.onSuccess, options.onError]
   );
 
   // Deactivate user (admin only)
@@ -125,7 +125,7 @@ export function useUser(options: UseUserOptions = {}) {
         setIsUpdating(false);
       }
     },
-    [options]
+    [options.onSuccess, options.onError]
   );
 
   // Reactivate user (admin only)
@@ -157,7 +157,7 @@ export function useUser(options: UseUserOptions = {}) {
         setIsUpdating(false);
       }
     },
-    [options]
+    [options.onSuccess, options.onError]
   );
 
   // Clear error

@@ -1,6 +1,13 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useMemo,
+  useCallback,
+} from "react";
 import { createClient } from "../../lib/supabase/client";
 import type { Session } from "@supabase/supabase-js";
 import type { AuthUser, AuthContextType } from "../../lib/auth/types";
@@ -13,7 +20,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
+
+  const fetchUserProfile = useCallback(
+    async (email: string) => {
+      try {
+        const response = await fetch("/api/auth/user", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ email }),
+        });
+
+        if (response.ok) {
+          const userData = await response.json();
+          console.log("User data fetched:", userData);
+          setUser(userData);
+        } else {
+          console.error("Failed to fetch user profile", response.status);
+          setUser(null);
+          // If user not found in DB, sign them out from Supabase too
+          if (response.status === 404) {
+            await supabase.auth.signOut();
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching user profile:", error);
+        setUser(null);
+      }
+    },
+    [supabase]
+  );
 
   useEffect(() => {
     // Get initial session
@@ -63,35 +101,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     return () => subscription.unsubscribe();
-  }, [supabase.auth]);
-
-  const fetchUserProfile = async (email: string) => {
-    try {
-      const response = await fetch("/api/auth/user", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email }),
-      });
-
-      if (response.ok) {
-        const userData = await response.json();
-        console.log("User data fetched:", userData);
-        setUser(userData);
-      } else {
-        console.error("Failed to fetch user profile", response.status);
-        setUser(null);
-        // If user not found in DB, sign them out from Supabase too
-        if (response.status === 404) {
-          await supabase.auth.signOut();
-        }
-      }
-    } catch (error) {
-      console.error("Error fetching user profile:", error);
-      setUser(null);
-    }
-  };
+  }, [supabase, fetchUserProfile]);
 
   const signInWithGoogle = async () => {
     try {

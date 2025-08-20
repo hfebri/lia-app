@@ -6,40 +6,46 @@ import { Sidebar } from "@/components/shared/sidebar";
 import { Footer } from "@/components/shared/footer";
 import { ErrorBoundary } from "@/components/shared/error-boundary";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/components/auth/auth-provider";
 import { LoadingPage } from "@/components/shared/loading";
 import { cn } from "@/lib/utils";
+import { Bot, Menu } from "lucide-react";
 
 interface AppLayoutProps {
   children: React.ReactNode;
   className?: string;
   showSidebar?: boolean;
+  showHeader?: boolean;
   showFooter?: boolean;
 }
 
 export function AppLayout({
   children,
   className,
-  showSidebar = true,
+  showSidebar = false,
+  showHeader = true,
   showFooter = true,
 }: AppLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { status } = useAuth();
+  const { isLoading } = useAuth();
 
-  if (status === "loading") {
+  if (isLoading) {
     return <LoadingPage message="Initializing application..." />;
   }
 
   return (
     <ErrorBoundary>
       <div className="min-h-screen bg-background">
-        {/* Header */}
-        <Header onMobileMenuToggle={() => setSidebarOpen(true)} />
+        {/* Header - only show when not using sidebar */}
+        {showHeader && !showSidebar && (
+          <Header onMobileMenuToggle={() => setSidebarOpen(true)} />
+        )}
 
         <div className="flex">
           {/* Desktop Sidebar */}
           {showSidebar && (
-            <aside className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 md:top-14 md:z-50 md:border-r">
+            <aside className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 md:top-0 md:z-50 md:border-r">
               <Sidebar />
             </aside>
           )}
@@ -53,11 +59,33 @@ export function AppLayout({
             </Sheet>
           )}
 
+          {/* Mobile Header for sidebar layouts */}
+          {showSidebar && (
+            <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-background border-b h-14 flex items-center px-4">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setSidebarOpen(true)}
+              >
+                <Menu className="h-4 w-4" />
+                <span className="sr-only">Toggle navigation menu</span>
+              </Button>
+              <div className="ml-2 flex items-center">
+                <Bot className="h-5 w-5 mr-2" />
+                <span className="font-bold">LIA App</span>
+              </div>
+            </div>
+          )}
+
           {/* Main Content */}
           <main
             className={cn(
-              "flex-1 min-h-[calc(100vh-3.5rem)]",
-              showSidebar && "md:pl-64",
+              "flex-1",
+              showHeader && !showSidebar
+                ? "min-h-[calc(100vh-3.5rem)]"
+                : showSidebar
+                ? "min-h-screen md:pl-64 pt-14 md:pt-0"
+                : "min-h-screen",
               className
             )}
           >
@@ -77,7 +105,7 @@ export function AppLayout({
 // Specialized layouts for different sections
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
-    <AppLayout showSidebar={true} showFooter={false}>
+    <AppLayout showSidebar={true} showHeader={false} showFooter={false}>
       {children}
     </AppLayout>
   );
@@ -87,6 +115,7 @@ export function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
     <AppLayout
       showSidebar={false}
+      showHeader={true}
       showFooter={true}
       className="flex items-center justify-center"
     >
@@ -97,7 +126,7 @@ export function AuthLayout({ children }: { children: React.ReactNode }) {
 
 export function LandingLayout({ children }: { children: React.ReactNode }) {
   return (
-    <AppLayout showSidebar={false} showFooter={true}>
+    <AppLayout showSidebar={false} showHeader={true} showFooter={true}>
       {children}
     </AppLayout>
   );

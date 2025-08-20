@@ -24,7 +24,7 @@ import {
 import Link from "next/link";
 
 function HomePage() {
-  const { user, status } = useAuth();
+  const { user, isLoading, isAuthenticated } = useAuth();
 
   // Helper function to check user role
   const hasRole = (role: string) => {
@@ -32,7 +32,7 @@ function HomePage() {
   };
 
   // TEMPORARY: Show dashboard for everyone (bypass authentication)
-  // Change this condition back to `if (status === "authenticated" && user) {` to re-enable authentication
+  // Change this condition back to `if (isAuthenticated && user) {` to re-enable authentication
   if (true) {
     // Show dashboard for authenticated users
     return (
@@ -155,7 +155,7 @@ function HomePage() {
         </p>
 
         <div className="pt-6">
-          {status === "loading" ? (
+          {isLoading ? (
             <Button disabled size="lg" className="text-lg px-8 py-4">
               Loading...
             </Button>
@@ -213,11 +213,11 @@ function HomePage() {
           <CardTitle>Authentication Status</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {status === "loading" && (
+          {isLoading && (
             <p className="text-muted-foreground">Checking authentication...</p>
           )}
 
-          {status === "unauthenticated" && (
+          {!isAuthenticated && !isLoading && (
             <div className="space-y-4 text-center">
               <p className="text-muted-foreground">
                 Sign in to access all features

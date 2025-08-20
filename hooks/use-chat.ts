@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import {
   ChatState,
   Message,
@@ -19,18 +19,18 @@ const initialState: ChatState = {
   error: null,
 };
 
+// TEMPORARY: Mock user for testing when authentication is disabled
+const MOCK_USER = {
+  id: "12345678-1234-1234-1234-123456789abc",
+  email: "test@example.com",
+  name: "Test User",
+};
+
 export function useChat() {
   const [state, setState] = useState<ChatState>(initialState);
   const { user } = useUser();
 
-  // TEMPORARY: Mock user for testing when authentication is disabled
-  const mockUser = {
-    id: "12345678-1234-1234-1234-123456789abc",
-    email: "test@example.com",
-    name: "Test User",
-  };
-
-  const currentUser = user || mockUser;
+  const currentUser = user || MOCK_USER;
 
   // Load conversations for the current user
   const loadConversations = useCallback(async () => {

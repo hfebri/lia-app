@@ -21,32 +21,32 @@ interface HeaderProps {
 }
 
 export function Header({ onMobileMenuToggle }: HeaderProps) {
-  const { user, status, hasRole } = useAuth();
+  const { user, isLoading, isAuthenticated, checkRole } = useAuth();
 
   return (
-    <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex items-center justify-center">
       <div className="container flex h-14 items-center">
-        {/* Mobile menu button */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="md:hidden"
-          onClick={onMobileMenuToggle}
-        >
-          <Menu className="h-4 w-4" />
-          <span className="sr-only">Toggle navigation menu</span>
-        </Button>
+        {/* Left side - Logo */}
+        <div className="flex items-center min-w-0 flex-1">
+          {/* Mobile menu button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="md:hidden mr-2"
+            onClick={onMobileMenuToggle}
+          >
+            <Menu className="h-4 w-4" />
+            <span className="sr-only">Toggle navigation menu</span>
+          </Button>
 
-        {/* Logo */}
-        <div className="mr-4 hidden md:flex">
-          <Link href="/" className="mr-6 flex items-center space-x-2">
+          <Link href="/" className="flex items-center space-x-2">
             <Bot className="h-6 w-6" />
-            <span className="hidden font-bold sm:inline-block">LIA App</span>
+            <span className="font-bold">LIA App</span>
           </Link>
         </div>
 
-        {/* Navigation */}
-        <nav className="flex items-center space-x-6 text-sm font-medium">
+        {/* Center - Navigation */}
+        <nav className="hidden md:flex items-center justify-center space-x-8 text-sm font-medium flex-1">
           <Link
             href="/chat"
             className="transition-colors hover:text-foreground/80 text-foreground/60"
@@ -67,8 +67,9 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
           </Link>
         </nav>
 
-        <div className="ml-auto flex items-center space-x-4">
-          {status === "authenticated" && user ? (
+        {/* Right side - User menu */}
+        <div className="flex items-center space-x-4 min-w-0 flex-1 justify-end">
+          {isAuthenticated && user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -92,7 +93,7 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
                         {user.email}
                       </p>
                     )}
-                    {hasRole("admin") && (
+                    {checkRole("admin") && (
                       <Badge variant="secondary" className="w-fit">
                         Admin
                       </Badge>
@@ -112,7 +113,7 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
                     <span>Settings</span>
                   </Link>
                 </DropdownMenuItem>
-                {hasRole("admin") && (
+                {checkRole("admin") && (
                   <DropdownMenuItem asChild>
                     <Link href="/admin">
                       <Settings className="mr-2 h-4 w-4" />
