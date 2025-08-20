@@ -1,0 +1,343 @@
+/* Mobile-specific styles and responsive utilities */
+
+/* Mobile-first approach - styles apply to mobile by default */
+
+/* Touch-friendly tap targets */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Better mobile scrolling */
+.mobile-scroll {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* Mobile-optimized animations - reduced motion for better performance */
+@media (prefers-reduced-motion: no-preference) {
+  .mobile-animate {
+    transition: all 0.2s ease;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mobile-animate {
+    transition: none;
+  }
+}
+
+/* Mobile viewport adjustments */
+.mobile-viewport {
+  min-height: 100vh;
+  min-height: 100dvh; /* Dynamic viewport height for mobile browsers */
+}
+
+/* Safe area handling for notched devices */
+.safe-area-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.safe-area-left {
+  padding-left: env(safe-area-inset-left);
+}
+
+.safe-area-right {
+  padding-right: env(safe-area-inset-right);
+}
+
+.safe-area-all {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+/* Mobile-specific input handling */
+.mobile-input {
+  font-size: 16px; /* Prevents zoom on iOS when focusing inputs */
+}
+
+/* Mobile keyboard handling */
+.keyboard-avoid {
+  position: relative;
+}
+
+@supports (height: 100dvh) {
+  .keyboard-avoid {
+    height: 100dvh;
+  }
+}
+
+/* Mobile-friendly modals and overlays */
+.mobile-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1000;
+}
+
+/* Mobile navigation styles */
+.mobile-nav-trigger {
+  position: relative;
+  z-index: 1001;
+}
+
+/* Better mobile button styles */
+.mobile-button {
+  min-height: 44px;
+  padding: 12px 16px;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Mobile-optimized card styles */
+.mobile-card {
+  border-radius: 12px;
+  padding: 16px;
+  margin: 8px 0;
+}
+
+/* Mobile-friendly table alternatives */
+.mobile-table {
+  display: block;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.mobile-table-row {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 8px;
+}
+
+/* Mobile text sizing and readability */
+.mobile-text-xs {
+  font-size: 12px;
+  line-height: 16px;
+}
+.mobile-text-sm {
+  font-size: 14px;
+  line-height: 20px;
+}
+.mobile-text-base {
+  font-size: 16px;
+  line-height: 24px;
+}
+.mobile-text-lg {
+  font-size: 18px;
+  line-height: 28px;
+}
+.mobile-text-xl {
+  font-size: 20px;
+  line-height: 28px;
+}
+
+/* Mobile spacing utilities */
+.mobile-space-none {
+  margin: 0;
+  padding: 0;
+}
+.mobile-space-xs {
+  margin: 4px;
+  padding: 4px;
+}
+.mobile-space-sm {
+  margin: 8px;
+  padding: 8px;
+}
+.mobile-space-md {
+  margin: 16px;
+  padding: 16px;
+}
+.mobile-space-lg {
+  margin: 24px;
+  padding: 24px;
+}
+
+/* Mobile-specific visibility utilities */
+@media (max-width: 767px) {
+  .mobile-hidden {
+    display: none !important;
+  }
+  .mobile-visible {
+    display: block !important;
+  }
+  .mobile-flex {
+    display: flex !important;
+  }
+  .mobile-grid {
+    display: grid !important;
+  }
+}
+
+@media (min-width: 768px) {
+  .desktop-hidden {
+    display: none !important;
+  }
+  .mobile-only {
+    display: none !important;
+  }
+}
+
+/* Mobile chat-specific styles */
+.mobile-chat-container {
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+.mobile-chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 16px;
+  scroll-behavior: smooth;
+}
+
+.mobile-chat-input {
+  background: var(--background);
+  border-top: 1px solid var(--border);
+  padding: 12px 16px;
+  padding-bottom: calc(12px + env(safe-area-inset-bottom));
+}
+
+/* Mobile message bubbles */
+.mobile-message {
+  max-width: 85%;
+  word-wrap: break-word;
+  padding: 12px 16px;
+  border-radius: 18px;
+  margin-bottom: 8px;
+}
+
+.mobile-message.user {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  margin-left: auto;
+  border-bottom-right-radius: 4px;
+}
+
+.mobile-message.assistant {
+  background: var(--muted);
+  color: var(--muted-foreground);
+  margin-right: auto;
+  border-bottom-left-radius: 4px;
+}
+
+/* Mobile loading indicators */
+.mobile-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+}
+
+.mobile-loading-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--muted);
+  border-top: 2px solid var(--primary);
+  border-radius: 50%;
+  animation: mobile-spin 1s linear infinite;
+}
+
+@keyframes mobile-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Mobile form styles */
+.mobile-form {
+  padding: 16px;
+}
+
+.mobile-form-group {
+  margin-bottom: 16px;
+}
+
+.mobile-form-label {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.mobile-form-input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 16px; /* Prevents zoom on iOS */
+}
+
+/* Mobile-friendly focus styles */
+.mobile-focus:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Performance optimizations for mobile */
+.mobile-optimized {
+  will-change: transform;
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+/* Mobile haptic feedback simulation */
+.mobile-haptic:active {
+  transform: scale(0.98);
+  transition: transform 0.1s ease;
+}
+
+/* Responsive breakpoint utilities */
+@media (max-width: 639px) {
+  .mobile\:block {
+    display: block !important;
+  }
+  .mobile\:flex {
+    display: flex !important;
+  }
+  .mobile\:hidden {
+    display: none !important;
+  }
+  .mobile\:text-center {
+    text-align: center !important;
+  }
+  .mobile\:text-left {
+    text-align: left !important;
+  }
+  .mobile\:w-full {
+    width: 100% !important;
+  }
+  .mobile\:p-4 {
+    padding: 1rem !important;
+  }
+  .mobile\:m-2 {
+    margin: 0.5rem !important;
+  }
+}
+
+/* Print styles - hide mobile-specific elements when printing */
+@media print {
+  .mobile-nav-trigger,
+  .mobile-bottom-nav,
+  .mobile-fab {
+    display: none !important;
+  }
+}
