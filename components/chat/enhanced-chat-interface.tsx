@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAiChat } from "@/hooks/use-ai-chat";
+import { useFileUpload, type FileItem } from "@/hooks/use-file-upload";
 import { ModelSelector } from "./model-selector";
 import { StreamingMessage } from "./streaming-message";
 import { AIResponse } from "./ai-response";
@@ -37,20 +38,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-interface FileItem {
-  id: string;
-  name: string;
-  size: number;
-  type: string;
-  url?: string;
-  uploadedAt: Date;
-  analysis?: {
-    status: "pending" | "processing" | "completed" | "error";
-    extractedText?: string;
-    summary?: string;
-    insights?: string[];
-  };
-}
+// FileItem interface is now imported from the hook
 
 interface EnhancedChatInterfaceProps {
   className?: string;
@@ -61,9 +49,20 @@ export function EnhancedChatInterface({
 }: EnhancedChatInterfaceProps) {
   const [inputValue, setInputValue] = useState("");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [uploadedFiles, setUploadedFiles] = useState<FileItem[]>([]);
   const [attachedFiles, setAttachedFiles] = useState<FileItem[]>([]);
   const [showFileUpload, setShowFileUpload] = useState(false);
+
+  // Use real file upload hook
+  const {
+    files: uploadedFiles,
+    isUploading,
+    uploadFiles,
+    analyzeFile,
+    deleteFile,
+    refreshFiles,
+    error: fileError,
+    clearError: clearFileError,
+  } = useFileUpload();
 
   const {
     messages,
@@ -84,10 +83,11 @@ export function EnhancedChatInterface({
     currentModel,
   } = useAiChat();
 
-  // Load models on mount
+  // Load models and files on mount
   useEffect(() => {
     loadModels();
-  }, [loadModels]);
+    refreshFiles();
+  }, [loadModels, refreshFiles]);
 
   const handleSendMessage = async () => {
     if (!inputValue.trim() && attachedFiles.length === 0) return;
@@ -104,15 +104,12 @@ export function EnhancedChatInterface({
     if (messageFiles.length > 0) {
       const fileContext = messageFiles
         .map((file) => {
-          let context = `[File: ${file.name}]`;
+          let context = `[File: ${file.originalName}]`;
           if (file.analysis?.summary) {
             context += `\nSummary: ${file.analysis.summary}`;
           }
-          if (file.analysis?.extractedText) {
-            context += `\nContent: ${file.analysis.extractedText.substring(
-              0,
-              1000
-            )}...`;
+          if (file.extractedText) {
+            context += `\nContent: ${file.extractedText.substring(0, 1000)}...`;
           }
           return context;
         })
@@ -142,41 +139,17 @@ export function EnhancedChatInterface({
   const handleFileUpload = async () => {
     if (selectedFiles.length === 0) return;
 
-    // Simulate file upload and analysis
-    const newFiles: FileItem[] = selectedFiles.map((file) => ({
-      id: Math.random().toString(36).substr(2, 9),
-      name: file.name,
-      size: file.size,
-      type: file.type,
-      uploadedAt: new Date(),
-      analysis: {
-        status: "processing" as const,
-      },
-    }));
+    try {
+      await uploadFiles(selectedFiles, {
+        extractText: true,
+        analyzeWithAI: true,
+      });
 
-    setUploadedFiles((prev) => [...prev, ...newFiles]);
-    setSelectedFiles([]);
-    setShowFileUpload(false);
-
-    // Simulate analysis completion
-    setTimeout(() => {
-      setUploadedFiles((prev) =>
-        prev.map((file) => {
-          if (newFiles.some((newFile) => newFile.id === file.id)) {
-            return {
-              ...file,
-              analysis: {
-                status: "completed" as const,
-                summary: `AI analysis of ${file.name}: This document contains important information that can be referenced in conversations.`,
-                extractedText: "Sample extracted text from the document...",
-                insights: ["Key Point 1", "Key Point 2", "Key Point 3"],
-              },
-            };
-          }
-          return file;
-        })
-      );
-    }, 3000);
+      setSelectedFiles([]);
+      setShowFileUpload(false);
+    } catch (error) {
+      console.error("File upload failed:", error);
+    }
   };
 
   const handleFileAttach = (file: FileItem) => {
@@ -207,6 +180,14 @@ export function EnhancedChatInterface({
       </div>
     );
   }
+
+  // Show file error as toast/notification (non-blocking)
+  useEffect(() => {
+    if (fileError) {
+      console.error("File error:", fileError);
+      // In a real app, you might want to show a toast notification here
+    }
+  }, [fileError]);
 
   return (
     <div className={cn("flex h-full", className)}>
@@ -264,6 +245,8 @@ export function EnhancedChatInterface({
                         <FileList
                           files={uploadedFiles}
                           onFileSelect={handleFileAttach}
+                          onFileAnalyze={analyzeFile}
+                          onFileDelete={deleteFile}
                           onUploadClick={() => setShowFileUpload(true)}
                         />
                       </TabsContent>
