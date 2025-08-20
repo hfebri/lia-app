@@ -4,12 +4,11 @@
 
 - [x] Step 1: Create comprehensive database schema with Drizzle ORM
 
-  - **Task**: Define database schema for users, conversations, messages, templates, files, and analytics tables
+  - **Task**: Define database schema for users, conversations, messages, files, and analytics tables
   - **Files**:
     - `db/schema/index.ts`: Main schema exports
     - `db/schema/users.ts`: User table and relations
     - `db/schema/conversations.ts`: Conversations and messages tables
-    - `db/schema/templates.ts`: Conversation templates schema
     - `db/schema/files.ts`: File uploads and metadata
     - `db/schema/analytics.ts`: Usage tracking and metrics
     - `db/types.ts`: TypeScript types for database entities
@@ -24,7 +23,6 @@
     - `lib/db/queries/users.ts`: User-related database operations
     - `lib/db/queries/conversations.ts`: Conversation CRUD operations
     - `lib/db/queries/messages.ts`: Message handling functions
-    - `lib/db/queries/templates.ts`: Template management queries
     - `lib/db/queries/files.ts`: File metadata operations
     - `lib/db/queries/analytics.ts`: Analytics and metrics queries
     - `lib/db/index.ts`: Centralized database exports
@@ -42,10 +40,9 @@
   - **User Instructions**: Run `npm run db:generate` to generate migrations, then `npm run db:migrate` to apply them to Supabase database
 
 - [x] Step 4: Create database seed data
-  - **Task**: Create seed data for initial templates, admin user setup, and default configuration
+  - **Task**: Create seed data for admin user setup and default configuration
   - **Files**:
     - `lib/db/seed.ts`: Main seed script
-    - `lib/db/seeds/templates.ts`: Default conversation templates
     - `lib/db/seeds/users.ts`: Admin user setup
     - `lib/db/seeds/analytics.ts`: Initial analytics setup
     - `scripts/seed.ts`: Standalone seed script
@@ -120,12 +117,10 @@
   - **User Instructions**: None
 
 - [x] Step 9: Implement main application layout and routing structure
-  - **Task**: Create main layout with navigation, implement routing structure for different sections
+  - **Task**: Create main layout with navigation and implement routing structure for different sections
   - **Files**:
     - `app/(dashboard)/layout.tsx`: Dashboard layout with sidebar
     - `app/(dashboard)/chat/page.tsx`: Chat page placeholder
-    - `app/(dashboard)/templates/page.tsx`: Templates page placeholder
-    - `app/(dashboard)/files/page.tsx`: Files page placeholder
     - `app/(admin)/layout.tsx`: Admin layout
     - `app/(admin)/dashboard/page.tsx`: Admin dashboard placeholder
     - `app/layout.tsx`: Update with providers and auth wrapper
@@ -165,114 +160,88 @@
   - **Step Dependencies**: Step 10
   - **User Instructions**: None
 
-## AI Integration & Model Management
+## AI Integration via Replicate
 
-- [x] Step 12: Setup AI service providers and unified interface
+- [x] Step 12: Setup AI service providers with Replicate API
 
-  - **Task**: Create service classes for Replicate GPT-5 with unified interface
+  - **Task**: Create service classes using Replicate.com unified API to access OpenAI, Claude, and DeepSeek models
   - **Files**:
-    - `lib/ai/types.ts`: AI service type definitions ✅
-    - `lib/ai/service.ts`: Unified AI service interface ✅
-    - `lib/ai/providers/replicate.ts`: Replicate GPT-5 integration ✅
-    - `app/api/conversations/[id]/messages/route.ts`: Updated to use GPT-5 ✅
-    - `.env.local`: Added Replicate API token ✅
-    - `package.json`: Added Replicate SDK ✅
+    - `lib/ai/types.ts`: AI service type definitions
+    - `lib/ai/base-provider.ts`: Base AI provider interface
+    - `lib/ai/providers/replicate.ts`: Replicate API integration for all models
+    - `lib/ai/model-manager.ts`: Model selection and switching logic
+    - `lib/ai/config.ts`: AI service configuration with Replicate models
+    - `lib/ai/models.ts`: Available models from Replicate (OpenAI, Claude, DeepSeek)
+    - `package.json`: Add Replicate SDK dependencies
   - **Step Dependencies**: Step 11
-  - **User Instructions**: Replicate API integrated successfully with GPT-5
+  - **User Instructions**: Install Replicate: `npm install replicate`, add Replicate API token to `.env.local`
 
-- [ ] Step 13: Implement AI chat functionality and streaming
-  - **Task**: Connect chat interface to AI services, implement model selection and streaming responses
+- [x] Step 13: Implement AI chat functionality with Replicate streaming
+  - **Task**: Connect chat interface to Replicate AI services, implement model selection and streaming responses
   - **Files**:
-    - `app/api/chat/route.ts`: Chat API endpoint with AI integration and streaming
-    - `app/api/ai/models/route.ts`: Available models endpoint
-    - `lib/ai/chat-service.ts`: Chat service with AI integration
+    - `app/api/chat/route.ts`: Chat API endpoint with Replicate integration and streaming
+    - `app/api/ai/models/route.ts`: Available Replicate models endpoint
+    - `lib/ai/chat-service.ts`: Chat service with Replicate integration
     - `hooks/use-ai-chat.ts`: AI chat management hook with streaming
-    - `components/chat/model-selector.tsx`: AI model selection dropdown
+    - `components/chat/model-selector.tsx`: AI model selection dropdown (OpenAI, Claude, DeepSeek)
     - `components/chat/streaming-message.tsx`: Streaming message display
     - `components/chat/ai-response.tsx`: AI response formatting
   - **Step Dependencies**: Step 12
   - **User Instructions**: None
 
-## Template System
+## File Upload & Document Analysis (Integrated with Chat)
 
-- [ ] Step 14: Implement conversation templates functionality
+- [~] Step 14: Setup file upload infrastructure integrated with chat (Frontend Complete)
 
-  - **Task**: Create template management system with predefined templates and admin creation capabilities
-  - **Files**:
-    - `app/api/templates/route.ts`: Template CRUD endpoints
-    - `app/api/templates/[id]/route.ts`: Individual template operations
-    - `lib/services/template.ts`: Template service functions
-    - `hooks/use-templates.ts`: Template management hook
-    - `components/templates/template-grid.tsx`: Template selection grid
-    - `components/templates/template-card.tsx`: Individual template card
-    - `components/templates/template-form.tsx`: Template creation/edit form (admin)
-    - `app/(dashboard)/templates/page.tsx`: Templates page implementation
-    - `lib/data/default-templates.ts`: Default template data
+  - **Task**: Implement file upload system with validation and 10MB limit enforcement, integrated into chat interface
+  - **Completed Files**:
+    - `components/chat/file-upload.tsx`: File upload component within chat ✅
+    - `components/chat/file-attachment.tsx`: File attachment display in chat ✅
+    - `components/chat/file-list.tsx`: Uploaded files list in chat sidebar ✅
+    - `components/chat/enhanced-chat-interface.tsx`: Enhanced chat with file integration ✅
+    - `app/(dashboard)/chat/page.tsx`: Updated to use enhanced chat interface ✅
+    - Removed standalone files page and navigation references ✅
+  - **Still Needed**:
+    - `app/api/files/upload/route.ts`: Actual file upload API endpoint
+    - `app/api/files/[id]/route.ts`: File operations API
+    - `lib/services/file-upload.ts`: Backend file handling service
+    - `lib/utils/file-validation.ts`: Server-side file validation
+    - Real file storage implementation (Supabase Storage)
   - **Step Dependencies**: Step 13
-  - **User Instructions**: None
+  - **User Instructions**: Frontend complete - backend file storage and API endpoints still needed
 
-- [ ] Step 15: Integrate templates with chat interface
-  - **Task**: Allow users to start conversations from templates and implement template-based conversation initialization
-  - **Files**:
-    - `components/chat/template-starter.tsx`: Template-based conversation starter
-    - `components/templates/template-preview.tsx`: Template preview modal
-    - `lib/services/template-chat.ts`: Template-chat integration service
-    - `hooks/use-template-chat.ts`: Template chat functionality hook
-    - `app/(dashboard)/chat/new/[templateId]/page.tsx`: New conversation from template page
+- [~] Step 15: Implement document analysis within chat interface (Frontend Complete)
+  - **Task**: Add document processing, text extraction, and AI-powered analysis using Replicate, integrated into chat workflow
+  - **Completed Files**:
+    - `components/chat/enhanced-chat-interface.tsx`: File analysis simulation and attachment system ✅
+    - `components/chat/file-attachment.tsx`: Analysis status display and file management ✅
+    - Templates feature removed and file analyzer merged into chat menu ✅
+  - **Still Needed**:
+    - `app/api/files/analyze/route.ts`: Document analysis API endpoint
+    - `lib/services/document-analysis.ts`: Real document analysis service
+    - `lib/utils/text-extraction.ts`: Text extraction from various file types
+    - `lib/ai/document-ai.ts`: AI-powered document analysis using Replicate
+    - File processing dependencies: `npm install multer pdf-parse mammoth xlsx`
   - **Step Dependencies**: Step 14
-  - **User Instructions**: None
-
-## File Upload & Document Analysis
-
-- [ ] Step 16: Setup file upload infrastructure
-- [ ] Step 16: Setup file upload infrastructure
-
-  - **Task**: Implement file upload system with validation and 10MB limit enforcement
-  - **Files**:
-    - `app/api/files/upload/route.ts`: File upload endpoint
-    - `app/api/files/[id]/route.ts`: File operations endpoint
-    - `lib/services/file-upload.ts`: File upload service
-    - `lib/utils/file-validation.ts`: File validation utilities
-    - `components/files/file-upload.tsx`: File upload component
-    - `components/files/file-list.tsx`: Uploaded files display
-    - `components/files/file-item.tsx`: Individual file component
-    - `hooks/use-file-upload.ts`: File upload management hook
-    - `package.json`: Add file processing dependencies
-  - **Step Dependencies**: Step 15
-  - **User Instructions**: Install file processing: `npm install multer pdf-parse mammoth xlsx`, create uploads directory
-
-- [ ] Step 17: Implement document analysis capabilities
-  - **Task**: Add document processing, text extraction, and AI-powered analysis for uploaded files
-  - **Files**:
-    - `app/api/files/analyze/route.ts`: Document analysis endpoint
-    - `lib/services/document-analysis.ts`: Document analysis service
-    - `lib/utils/text-extraction.ts`: Text extraction utilities for different file types
-    - `lib/ai/document-ai.ts`: AI-powered document analysis
-    - `components/files/analysis-results.tsx`: Analysis results display
-    - `components/chat/file-attachment.tsx`: File attachment in chat
-    - `hooks/use-document-analysis.ts`: Document analysis hook
-    - `app/(dashboard)/files/page.tsx`: Files management page
-  - **Step Dependencies**: Step 16
-  - **User Instructions**: None
+  - **User Instructions**: Frontend UI complete - backend document processing and real AI analysis still needed
 
 ## Admin Dashboard & Analytics
 
-- [ ] Step 18: Build admin dashboard infrastructure
+- [ ] Step 16: Build admin dashboard infrastructure
 
   - **Task**: Create admin-only dashboard with navigation and access controls
   - **Files**:
     - `app/(admin)/dashboard/page.tsx`: Admin dashboard implementation
     - `app/(admin)/users/page.tsx`: User management page
-    - `app/(admin)/templates/page.tsx`: Template management page
     - `app/(admin)/analytics/page.tsx`: Analytics page
     - `components/admin/admin-nav.tsx`: Admin navigation
     - `components/admin/admin-stats.tsx`: Statistics display cards
     - `components/admin/user-table.tsx`: User management table
     - `components/admin/admin-guard.tsx`: Admin access wrapper
-  - **Step Dependencies**: Step 17
+  - **Step Dependencies**: Step 15
   - **User Instructions**: None
 
-- [ ] Step 19: Implement analytics and usage tracking
+- [ ] Step 17: Implement analytics and usage tracking
   - **Task**: Add usage analytics, popular topics tracking, and daily/monthly metrics collection
   - **Files**:
     - `app/api/admin/analytics/route.ts`: Analytics data endpoints
@@ -284,12 +253,12 @@
     - `components/admin/usage-metrics.tsx`: Usage metrics display
     - `hooks/use-analytics.ts`: Analytics data hook
     - `package.json`: Add chart dependencies
-  - **Step Dependencies**: Step 18
+  - **Step Dependencies**: Step 16
   - **User Instructions**: Install chart library: `npm install recharts`
 
 ## Polish & Optimization
 
-- [ ] Step 20: Implement responsive design and mobile optimization
+- [ ] Step 18: Implement responsive design and mobile optimization
 
   - **Task**: Ensure all components are fully responsive and work well on mobile devices
   - **Files**:
@@ -297,10 +266,10 @@
     - `components/mobile/mobile-chat.tsx`: Mobile-optimized chat interface
     - `components/shared/responsive-layout.tsx`: Responsive layout utilities
     - `styles/mobile.css`: Mobile-specific styles
-  - **Step Dependencies**: Step 19
+  - **Step Dependencies**: Step 17
   - **User Instructions**: None
 
-- [ ] Step 21: Add comprehensive error handling and loading states
+- [ ] Step 19: Add comprehensive error handling and loading states
 
   - **Task**: Implement comprehensive error handling, loading states, and user feedback mechanisms
   - **Files**:
@@ -311,14 +280,14 @@
     - `hooks/use-error-handler.ts`: Error handling hook
     - `app/error.tsx`: Global error page
     - `app/loading.tsx`: Global loading page
-  - **Step Dependencies**: Step 20
+  - **Step Dependencies**: Step 18
   - **User Instructions**: None
 
-- [ ] Step 22: Final integration testing and optimizations
+- [ ] Step 20: Final integration testing and optimizations
   - **Task**: Perform final testing, add performance optimizations, and ensure all features work together
   - **Files**:
     - `lib/utils/performance.ts`: Performance optimization utilities
     - `hooks/use-debounce.ts`: Debounce hook for search/input
     - `components/shared/meta-tags.tsx`: SEO meta tags component
-  - **Step Dependencies**: Step 21
+  - **Step Dependencies**: Step 19
   - **User Instructions**: Test application thoroughly, check all features work correctly

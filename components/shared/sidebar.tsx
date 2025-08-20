@@ -11,8 +11,6 @@ import {
   Bot,
   MessageSquare,
   FileText,
-  Upload,
-  BookTemplate,
   Settings,
   BarChart3,
   Users,
@@ -43,16 +41,7 @@ const navigationItems: NavItem[] = [
     href: "/chat",
     icon: MessageSquare,
   },
-  {
-    title: "Templates",
-    href: "/templates",
-    icon: BookTemplate,
-  },
-  {
-    title: "Files",
-    href: "/files",
-    icon: Upload,
-  },
+
   {
     title: "Settings",
     href: "/settings",
@@ -73,12 +62,7 @@ const adminItems: NavItem[] = [
     icon: Users,
     adminOnly: true,
   },
-  {
-    title: "Template Management",
-    href: "/admin/templates",
-    icon: FileText,
-    adminOnly: true,
-  },
+
   {
     title: "Analytics",
     href: "/admin/analytics",

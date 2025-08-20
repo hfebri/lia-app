@@ -1,7 +1,6 @@
 // Export all schemas
 export * from "./users";
 export * from "./conversations";
-export * from "./templates";
 export * from "./files";
 export * from "./analytics";
 
@@ -13,7 +12,6 @@ import {
   conversationsRelations,
   messagesRelations,
 } from "./conversations";
-import { templates, templatesRelations } from "./templates";
 import { files, filesRelations } from "./files";
 import { analytics, dailyMetrics, analyticsRelations } from "./analytics";
 
@@ -22,7 +20,6 @@ export const schema = {
   users,
   conversations,
   messages,
-  templates,
   files,
   analytics,
   dailyMetrics,
@@ -31,7 +28,6 @@ export const schema = {
   usersRelations,
   conversationsRelations,
   messagesRelations,
-  templatesRelations,
   filesRelations,
   analyticsRelations,
 };

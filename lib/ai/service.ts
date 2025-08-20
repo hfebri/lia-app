@@ -10,6 +10,7 @@ import type {
 } from "./types";
 
 import { ReplicateProvider } from "./providers/replicate";
+import { MockProvider } from "./providers/mock";
 
 export class AIService {
   private providers: Map<string, AIProvider> = new Map();
@@ -41,6 +42,13 @@ export class AIService {
       } catch (error) {
         console.error("❌ Failed to initialize Replicate provider:", error);
       }
+    } else {
+      // Initialize mock provider for testing when no API key is available
+      console.log(
+        "🧪 No REPLICATE_API_TOKEN found, initializing mock provider for testing"
+      );
+      const mockProvider = new MockProvider();
+      this.providers.set("replicate", mockProvider);
     }
   }
 

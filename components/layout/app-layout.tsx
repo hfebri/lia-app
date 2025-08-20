@@ -5,7 +5,14 @@ import { Header } from "@/components/shared/header";
 import { Sidebar } from "@/components/shared/sidebar";
 import { Footer } from "@/components/shared/footer";
 import { ErrorBoundary } from "@/components/shared/error-boundary";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/components/auth/auth-provider";
 import { LoadingPage } from "@/components/shared/loading";
@@ -54,6 +61,13 @@ export function AppLayout({
           {showSidebar && (
             <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
               <SheetContent side="left" className="p-0 w-64">
+                <SheetHeader className="sr-only">
+                  <SheetTitle>Navigation Menu</SheetTitle>
+                  <SheetDescription>
+                    Mobile navigation sidebar for accessing different sections
+                    of the application.
+                  </SheetDescription>
+                </SheetHeader>
                 <Sidebar />
               </SheetContent>
             </Sheet>

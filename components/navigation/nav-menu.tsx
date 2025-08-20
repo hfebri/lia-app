@@ -105,16 +105,6 @@ export const defaultNavSections: NavMenuSection[] = [
         href: "/chat",
         description: "AI-powered conversations",
       },
-      {
-        title: "Templates",
-        href: "/templates",
-        description: "Pre-built conversation starters",
-      },
-      {
-        title: "File Upload",
-        href: "/files",
-        description: "Document analysis and processing",
-      },
     ],
   },
   {

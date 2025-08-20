@@ -53,18 +53,6 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
           >
             Chat
           </Link>
-          <Link
-            href="/templates"
-            className="transition-colors hover:text-foreground/80 text-foreground/60"
-          >
-            Templates
-          </Link>
-          <Link
-            href="/files"
-            className="transition-colors hover:text-foreground/80 text-foreground/60"
-          >
-            Files
-          </Link>
         </nav>
 
         {/* Right side - User menu */}
