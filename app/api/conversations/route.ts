@@ -66,11 +66,10 @@ export async function POST(request: NextRequest) {
     const userId = session?.user?.id || "12345678-1234-1234-1234-123456789abc";
 
     const body = await request.json();
-    const { title, templateId, initialMessage } = body;
+    const { title, initialMessage } = body;
 
     const conversation = await ConversationService.createConversation(userId, {
       title,
-      templateId,
       initialMessage,
     });
 

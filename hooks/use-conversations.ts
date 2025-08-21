@@ -95,7 +95,6 @@ export function useConversations() {
     async (
       params: {
         title?: string;
-        templateId?: string;
         initialMessage?: string;
       } = {}
     ) => {

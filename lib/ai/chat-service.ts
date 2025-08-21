@@ -172,9 +172,20 @@ export class ChatService {
               const content = parsed.content || "";
               const isComplete = parsed.isComplete || false;
 
-              if (content.trim() || isComplete) {
+              // Filter out empty content and content that's just "{}"
+              const trimmedContent = content.trim();
+              const shouldYield =
+                (trimmedContent &&
+                  trimmedContent !== "{}" &&
+                  trimmedContent !== '""') ||
+                isComplete;
+
+              if (shouldYield) {
                 yield {
-                  content,
+                  content:
+                    trimmedContent === "{}" || trimmedContent === '""'
+                      ? ""
+                      : content,
                   isComplete,
                   usage: parsed.usage,
                 };

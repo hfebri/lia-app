@@ -35,7 +35,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (response.ok) {
           const userData = await response.json();
-          console.log("User data fetched:", userData);
           setUser(userData);
         } else {
           console.error("Failed to fetch user profile", response.status);
@@ -87,8 +86,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("Auth state change:", event, session?.user?.email);
-
       setSession(session);
 
       if (session?.user) {

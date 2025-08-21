@@ -99,8 +99,14 @@ export class ReplicateProvider implements AIProvider {
         if (event.data) {
           const chunk = String(event.data);
 
-          // Only yield if chunk has actual content
-          if (chunk.trim()) {
+          // Filter out empty chunks and chunks that are just "{}"
+          const trimmedChunk = chunk.trim();
+          if (
+            trimmedChunk &&
+            trimmedChunk !== "{}" &&
+            trimmedChunk !== '""' &&
+            trimmedChunk !== "null"
+          ) {
             accumulatedContent += chunk;
 
             yield {

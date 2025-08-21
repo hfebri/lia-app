@@ -51,7 +51,7 @@ export class ConversationService {
     userId: string,
     params: CreateConversationParams = {}
   ): Promise<Conversation> {
-    const { title, templateId, initialMessage } = params;
+    const { title, initialMessage } = params;
 
     const conversationData: NewConversation = {
       userId,
@@ -60,9 +60,8 @@ export class ConversationService {
         (initialMessage
           ? generateConversationTitle(initialMessage)
           : "New Conversation"),
-      templateId: templateId || null,
       aiModel: "gpt-3.5-turbo", // Default model
-      metadata: templateId ? { template: templateId } : null,
+      metadata: null,
     };
 
     const conversation = await dbCreateConversation(conversationData);
