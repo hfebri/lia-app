@@ -7,23 +7,14 @@ import { ModelSelector } from "./model-selector";
 import { StreamingMessage } from "./streaming-message";
 import { AIResponse } from "./ai-response";
 import { MessageItem } from "./message-item";
-import { FileUpload } from "./file-upload";
 import { FileAttachment } from "./file-attachment";
-import { FileList } from "./file-list";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 import {
   Brain,
   Send,
@@ -50,7 +41,7 @@ export function EnhancedChatInterface({
   const [inputValue, setInputValue] = useState("");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [attachedFiles, setAttachedFiles] = useState<FileItem[]>([]);
-  const [showFileUpload, setShowFileUpload] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
 
   // Use real file upload hook
   const {
@@ -146,9 +137,44 @@ export function EnhancedChatInterface({
       });
 
       setSelectedFiles([]);
-      setShowFileUpload(false);
     } catch (error) {
       console.error("File upload failed:", error);
+    }
+  };
+
+  // Drag and drop handlers
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+
+    const files = Array.from(e.dataTransfer.files).filter((file) => {
+      const allowedTypes = [
+        ".pdf",
+        ".doc",
+        ".docx",
+        ".txt",
+        ".rtf",
+        ".xls",
+        ".xlsx",
+        ".csv",
+      ];
+      return allowedTypes.some((type) =>
+        file.name.toLowerCase().endsWith(type)
+      );
+    });
+
+    if (files.length > 0) {
+      setSelectedFiles((prev) => [...prev, ...files]);
     }
   };
 
@@ -190,7 +216,27 @@ export function EnhancedChatInterface({
   }, [fileError]);
 
   return (
-    <div className={cn("flex h-full", className)}>
+    <div
+      className={cn("flex h-full relative", className)}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {/* Drag Overlay */}
+      {isDragOver && (
+        <div className="absolute inset-0 z-50 bg-blue-50/90 dark:bg-blue-950/90 flex items-center justify-center border-2 border-dashed border-blue-500 rounded-lg">
+          <div className="text-center">
+            <Upload className="h-12 w-12 text-blue-500 mx-auto mb-4" />
+            <p className="text-lg font-medium text-blue-700 dark:text-blue-300">
+              Drop files here to upload
+            </p>
+            <p className="text-sm text-blue-600 dark:text-blue-400">
+              Supports PDF, Word, Excel, and text files
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col">
         {/* Header */}
@@ -224,55 +270,6 @@ export function EnhancedChatInterface({
                 disabled={isLoading || isStreaming}
               />
 
-              <Sheet>
-                <SheetTrigger asChild>
-                  <Button variant="outline" size="sm">
-                    <FileText className="mr-1 h-4 w-4" />
-                    Files ({uploadedFiles.length})
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="right" className="w-96">
-                  <SheetHeader>
-                    <SheetTitle>File Management</SheetTitle>
-                  </SheetHeader>
-                  <div className="mt-4">
-                    <Tabs defaultValue="uploaded" className="h-full">
-                      <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="uploaded">Files</TabsTrigger>
-                        <TabsTrigger value="upload">Upload</TabsTrigger>
-                      </TabsList>
-                      <TabsContent value="uploaded" className="mt-4">
-                        <FileList
-                          files={uploadedFiles}
-                          onFileSelect={handleFileAttach}
-                          onFileAnalyze={analyzeFile}
-                          onFileDelete={deleteFile}
-                          onUploadClick={() => setShowFileUpload(true)}
-                        />
-                      </TabsContent>
-                      <TabsContent value="upload" className="mt-4">
-                        <div className="space-y-4">
-                          <FileUpload
-                            selectedFiles={selectedFiles}
-                            onFileSelect={handleFileSelect}
-                            onFileRemove={handleFileRemove}
-                          />
-                          {selectedFiles.length > 0 && (
-                            <Button
-                              onClick={handleFileUpload}
-                              className="w-full"
-                            >
-                              <Upload className="mr-2 h-4 w-4" />
-                              Upload {selectedFiles.length} file(s)
-                            </Button>
-                          )}
-                        </div>
-                      </TabsContent>
-                    </Tabs>
-                  </div>
-                </SheetContent>
-              </Sheet>
-
               {hasMessages && (
                 <Button
                   variant="outline"
@@ -299,19 +296,9 @@ export function EnhancedChatInterface({
                       Start a conversation
                     </h3>
                     <p className="text-muted-foreground mb-4">
-                      Ask questions, upload files for analysis, or start typing
-                      below
+                      Ask questions, upload files for analysis using the
+                      paperclip button, or start typing below
                     </p>
-                    <div className="flex items-center justify-center space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setShowFileUpload(true)}
-                      >
-                        <Upload className="mr-1 h-4 w-4" />
-                        Upload File
-                      </Button>
-                    </div>
                   </div>
                 </div>
               ) : (
@@ -360,82 +347,123 @@ export function EnhancedChatInterface({
             )}
 
             {/* Input Row */}
-            <div className="flex items-end space-x-2">
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => setShowFileUpload(true)}
-                disabled={isLoading || isStreaming}
-                className="shrink-0"
-              >
-                <Paperclip className="h-4 w-4" />
-              </Button>
+            <div className="space-y-3">
+              {/* Uploaded Files Preview */}
+              {selectedFiles.length > 0 && (
+                <div className="flex flex-wrap gap-2 px-4">
+                  {selectedFiles.map((file, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center gap-2 bg-background border border-border rounded-lg px-3 py-2 text-sm"
+                    >
+                      <FileText className="h-4 w-4 text-muted-foreground" />
+                      <span className="max-w-32 truncate">{file.name}</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleFileRemove(index)}
+                        className="h-5 w-5 p-0 hover:bg-destructive/10 hover:text-destructive"
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                  {selectedFiles.length > 0 && (
+                    <Button
+                      onClick={handleFileUpload}
+                      size="sm"
+                      className="h-8 px-3 text-xs"
+                      disabled={isUploading}
+                    >
+                      {isUploading ? (
+                        <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                      ) : (
+                        <Upload className="h-3 w-3 mr-1" />
+                      )}
+                      Upload {selectedFiles.length} file
+                      {selectedFiles.length > 1 ? "s" : ""}
+                    </Button>
+                  )}
+                </div>
+              )}
 
-              <div className="flex-1">
-                <Input
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  onKeyDown={handleKeyPress}
-                  placeholder="Type your message..."
-                  disabled={isLoading || isStreaming}
-                  className="min-h-[40px]"
+              {/* Chat Input */}
+              <div className="flex items-end gap-3 p-4 bg-muted/30 rounded-xl border border-border/60 shadow-sm transition-all duration-200 focus-within:shadow-md focus-within:border-border">
+                <input
+                  type="file"
+                  ref={(ref) => {
+                    if (ref) {
+                      ref.style.display = "none";
+                      ref.onchange = (e) => {
+                        const target = e.target as HTMLInputElement;
+                        if (target.files) {
+                          const newFiles = Array.from(target.files);
+                          setSelectedFiles((prev) => [...prev, ...newFiles]);
+                          target.value = ""; // Reset input
+                        }
+                      };
+                    }
+                  }}
+                  multiple
+                  accept=".pdf,.doc,.docx,.txt,.rtf,.xls,.xlsx,.csv"
                 />
-              </div>
-
-              {isStreaming ? (
                 <Button
-                  onClick={stopStreaming}
-                  variant="destructive"
+                  variant="ghost"
                   size="icon"
-                  className="shrink-0"
+                  onClick={() => {
+                    const input = document.querySelector(
+                      'input[type="file"]'
+                    ) as HTMLInputElement;
+                    input?.click();
+                  }}
+                  disabled={isLoading || isStreaming}
+                  className="shrink-0 h-10 w-10 hover:bg-background/80 transition-colors"
                 >
-                  <Square className="h-4 w-4" />
+                  <Paperclip className="h-4 w-4 text-muted-foreground" />
                 </Button>
-              ) : (
+
+                <div className="flex-1 min-w-0">
+                  <Input
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    onKeyDown={handleKeyPress}
+                    placeholder="Type your message..."
+                    disabled={isLoading || isStreaming}
+                    className="border-0 bg-transparent text-sm placeholder:text-muted-foreground focus-visible:ring-0 shadow-none px-0 min-h-[40px]"
+                  />
+                </div>
+
                 <Button
-                  onClick={handleSendMessage}
+                  onClick={isStreaming ? stopStreaming : handleSendMessage}
                   disabled={
-                    (!inputValue.trim() && attachedFiles.length === 0) ||
-                    !canSend
+                    !isStreaming &&
+                    ((!inputValue.trim() && attachedFiles.length === 0) ||
+                      !canSend)
                   }
                   size="icon"
-                  className="shrink-0"
+                  className={cn(
+                    "shrink-0 h-10 w-10 transition-all duration-200",
+                    isStreaming
+                      ? "bg-destructive hover:bg-destructive/90 text-white"
+                      : (!inputValue.trim() && attachedFiles.length === 0) ||
+                        !canSend
+                      ? "bg-muted text-muted-foreground hover:bg-muted"
+                      : "bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg"
+                  )}
                 >
-                  {isLoading ? (
+                  {isStreaming ? (
+                    <Square className="h-4 w-4" />
+                  ) : isLoading ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <Send className="h-4 w-4" />
                   )}
                 </Button>
-              )}
+              </div>
             </div>
           </div>
         </div>
       </div>
-
-      {/* File Upload Sheet */}
-      {showFileUpload && (
-        <Sheet open={showFileUpload} onOpenChange={setShowFileUpload}>
-          <SheetContent side="right" className="w-96">
-            <SheetHeader>
-              <SheetTitle>Upload Files</SheetTitle>
-            </SheetHeader>
-            <div className="mt-4 space-y-4">
-              <FileUpload
-                selectedFiles={selectedFiles}
-                onFileSelect={handleFileSelect}
-                onFileRemove={handleFileRemove}
-              />
-              {selectedFiles.length > 0 && (
-                <Button onClick={handleFileUpload} className="w-full">
-                  <Upload className="mr-2 h-4 w-4" />
-                  Upload {selectedFiles.length} file(s)
-                </Button>
-              )}
-            </div>
-          </SheetContent>
-        </Sheet>
-      )}
     </div>
   );
 }

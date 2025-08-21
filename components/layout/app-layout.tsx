@@ -14,7 +14,7 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/components/auth/auth-provider";
+import { useAuth } from "@/hooks/use-auth";
 import { LoadingPage } from "@/components/shared/loading";
 import { cn } from "@/lib/utils";
 import { Bot, Menu } from "lucide-react";

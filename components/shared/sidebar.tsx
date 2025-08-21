@@ -3,10 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { useAuth } from "@/components/auth/auth-provider";
+import { useAuth } from "@/hooks/use-auth";
+import { useConversations } from "@/hooks/use-conversations";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Bot,
   MessageSquare,
@@ -16,6 +18,8 @@ import {
   Users,
   Shield,
   Home,
+  Plus,
+  Clock,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -32,20 +36,14 @@ interface NavItem {
 
 const navigationItems: NavItem[] = [
   {
-    title: "Home",
+    title: "Dashboard",
     href: "/",
-    icon: Home,
+    icon: BarChart3,
   },
   {
     title: "Chat",
     href: "/chat",
     icon: MessageSquare,
-  },
-
-  {
-    title: "Settings",
-    href: "/settings",
-    icon: Settings,
   },
 ];
 
@@ -74,10 +72,26 @@ const adminItems: NavItem[] = [
 export function Sidebar({ className }: SidebarProps) {
   const pathname = usePathname();
   const { user } = useAuth();
+  const { conversations, createConversation, isLoading } = useConversations();
 
   // Helper function to check user role
   const hasRole = (role: string) => {
     return user?.role === role;
+  };
+
+  // Create new conversation
+  const handleNewChat = async () => {
+    try {
+      const newConversation = await createConversation({
+        title: "New Chat",
+      });
+      if (newConversation) {
+        // Navigate to the new conversation
+        window.location.href = `/chat?conversation=${newConversation.id}`;
+      }
+    } catch (error) {
+      console.error("Failed to create new conversation:", error);
+    }
   };
 
   return (
@@ -121,6 +135,72 @@ export function Sidebar({ className }: SidebarProps) {
               );
             })}
           </div>
+        </div>
+
+        {/* Chat History */}
+        <div className="px-3 py-2">
+          <div className="flex items-center justify-between mb-2 px-4">
+            <h2 className="text-lg font-semibold tracking-tight">
+              Chat History
+            </h2>
+            <Button
+              onClick={handleNewChat}
+              size="sm"
+              variant="ghost"
+              className="h-8 w-8 p-0"
+              disabled={isLoading}
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
+
+          <ScrollArea className="h-48">
+            <div className="space-y-1">
+              {conversations.length === 0 ? (
+                <div className="px-4 py-8 text-center">
+                  <MessageSquare className="h-8 w-8 mx-auto mb-2 text-muted-foreground/40" />
+                  <p className="text-sm text-muted-foreground">
+                    No conversations yet
+                  </p>
+                  <Button
+                    onClick={handleNewChat}
+                    size="sm"
+                    variant="outline"
+                    className="mt-2"
+                    disabled={isLoading}
+                  >
+                    <Plus className="h-3 w-3 mr-1" />
+                    Start Chat
+                  </Button>
+                </div>
+              ) : (
+                conversations.slice(0, 10).map((conversation) => (
+                  <Button
+                    key={conversation.id}
+                    variant="ghost"
+                    className="w-full justify-start h-auto p-2 text-left"
+                    asChild
+                  >
+                    <Link href={`/chat?conversation=${conversation.id}`}>
+                      <div className="flex items-start gap-2 w-full">
+                        <Clock className="h-3 w-3 mt-1 text-muted-foreground flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">
+                            {conversation.title || "Untitled Chat"}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(
+                              conversation.createdAt
+                            ).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                    </Link>
+                  </Button>
+                ))
+              )}
+            </div>
+          </ScrollArea>
         </div>
 
         {/* Admin Section */}

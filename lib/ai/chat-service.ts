@@ -61,7 +61,6 @@ export class ChatService {
       temperature = 0.7,
       maxTokens = 1000,
     } = options;
-
     // Convert messages to AI format
     const aiMessages: AIMessage[] = messages.map((msg) => ({
       role: msg.role,
@@ -169,13 +168,19 @@ export class ChatService {
                 throw new Error(parsed.error);
               }
 
-              yield {
-                content: parsed.content || "",
-                isComplete: parsed.isComplete || false,
-                usage: parsed.usage,
-              };
+              // Only yield if there's actual content or if it's the completion marker
+              const content = parsed.content || "";
+              const isComplete = parsed.isComplete || false;
 
-              if (parsed.isComplete) {
+              if (content.trim() || isComplete) {
+                yield {
+                  content,
+                  isComplete,
+                  usage: parsed.usage,
+                };
+              }
+
+              if (isComplete) {
                 return;
               }
             } catch (parseError) {

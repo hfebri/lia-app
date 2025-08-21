@@ -1,6 +1,4 @@
-import pdf from "pdf-parse";
-import mammoth from "mammoth";
-import * as XLSX from "xlsx";
+// Use dynamic imports to avoid module load-time errors
 
 export interface TextExtractionResult {
   success: boolean;
@@ -65,7 +63,8 @@ export async function extractTextFromFile(
  */
 async function extractFromPDF(buffer: Buffer): Promise<TextExtractionResult> {
   try {
-    const data = await pdf(buffer);
+    const pdf = await import("pdf-parse");
+    const data = await pdf.default(buffer);
 
     const text = data.text.trim();
     const wordCount = text
@@ -101,6 +100,7 @@ async function extractFromPDF(buffer: Buffer): Promise<TextExtractionResult> {
  */
 async function extractFromWord(buffer: Buffer): Promise<TextExtractionResult> {
   try {
+    const mammoth = await import("mammoth");
     const result = await mammoth.extractRawText({ buffer });
 
     const text = result.value.trim();
@@ -131,6 +131,7 @@ async function extractFromWord(buffer: Buffer): Promise<TextExtractionResult> {
  */
 async function extractFromExcel(buffer: Buffer): Promise<TextExtractionResult> {
   try {
+    const XLSX = await import("xlsx");
     const workbook = XLSX.read(buffer, { type: "buffer" });
     const textParts: string[] = [];
 

@@ -38,15 +38,19 @@ export function MessageItem({
 
   return (
     <div
-      className={cn("flex gap-3 p-4", isUser ? "flex-row-reverse" : "flex-row")}
+      className={cn(
+        "flex gap-3 p-4 group hover:bg-muted/30 transition-colors duration-200",
+        isUser ? "flex-row-reverse" : "flex-row"
+      )}
     >
       {/* Avatar */}
-      <Avatar className="h-8 w-8 shrink-0">
+      <Avatar className="h-8 w-8 shrink-0 ring-2 ring-background shadow-sm">
         <AvatarFallback
           className={cn(
+            "font-medium transition-colors",
             isUser
-              ? "bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300"
-              : "bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-300"
+              ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white"
+              : "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white"
           )}
         >
           {isUser ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
@@ -57,57 +61,82 @@ export function MessageItem({
       {/* Message Content */}
       <div
         className={cn(
-          "flex flex-col gap-2 max-w-[80%]",
+          "flex flex-col gap-1 max-w-[75%] min-w-0",
           isUser ? "items-end" : "items-start"
         )}
       >
         {/* Message Bubble */}
-        <Card
+        <div
           className={cn(
-            "relative",
+            "relative rounded-2xl px-4 py-3 shadow-sm transition-all duration-200 hover:shadow-md",
+            "before:absolute before:inset-0 before:rounded-2xl before:ring-1 before:ring-inset before:ring-white/10",
             isUser
-              ? "bg-blue-600 text-white border-blue-600"
-              : "bg-muted border-border",
+              ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-br-md"
+              : "bg-background border border-border/60 text-foreground rounded-bl-md",
             isStreaming && "animate-pulse"
           )}
         >
-          <CardContent className="p-3">
-            <div className="text-sm whitespace-pre-wrap break-words">
-              {message.content}
-              {isStreaming && (
-                <span className="inline-block w-2 h-4 ml-1 bg-current animate-pulse" />
-              )}
-            </div>
-          </CardContent>
-        </Card>
+          {/* Message tail */}
+          <div
+            className={cn(
+              "absolute top-4 w-3 h-3 transform rotate-45",
+              isUser
+                ? "-right-1 bg-gradient-to-br from-blue-500 to-blue-600"
+                : "-left-1 bg-background border-l border-b border-border/60"
+            )}
+          />
+
+          <div className="relative text-sm leading-relaxed whitespace-pre-wrap break-words">
+            {message.content}
+            {isStreaming && (
+              <span className="inline-flex items-center ml-2">
+                <span className="w-1 h-1 bg-current rounded-full animate-pulse" />
+                <span
+                  className="w-1 h-1 bg-current rounded-full animate-pulse ml-1"
+                  style={{ animationDelay: "0.2s" }}
+                />
+                <span
+                  className="w-1 h-1 bg-current rounded-full animate-pulse ml-1"
+                  style={{ animationDelay: "0.4s" }}
+                />
+              </span>
+            )}
+          </div>
+        </div>
 
         {/* Message Metadata */}
         <div
           className={cn(
-            "flex items-center gap-2 text-xs text-muted-foreground",
+            "flex items-center gap-2 mt-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200",
             isUser ? "flex-row-reverse" : "flex-row"
           )}
         >
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
             <Clock className="h-3 w-3" />
             <span>{formatTime(message.timestamp)}</span>
           </div>
 
           {message.metadata?.model && (
-            <Badge variant="outline" className="text-xs">
-              {message.metadata.model}
+            <Badge
+              variant="secondary"
+              className="text-xs px-2 py-0.5 font-medium"
+            >
+              {message.metadata.model.split("/").pop()}
             </Badge>
           )}
 
           {message.metadata?.tokens && (
-            <Badge variant="outline" className="text-xs">
-              {message.metadata.tokens} tokens
+            <Badge variant="outline" className="text-xs px-2 py-0.5">
+              {message.metadata.tokens}
             </Badge>
           )}
 
           {isStreaming && (
-            <Badge variant="outline" className="text-xs animate-pulse">
-              Typing...
+            <Badge variant="secondary" className="text-xs animate-pulse">
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 bg-current rounded-full animate-bounce" />
+                Typing
+              </div>
             </Badge>
           )}
         </div>

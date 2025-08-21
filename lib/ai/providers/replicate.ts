@@ -98,25 +98,31 @@ export class ReplicateProvider implements AIProvider {
       for await (const event of stream) {
         if (event.data) {
           const chunk = String(event.data);
-          accumulatedContent += chunk;
 
-          yield {
-            content: chunk,
-            isComplete: false,
-          };
+          // Only yield if chunk has actual content
+          if (chunk.trim()) {
+            accumulatedContent += chunk;
+
+            yield {
+              content: chunk,
+              isComplete: false,
+            };
+          }
         }
       }
 
-      // Final chunk
-      yield {
-        content: "",
-        isComplete: true,
-        usage: {
-          prompt_tokens: 0,
-          completion_tokens: 0,
-          total_tokens: 0,
-        },
-      };
+      // Final chunk with actual final content (no empty content)
+      if (accumulatedContent.trim()) {
+        yield {
+          content: "",
+          isComplete: true,
+          usage: {
+            prompt_tokens: 0,
+            completion_tokens: 0,
+            total_tokens: 0,
+          },
+        };
+      }
     } catch (error) {
       console.error("Replicate streaming error:", error);
       throw this.handleError(error, options.model);

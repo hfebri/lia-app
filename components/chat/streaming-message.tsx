@@ -67,56 +67,81 @@ export function StreamingMessage({
   }, [content, displayedContent.length]);
 
   return (
-    <div className={cn("flex space-x-3 group", className)}>
+    <div
+      className={cn(
+        "flex gap-3 p-4 group hover:bg-muted/30 transition-colors duration-200",
+        className
+      )}
+    >
       {/* AI Avatar */}
-      <div className="flex-shrink-0">
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-accent">
+      <div className="h-8 w-8 shrink-0 ring-2 ring-background shadow-sm rounded-full overflow-hidden">
+        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-emerald-500 to-emerald-600 text-white">
           {getModelIcon(model)}
         </div>
       </div>
 
       {/* Message Content */}
-      <div className="flex-1 space-y-2 overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center space-x-2">
-          <span className="text-sm font-medium">{getModelName(model)}</span>
+      <div className="flex flex-col gap-1 max-w-[75%] min-w-0 items-start">
+        {/* Message Bubble */}
+        <div className="relative rounded-2xl rounded-bl-md px-4 py-3 bg-background border border-border/60 text-foreground shadow-sm transition-all duration-200 hover:shadow-md">
+          {/* Message tail */}
+          <div className="absolute top-4 -left-1 w-3 h-3 transform rotate-45 bg-background border-l border-b border-border/60" />
+
+          <div className="relative text-sm leading-relaxed whitespace-pre-wrap break-words">
+            {displayedContent}
+            {isStreaming && (
+              <span className="inline-flex items-center ml-2">
+                <span className="w-1 h-1 bg-current rounded-full animate-pulse" />
+                <span
+                  className="w-1 h-1 bg-current rounded-full animate-pulse ml-1"
+                  style={{ animationDelay: "0.2s" }}
+                />
+                <span
+                  className="w-1 h-1 bg-current rounded-full animate-pulse ml-1"
+                  style={{ animationDelay: "0.4s" }}
+                />
+              </span>
+            )}
+          </div>
+
+          {/* Actions inline with message when streaming */}
+          {isStreaming && onStop && (
+            <div className="flex items-center gap-2 mt-3 pt-2 border-t border-border/30">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onStop}
+                className="h-7 px-3 text-xs hover:bg-muted/60"
+              >
+                <Square className="h-3 w-3 mr-1" />
+                Stop generating
+              </Button>
+            </div>
+          )}
+        </div>
+
+        {/* Message Metadata */}
+        <div className="flex items-center gap-2 mt-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            {getModelIcon(model)}
+            <span>{getModelName(model)}</span>
+          </div>
+
           {isStreaming && (
-            <Badge variant="secondary" className="text-xs">
-              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-              Generating...
+            <Badge variant="secondary" className="text-xs animate-pulse">
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 bg-current rounded-full animate-bounce" />
+                Generating
+              </div>
             </Badge>
           )}
+
           {!isStreaming && content && (
             <Badge variant="outline" className="text-xs">
               Complete
             </Badge>
           )}
         </div>
-
-        {/* Message Content */}
-        <div className="prose prose-sm max-w-none dark:prose-invert">
-          <div className="whitespace-pre-wrap break-words">
-            {displayedContent}
-            {isStreaming && (
-              <span className="inline-block w-2 h-5 bg-current animate-pulse ml-1" />
-            )}
-          </div>
-        </div>
-
-        {/* Actions */}
-        {isStreaming && onStop && (
-          <div className="flex items-center space-x-2 pt-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onStop}
-              className="h-7 px-2 text-xs"
-            >
-              <Square className="h-3 w-3 mr-1" />
-              Stop
-            </Button>
-          </div>
-        )}
       </div>
     </div>
   );

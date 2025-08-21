@@ -24,7 +24,6 @@ export const conversations = pgTable("conversations", {
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   title: varchar("title", { length: 255 }).notNull(),
-  templateId: uuid("template_id").references(() => templates.id),
   aiModel: varchar("ai_model", { length: 100 }).notNull().default("gpt-4"),
   metadata: jsonb("metadata"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -55,10 +54,6 @@ export const conversationsRelations = relations(
       fields: [conversations.userId],
       references: [users.id],
     }),
-    template: one(templates, {
-      fields: [conversations.templateId],
-      references: [templates.id],
-    }),
     messages: many(messages),
   })
 );
@@ -74,6 +69,3 @@ export const messagesRelations = relations(messages, ({ one }) => ({
     references: [users.id],
   }),
 }));
-
-// Import templates for relations
-import { templates } from "./templates";

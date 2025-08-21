@@ -1,6 +1,6 @@
 import { eq, desc, asc, count, and, sql } from "drizzle-orm";
 import { db } from "../../../db/db";
-import { conversations, messages, users, templates } from "../../../db/schema";
+import { conversations, messages, users } from "../../../db/schema";
 import type {
   Conversation,
   NewConversation,
@@ -29,7 +29,6 @@ export async function getConversationWithMessages(
     where: eq(conversations.id, id),
     with: {
       user: true,
-      template: true,
       messages: {
         orderBy: [asc(messages.createdAt)],
       },
@@ -140,7 +139,6 @@ export async function getConversationsWithLastMessage(
       id: conversations.id,
       userId: conversations.userId,
       title: conversations.title,
-      templateId: conversations.templateId,
       aiModel: conversations.aiModel,
       metadata: conversations.metadata,
       createdAt: conversations.createdAt,
@@ -154,7 +152,6 @@ export async function getConversationsWithLastMessage(
       conversations.id,
       conversations.userId,
       conversations.title,
-      conversations.templateId,
       conversations.aiModel,
       conversations.metadata,
       conversations.createdAt,
@@ -238,7 +235,6 @@ export async function getRecentConversations(
     orderBy: [desc(conversations.createdAt)],
     with: {
       user: true,
-      template: true,
       messages: {
         limit: 1,
         orderBy: [desc(messages.createdAt)],
