@@ -91,7 +91,15 @@ export function DashboardOverview() {
               {stats.totalConversations.toLocaleString()}
             </div>
             <p className="text-xs text-muted-foreground flex items-center">
-              <span className={`font-medium ${trends.conversations.startsWith('+') ? 'text-green-600' : trends.conversations.startsWith('-') ? 'text-red-600' : 'text-muted-foreground'}`}>
+              <span
+                className={`font-medium ${
+                  trends.conversations.startsWith("+")
+                    ? "text-green-600"
+                    : trends.conversations.startsWith("-")
+                    ? "text-red-600"
+                    : "text-muted-foreground"
+                }`}
+              >
                 {trends.conversations}
               </span>
               <span className="ml-1">from last month</span>
@@ -111,7 +119,15 @@ export function DashboardOverview() {
               {stats.totalMessages.toLocaleString()}
             </div>
             <p className="text-xs text-muted-foreground flex items-center">
-              <span className={`font-medium ${trends.messages.startsWith('+') ? 'text-green-600' : trends.messages.startsWith('-') ? 'text-red-600' : 'text-muted-foreground'}`}>
+              <span
+                className={`font-medium ${
+                  trends.messages.startsWith("+")
+                    ? "text-green-600"
+                    : trends.messages.startsWith("-")
+                    ? "text-red-600"
+                    : "text-muted-foreground"
+                }`}
+              >
                 {trends.messages}
               </span>
               <span className="ml-1">from last month</span>
@@ -131,7 +147,15 @@ export function DashboardOverview() {
               {stats.filesProcessed.toLocaleString()}
             </div>
             <p className="text-xs text-muted-foreground flex items-center">
-              <span className={`font-medium ${trends.files.startsWith('+') ? 'text-green-600' : trends.files.startsWith('-') ? 'text-red-600' : 'text-muted-foreground'}`}>
+              <span
+                className={`font-medium ${
+                  trends.files.startsWith("+")
+                    ? "text-green-600"
+                    : trends.files.startsWith("-")
+                    ? "text-red-600"
+                    : "text-muted-foreground"
+                }`}
+              >
                 {trends.files}
               </span>
               <span className="ml-1">from last month</span>
@@ -151,7 +175,15 @@ export function DashboardOverview() {
               {stats.averageResponseTime}
             </div>
             <p className="text-xs text-muted-foreground flex items-center">
-              <span className={`font-medium ${trends.responseTime.startsWith('+') ? 'text-red-600' : trends.responseTime.startsWith('-') ? 'text-green-600' : 'text-muted-foreground'}`}>
+              <span
+                className={`font-medium ${
+                  trends.responseTime.startsWith("+")
+                    ? "text-red-600"
+                    : trends.responseTime.startsWith("-")
+                    ? "text-green-600"
+                    : "text-muted-foreground"
+                }`}
+              >
                 {trends.responseTime}
               </span>
               <span className="ml-1">from last month</span>
@@ -159,7 +191,6 @@ export function DashboardOverview() {
           </CardContent>
         </Card>
       </div>
-
 
       {/* Charts and Analytics */}
       <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
@@ -216,19 +247,33 @@ export function DashboardOverview() {
             <CardDescription>Get started with common tasks</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Button asChild className="w-full justify-start h-10 sm:h-11" size="default">
+            <Button
+              asChild
+              className="w-full justify-start h-10 sm:h-11"
+              size="default"
+            >
               <Link href="/chat">
                 <MessageSquare className="h-4 w-4 mr-2" />
                 <span className="truncate">Start New Chat</span>
               </Link>
             </Button>
-            <Button asChild variant="outline" className="w-full justify-start h-10 sm:h-11" size="default">
+            <Button
+              asChild
+              variant="outline"
+              className="w-full justify-start h-10 sm:h-11"
+              size="default"
+            >
               <Link href="/chat">
                 <FileText className="h-4 w-4 mr-2" />
                 <span className="truncate">Upload & Analyze File</span>
               </Link>
             </Button>
-            <Button variant="outline" className="w-full justify-start h-10 sm:h-11" size="default" onClick={() => refetch()}>
+            <Button
+              variant="outline"
+              className="w-full justify-start h-10 sm:h-11"
+              size="default"
+              onClick={() => refetch()}
+            >
               <RefreshCw className="h-4 w-4 mr-2" />
               <span className="truncate">Refresh Data</span>
             </Button>
