@@ -67,7 +67,8 @@ export function DashboardOverview() {
       });
 
       if (response.ok) {
-        // Refresh the analytics data to get updated conversation list
+        // Refresh only the analytics data to update the conversation list
+        // This avoids a full page reload and just updates the dashboard data
         refetch();
       } else {
         console.error("Failed to delete conversation");

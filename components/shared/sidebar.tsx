@@ -1,7 +1,8 @@
 "use client";
 
+import React, { memo } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { useConversations } from "@/hooks/use-conversations";
@@ -91,10 +92,11 @@ const adminItems: NavItem[] = [
   },
 ];
 
-export function Sidebar({ className }: SidebarProps) {
+export const Sidebar = memo(function Sidebar({ className }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const { user } = useAuth();
-  const { conversations, createConversation, isLoading } = useConversations();
+  const { conversations, createConversation, deleteConversation, isLoading } = useConversations();
 
   // Helper function to check user role
   const hasRole = (role: string) => {
@@ -108,30 +110,21 @@ export function Sidebar({ className }: SidebarProps) {
         title: "New Chat",
       });
       if (newConversation) {
-        // Navigate to the new conversation
-        window.location.href = `/chat?conversation=${newConversation.id}`;
+        // Navigate to the new conversation using Next.js router (client-side navigation)
+        router.push(`/chat?conversation=${newConversation.id}`);
       }
     } catch (error) {
       console.error("Failed to create new conversation:", error);
     }
   };
 
-  // Delete conversation
+  // Delete conversation using the hook
   const handleDeleteConversation = async (id: string) => {
-    try {
-      const response = await fetch(`/api/conversations/${id}`, {
-        method: "DELETE",
-      });
-
-      if (response.ok) {
-        // Refresh conversations list
-        window.location.reload();
-      } else {
-        console.error("Failed to delete conversation");
-      }
-    } catch (error) {
-      console.error("Error deleting conversation:", error);
+    const success = await deleteConversation(id);
+    if (!success) {
+      console.error("Failed to delete conversation");
     }
+    // The hook automatically updates the conversations list in state
   };
 
   return (
@@ -186,15 +179,6 @@ export function Sidebar({ className }: SidebarProps) {
             <h2 className="text-lg font-semibold tracking-tight">
               Chat History
             </h2>
-            <Button
-              onClick={handleNewChat}
-              size="sm"
-              variant="ghost"
-              className="h-8 w-8 p-0"
-              disabled={isLoading}
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
           </div>
 
           <ScrollArea className="h-48">
@@ -328,4 +312,4 @@ export function Sidebar({ className }: SidebarProps) {
       </div>
     </div>
   );
-}
+});

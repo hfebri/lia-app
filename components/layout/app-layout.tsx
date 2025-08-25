@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Header } from "@/components/shared/header";
 import { Sidebar } from "@/components/shared/sidebar";
 import { Footer } from "@/components/shared/footer";
@@ -37,6 +37,9 @@ export function AppLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { isLoading } = useAuth();
 
+  // Memoize the sidebar component to prevent unnecessary re-renders
+  const memoizedSidebar = useMemo(() => <Sidebar />, []);
+
   if (isLoading) {
     return <LoadingPage message="Initializing application..." />;
   }
@@ -53,7 +56,7 @@ export function AppLayout({
           {/* Desktop Sidebar */}
           {showSidebar && (
             <aside className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 md:top-0 md:z-50 md:border-r">
-              <Sidebar />
+              {memoizedSidebar}
             </aside>
           )}
 
@@ -68,7 +71,7 @@ export function AppLayout({
                     of the application.
                   </SheetDescription>
                 </SheetHeader>
-                <Sidebar />
+                {memoizedSidebar}
               </SheetContent>
             </Sheet>
           )}
