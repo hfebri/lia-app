@@ -1,176 +1,40 @@
 "use client";
 
-import { useAuth } from "@/components/auth/auth-provider";
-import { LoginButton } from "@/components/auth/login-button";
-import { LogoutButton } from "@/components/auth/logout-button";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { LandingLayout } from "@/components/layout/app-layout";
-import { Bot, MessageSquare, Sparkles, ArrowRight } from "lucide-react";
-import Link from "next/link";
+import { DashboardLayout } from "@/components/layout/app-layout";
+import { Suspense } from "react";
+import { DashboardOverview } from "./(dashboard)/_components/dashboard-overview";
+import { DashboardSkeleton } from "./(dashboard)/_components/dashboard-skeleton";
 
 function HomePage() {
-  const { user, isLoading, isAuthenticated } = useAuth();
-
-  // Helper function to check user role
-  const hasRole = (role: string) => {
-    return user?.role === role;
-  };
 
   // TEMPORARY: Show dashboard for everyone (bypass authentication)
-  // Change this condition back to `if (isAuthenticated && user) {` to re-enable authentication
-  if (true) {
-    // Show dashboard for authenticated users
-    return (
-      <div className="space-y-12">
-        {/* Hero Section */}
-        <div className="text-center space-y-6 py-12">
-          <div className="flex items-center justify-center space-x-2 mb-4">
-            <Bot className="h-12 w-12 text-primary" />
-            <h1 className="text-4xl font-bold tracking-tight">
-              Welcome to LIA App!
-            </h1>
-          </div>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Continue your AI-powered journey. Start a conversation with file
-            upload and analysis capabilities built right in.
-          </p>
-          <Badge variant="secondary" className="text-lg py-2 px-4">
-            🚀 Testing Mode - Authentication Disabled
-          </Badge>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="flex justify-center">
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer group max-w-md">
-            <CardHeader>
-              <MessageSquare className="h-10 w-10 text-primary mb-2 group-hover:scale-110 transition-transform" />
-              <CardTitle>Start Chatting</CardTitle>
-              <CardDescription>
-                Begin a new conversation with our AI assistant. File uploads and
-                document analysis are built right in!
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button asChild className="w-full">
-                <Link href="/chat">
-                  Start Chat
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Admin Section */}
-        {hasRole("admin") && (
-          <Card className="border-primary/20">
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Sparkles className="h-5 w-5 text-primary" />
-                <span>Admin Dashboard</span>
-              </CardTitle>
-              <CardDescription>
-                Access administrative features and analytics
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button asChild>
-                <Link href="/admin">
-                  Open Admin Dashboard
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-    );
-  }
-
-  // Show landing page for unauthenticated users
+  // For now, always show the dashboard
   return (
-    <div className="space-y-12">
-      {/* Hero Section */}
-      <div className="text-center space-y-6 py-12">
-        <div className="flex items-center justify-center space-x-2 mb-4">
-          <Bot className="h-16 w-16 text-primary animate-pulse" />
+    <div className="flex-1 space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-muted-foreground mt-1">
+            Welcome back! Here&apos;s an overview of your activity.
+          </p>
         </div>
-        <h1 className="text-5xl font-bold tracking-tight">
-          Welcome to LIA App
-        </h1>
-        <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-          AI Platform powered by AI Model API. Experience intelligent
-          conversations with integrated document analysis and file upload
-          capabilities to boost your productivity.
-        </p>
-
-        <div className="pt-6">
-          {isLoading ? (
-            <Button disabled size="lg" className="text-lg px-8 py-4">
-              Loading...
-            </Button>
-          ) : (
-            <LoginButton
-              size="lg"
-              className="text-lg px-8 py-4 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg"
-            >
-              Get Started
-              <ArrowRight className="ml-2 h-5 w-5" />
-            </LoginButton>
-          )}
-        </div>
+        <Badge variant="secondary" className="w-fit h-fit shrink-0">
+          🚀 Testing Mode
+        </Badge>
       </div>
 
-      {/* Features */}
-      <div className="flex justify-center">
-        <Card className="max-w-md">
-          <CardHeader className="text-center">
-            <MessageSquare className="h-12 w-12 text-primary mx-auto mb-4" />
-            <CardTitle>AI Conversations</CardTitle>
-            <CardDescription>
-              Chat with advanced AI models with integrated file upload and
-              document analysis for comprehensive assistance
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
-
-      {/* Authentication Status */}
-      <Card className="max-w-md mx-auto">
-        <CardHeader>
-          <CardTitle>Authentication Status</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {isLoading && (
-            <p className="text-muted-foreground">Checking authentication...</p>
-          )}
-
-          {!isAuthenticated && !isLoading && (
-            <div className="space-y-4 text-center">
-              <p className="text-muted-foreground">
-                Sign in to access all features
-              </p>
-              <LoginButton className="w-full">Sign in with Google</LoginButton>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <Suspense fallback={<DashboardSkeleton />}>
+        <DashboardOverview />
+      </Suspense>
     </div>
   );
 }
 
 export default function Home() {
   return (
-    <LandingLayout>
+    <DashboardLayout>
       <HomePage />
-    </LandingLayout>
+    </DashboardLayout>
   );
 }

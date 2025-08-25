@@ -1,4 +1,4 @@
-"use server";
+"use client";
 
 import {
   Card,
@@ -10,6 +10,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   MessageSquare,
   FileText,
@@ -20,201 +21,220 @@ import {
   Target,
   Plus,
   ArrowRight,
+  RefreshCw,
+  AlertCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { ActivityChart } from "./activity-chart";
 import { RecentConversations } from "./recent-conversations";
 import { FileAnalytics } from "./file-analytics";
+import { useUserAnalytics } from "@/hooks/use-user-analytics";
+import { DashboardSkeleton } from "./dashboard-skeleton";
 
-export async function DashboardOverview() {
-  // Mock data - in real app this would come from actual analytics
-  const stats = {
-    totalConversations: 24,
-    totalMessages: 847,
-    filesProcessed: 12,
-    averageResponseTime: "1.2s",
+export function DashboardOverview() {
+  const { data: analytics, isLoading, error, refetch } = useUserAnalytics();
+
+  if (isLoading) {
+    return <DashboardSkeleton />;
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription className="flex items-center justify-between">
+            <span>Failed to load dashboard data: {error}</span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => refetch()}
+              className="ml-4"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Retry
+            </Button>
+          </AlertDescription>
+        </Alert>
+        <DashboardSkeleton />
+      </div>
+    );
+  }
+
+  const stats = analytics?.stats || {
+    totalConversations: 0,
+    totalMessages: 0,
+    filesProcessed: 0,
+    averageResponseTime: "0s",
   };
 
-  const trends = {
-    conversations: "+23%",
-    messages: "+18%",
-    files: "+45%",
-    responseTime: "-12%",
+  const trends = analytics?.trends || {
+    conversations: "0%",
+    messages: "0%",
+    files: "0%",
+    responseTime: "0%",
   };
 
   return (
-    <div className="grid gap-6">
+    <div className="space-y-6">
       {/* Stats Overview */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Total Conversations
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 auto-rows-fr">
+        <Card className="hover:shadow-md transition-shadow border-l-4 border-l-blue-500 h-full min-w-0">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Conversations
             </CardTitle>
-            <MessageSquare className="h-4 w-4 text-muted-foreground" />
+            <MessageSquare className="h-5 w-5 text-blue-500" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalConversations}</div>
-            <p className="text-xs text-muted-foreground">
-              <span className="text-green-600">{trends.conversations}</span>{" "}
-              from last month
+          <CardContent className="pb-4">
+            <div className="text-2xl sm:text-3xl font-bold text-blue-600 mb-1">
+              {stats.totalConversations.toLocaleString()}
+            </div>
+            <p className="text-xs text-muted-foreground flex items-center">
+              <span className={`font-medium ${trends.conversations.startsWith('+') ? 'text-green-600' : trends.conversations.startsWith('-') ? 'text-red-600' : 'text-muted-foreground'}`}>
+                {trends.conversations}
+              </span>
+              <span className="ml-1">from last month</span>
             </p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Messages Exchanged
+        <Card className="hover:shadow-md transition-shadow border-l-4 border-l-green-500 h-full min-w-0">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Messages
             </CardTitle>
-            <Zap className="h-4 w-4 text-muted-foreground" />
+            <Zap className="h-5 w-5 text-green-500" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalMessages}</div>
-            <p className="text-xs text-muted-foreground">
-              <span className="text-green-600">{trends.messages}</span> from
-              last month
+          <CardContent className="pb-4">
+            <div className="text-2xl sm:text-3xl font-bold text-green-600 mb-1">
+              {stats.totalMessages.toLocaleString()}
+            </div>
+            <p className="text-xs text-muted-foreground flex items-center">
+              <span className={`font-medium ${trends.messages.startsWith('+') ? 'text-green-600' : trends.messages.startsWith('-') ? 'text-red-600' : 'text-muted-foreground'}`}>
+                {trends.messages}
+              </span>
+              <span className="ml-1">from last month</span>
             </p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
+        <Card className="hover:shadow-md transition-shadow border-l-4 border-l-purple-500 h-full min-w-0">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
               Files Processed
             </CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
+            <FileText className="h-5 w-5 text-purple-500" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.filesProcessed}</div>
-            <p className="text-xs text-muted-foreground">
-              <span className="text-green-600">{trends.files}</span> from last
-              month
+          <CardContent className="pb-4">
+            <div className="text-2xl sm:text-3xl font-bold text-purple-600 mb-1">
+              {stats.filesProcessed.toLocaleString()}
+            </div>
+            <p className="text-xs text-muted-foreground flex items-center">
+              <span className={`font-medium ${trends.files.startsWith('+') ? 'text-green-600' : trends.files.startsWith('-') ? 'text-red-600' : 'text-muted-foreground'}`}>
+                {trends.files}
+              </span>
+              <span className="ml-1">from last month</span>
             </p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Avg Response Time
+        <Card className="hover:shadow-md transition-shadow border-l-4 border-l-orange-500 h-full min-w-0">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Response Time
             </CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
+            <Clock className="h-5 w-5 text-orange-500" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
+          <CardContent className="pb-4">
+            <div className="text-2xl sm:text-3xl font-bold text-orange-600 mb-1">
               {stats.averageResponseTime}
             </div>
-            <p className="text-xs text-muted-foreground">
-              <span className="text-green-600">{trends.responseTime}</span> from
-              last month
+            <p className="text-xs text-muted-foreground flex items-center">
+              <span className={`font-medium ${trends.responseTime.startsWith('+') ? 'text-red-600' : trends.responseTime.startsWith('-') ? 'text-green-600' : 'text-muted-foreground'}`}>
+                {trends.responseTime}
+              </span>
+              <span className="ml-1">from last month</span>
             </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Quick Actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Target className="h-5 w-5" />
-            Quick Actions
-          </CardTitle>
-          <CardDescription>Get started with common tasks</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            <Button asChild className="h-auto flex-col gap-2 p-6">
-              <Link href="/chat">
-                <MessageSquare className="h-8 w-8" />
-                <div className="text-center">
-                  <div className="font-semibold">Start New Chat</div>
-                  <div className="text-sm text-muted-foreground">
-                    Begin a conversation with AI
-                  </div>
-                </div>
-              </Link>
-            </Button>
-
-            <Button
-              asChild
-              variant="outline"
-              className="h-auto flex-col gap-2 p-6"
-            >
-              <Link href="/chat">
-                <FileText className="h-8 w-8" />
-                <div className="text-center">
-                  <div className="font-semibold">Upload & Analyze</div>
-                  <div className="text-sm text-muted-foreground">
-                    Process documents with AI
-                  </div>
-                </div>
-              </Link>
-            </Button>
-
-            <Button
-              asChild
-              variant="outline"
-              className="h-auto flex-col gap-2 p-6"
-            >
-              <Link href="/chat">
-                <TrendingUp className="h-8 w-8" />
-                <div className="text-center">
-                  <div className="font-semibold">View Analytics</div>
-                  <div className="text-sm text-muted-foreground">
-                    Check usage patterns
-                  </div>
-                </div>
-              </Link>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Charts and Analytics */}
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
+      <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
+        <Card className="hover:shadow-md transition-shadow border-0 shadow-sm">
+          <CardHeader className="pb-4">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <TrendingUp className="h-5 w-5 text-primary" />
               Activity Overview
             </CardTitle>
             <CardDescription>
-              Your usage patterns over the last 30 days
+              Your usage patterns over the last 7 days
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <ActivityChart />
+            <ActivityChart data={analytics?.chartData} />
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
+        <Card className="hover:shadow-md transition-shadow border-0 shadow-sm">
+          <CardHeader className="pb-4">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <FileText className="h-5 w-5 text-primary" />
               File Analytics
             </CardTitle>
             <CardDescription>Document processing insights</CardDescription>
           </CardHeader>
           <CardContent>
-            <FileAnalytics />
+            <FileAnalytics data={analytics?.fileAnalytics} />
           </CardContent>
         </Card>
       </div>
 
-      {/* Recent Activity */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Clock className="h-5 w-5" />
-            Recent Conversations
-          </CardTitle>
-          <CardDescription>Your latest AI interactions</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <RecentConversations />
-        </CardContent>
-      </Card>
+      {/* Recent Activity and Quick Actions */}
+      <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-3">
+        <Card className="lg:col-span-2 hover:shadow-md transition-shadow border-0 shadow-sm">
+          <CardHeader className="pb-4">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Clock className="h-5 w-5 text-primary" />
+              Recent Conversations
+            </CardTitle>
+            <CardDescription>Your latest AI interactions</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <RecentConversations data={analytics?.recentConversations} />
+          </CardContent>
+        </Card>
+
+        <Card className="hover:shadow-md transition-shadow border-0 shadow-sm">
+          <CardHeader className="pb-4">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Target className="h-5 w-5 text-primary" />
+              Quick Actions
+            </CardTitle>
+            <CardDescription>Get started with common tasks</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Button asChild className="w-full justify-start h-10 sm:h-11" size="default">
+              <Link href="/chat">
+                <MessageSquare className="h-4 w-4 mr-2" />
+                <span className="truncate">Start New Chat</span>
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className="w-full justify-start h-10 sm:h-11" size="default">
+              <Link href="/chat">
+                <FileText className="h-4 w-4 mr-2" />
+                <span className="truncate">Upload & Analyze File</span>
+              </Link>
+            </Button>
+            <Button variant="outline" className="w-full justify-start h-10 sm:h-11" size="default" onClick={() => refetch()}>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              <span className="truncate">Refresh Data</span>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

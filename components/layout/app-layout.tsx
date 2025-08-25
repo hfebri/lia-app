@@ -94,7 +94,7 @@ export function AppLayout({
           {/* Main Content */}
           <main
             className={cn(
-              "flex-1",
+              "flex-1 flex flex-col min-h-screen overflow-hidden",
               showHeader && !showSidebar
                 ? "min-h-[calc(100vh-3.5rem)]"
                 : showSidebar
@@ -103,7 +103,7 @@ export function AppLayout({
               className
             )}
           >
-            <div className="container mx-auto p-4 md:p-6 lg:p-8">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 h-full flex flex-col">
               <ErrorBoundary>{children}</ErrorBoundary>
             </div>
           </main>

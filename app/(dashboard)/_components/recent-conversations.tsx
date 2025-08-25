@@ -3,103 +3,112 @@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Clock, MessageSquare, ArrowRight } from "lucide-react";
 import Link from "next/link";
 
-export function RecentConversations() {
-  // Mock recent conversations data
-  const recentConversations = [
-    {
-      id: "1",
-      title: "Document Analysis Query",
-      lastMessage: "Can you analyze this PDF for key insights?",
-      time: "2 minutes ago",
-      messageCount: 8,
-      status: "active",
-    },
-    {
-      id: "2",
-      title: "Data Processing Help",
-      lastMessage: "Thanks for explaining the data structure!",
-      time: "1 hour ago",
-      messageCount: 15,
-      status: "completed",
-    },
-    {
-      id: "3",
-      title: "Code Review Discussion",
-      lastMessage: "The implementation looks good overall...",
-      time: "3 hours ago",
-      messageCount: 22,
-      status: "completed",
-    },
-    {
-      id: "4",
-      title: "Research Question",
-      lastMessage: "What are the best practices for...",
-      time: "Yesterday",
-      messageCount: 6,
-      status: "completed",
-    },
-    {
-      id: "5",
-      title: "Technical Support",
-      lastMessage: "The error has been resolved successfully.",
-      time: "2 days ago",
-      messageCount: 12,
-      status: "completed",
-    },
-  ];
+interface RecentConversationsProps {
+  data?: Array<{
+    id: string;
+    title: string;
+    lastMessage: string;
+    messageCount: number;
+    createdAt: string;
+    updatedAt: string;
+  }>;
+}
+
+export function RecentConversations({ data }: RecentConversationsProps) {
+  // Function to format relative time
+  const getRelativeTime = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInMs = now.getTime() - date.getTime();
+    const diffInHours = diffInMs / (1000 * 60 * 60);
+    const diffInDays = diffInHours / 24;
+
+    if (diffInHours < 1) {
+      const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
+      return diffInMinutes <= 1 ? "1 minute ago" : `${diffInMinutes} minutes ago`;
+    } else if (diffInHours < 24) {
+      const hours = Math.floor(diffInHours);
+      return hours === 1 ? "1 hour ago" : `${hours} hours ago`;
+    } else if (diffInDays < 7) {
+      const days = Math.floor(diffInDays);
+      return days === 1 ? "1 day ago" : `${days} days ago`;
+    } else {
+      return date.toLocaleDateString();
+    }
+  };
+
+  if (!data) {
+    return (
+      <div className="space-y-4">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="flex items-center gap-4 p-4 rounded-lg border">
+            <Skeleton className="h-10 w-10 rounded-full" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-3 w-1/2" />
+              <div className="flex gap-4">
+                <Skeleton className="h-3 w-16" />
+                <Skeleton className="h-3 w-20" />
+              </div>
+            </div>
+            <Skeleton className="h-8 w-8" />
+          </div>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
-      {recentConversations.map((conversation) => (
-        <div
-          key={conversation.id}
-          className="flex items-center gap-4 p-4 rounded-lg border hover:bg-muted/50 transition-colors"
-        >
-          <Avatar>
-            <AvatarFallback>
-              <MessageSquare className="h-4 w-4" />
-            </AvatarFallback>
-          </Avatar>
+      {data.length > 0 ? (
+        data.map((conversation) => (
+          <div
+            key={conversation.id}
+            className="flex items-center gap-4 p-4 rounded-lg border hover:bg-muted/50 transition-colors"
+          >
+            <Avatar>
+              <AvatarFallback>
+                <MessageSquare className="h-4 w-4" />
+              </AvatarFallback>
+            </Avatar>
 
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <h4 className="font-medium truncate">{conversation.title}</h4>
-              <Badge
-                variant={
-                  conversation.status === "active" ? "default" : "secondary"
-                }
-                className="text-xs"
-              >
-                {conversation.status}
-              </Badge>
-            </div>
-            <p className="text-sm text-muted-foreground truncate mb-2">
-              {conversation.lastMessage}
-            </p>
-            <div className="flex items-center gap-4 text-xs text-muted-foreground">
-              <div className="flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                {conversation.time}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <h4 className="font-medium truncate">{conversation.title}</h4>
+                <Badge
+                  variant="secondary"
+                  className="text-xs"
+                >
+                  {conversation.messageCount} msgs
+                </Badge>
               </div>
-              <div className="flex items-center gap-1">
-                <MessageSquare className="h-3 w-3" />
-                {conversation.messageCount} messages
+              <p className="text-sm text-muted-foreground truncate mb-2">
+                {conversation.lastMessage}
+              </p>
+              <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                <div className="flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  {getRelativeTime(conversation.updatedAt)}
+                </div>
+                <div className="flex items-center gap-1">
+                  <MessageSquare className="h-3 w-3" />
+                  {conversation.messageCount} messages
+                </div>
               </div>
             </div>
+
+            <Button asChild variant="ghost" size="sm">
+              <Link href={`/chat?conversation=${conversation.id}`}>
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </Button>
           </div>
-
-          <Button asChild variant="ghost" size="sm">
-            <Link href={`/chat?conversation=${conversation.id}`}>
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-          </Button>
-        </div>
-      ))}
-
-      {recentConversations.length === 0 && (
+        ))
+      ) : (
         <div className="text-center py-8">
           <MessageSquare className="h-12 w-12 mx-auto mb-4 text-muted-foreground/40" />
           <h3 className="text-sm font-medium mb-2">No conversations yet</h3>

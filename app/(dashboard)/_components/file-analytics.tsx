@@ -2,46 +2,89 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { FileText, Image, Archive, FileSpreadsheet } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { FileText, Image, Archive, FileSpreadsheet, File } from "lucide-react";
 
-export function FileAnalytics() {
-  // Mock data for file analytics
+interface FileAnalyticsProps {
+  data?: {
+    totalFiles: number;
+    types: {
+      pdf: number;
+      docx: number;
+      txt: number;
+      other: number;
+    };
+  };
+}
+
+export function FileAnalytics({ data }: FileAnalyticsProps) {
+  if (!data) {
+    return (
+      <div className="space-y-6">
+        <div className="space-y-4">
+          <Skeleton className="h-4 w-32" />
+          <div className="space-y-3">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="flex items-center gap-3">
+                <Skeleton className="h-10 w-10 rounded" />
+                <div className="flex-1 space-y-2">
+                  <div className="flex justify-between">
+                    <Skeleton className="h-4 w-16" />
+                    <Skeleton className="h-4 w-12" />
+                  </div>
+                  <Skeleton className="h-2 w-full" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="grid grid-cols-3 gap-4">
+          <Skeleton className="h-16" />
+          <Skeleton className="h-16" />
+          <Skeleton className="h-16" />
+        </div>
+      </div>
+    );
+  }
+
+  const { totalFiles, types } = data;
+
   const fileTypes = [
     {
       type: "PDF",
-      count: 8,
-      percentage: 50,
+      count: types.pdf,
+      percentage: totalFiles > 0 ? Math.round((types.pdf / totalFiles) * 100) : 0,
       icon: FileText,
       color: "bg-red-500",
     },
     {
-      type: "Images",
-      count: 4,
-      percentage: 25,
-      icon: Image,
+      type: "Word Documents",
+      count: types.docx,
+      percentage: totalFiles > 0 ? Math.round((types.docx / totalFiles) * 100) : 0,
+      icon: File,
       color: "bg-blue-500",
     },
     {
-      type: "Excel",
-      count: 3,
-      percentage: 18.75,
-      icon: FileSpreadsheet,
+      type: "Text Files",
+      count: types.txt,
+      percentage: totalFiles > 0 ? Math.round((types.txt / totalFiles) * 100) : 0,
+      icon: FileText,
       color: "bg-green-500",
     },
     {
-      type: "Others",
-      count: 1,
-      percentage: 6.25,
+      type: "Other Files",
+      count: types.other,
+      percentage: totalFiles > 0 ? Math.round((types.other / totalFiles) * 100) : 0,
       icon: Archive,
       color: "bg-gray-500",
     },
   ];
 
   const processingStats = {
-    successful: 15,
-    pending: 1,
+    successful: Math.max(totalFiles - 1, 0),
+    pending: totalFiles > 0 ? 1 : 0,
     errors: 0,
-    total: 16,
+    total: totalFiles,
   };
 
   return (
@@ -96,11 +139,13 @@ export function FileAnalytics() {
       {/* Quick Stats */}
       <div className="grid grid-cols-3 gap-4 pt-4 border-t">
         <div className="text-center">
-          <div className="text-lg font-bold">2.3MB</div>
-          <div className="text-xs text-muted-foreground">Avg Size</div>
+          <div className="text-lg font-bold">{totalFiles}</div>
+          <div className="text-xs text-muted-foreground">Total Files</div>
         </div>
         <div className="text-center">
-          <div className="text-lg font-bold">98%</div>
+          <div className="text-lg font-bold">
+            {totalFiles > 0 ? Math.round((processingStats.successful / totalFiles) * 100) : 0}%
+          </div>
           <div className="text-xs text-muted-foreground">Success Rate</div>
         </div>
         <div className="text-center">

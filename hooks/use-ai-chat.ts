@@ -262,6 +262,16 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     await sendMessage(lastUserMessage.content);
   }, [state.messages, sendMessage]);
 
+  // Set messages directly (for loading conversations)
+  const setMessages = useCallback((messages: ChatMessage[]) => {
+    setState((prev) => ({
+      ...prev,
+      messages: messages.slice(-maxMessages),
+      error: null,
+      streamingContent: "",
+    }));
+  }, [maxMessages]);
+
   return {
     // State
     messages: state.messages,
@@ -282,6 +292,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     clearError,
     regenerateResponse,
     loadModels,
+    setMessages,
 
     // Computed
     hasMessages: state.messages.length > 0,

@@ -72,6 +72,7 @@ export function EnhancedChatInterface({
     clearConversation,
     clearError,
     loadModels,
+    setMessages,
     hasMessages,
     canSend,
     currentModel,
@@ -132,7 +133,7 @@ export function EnhancedChatInterface({
           throw new Error(messagesResult.message || "Failed to load messages");
 
         // Convert database messages to AI chat messages format
-        const aiMessages = messagesResult.data.messages.map(
+        const aiMessages = messagesResult.data.map(
           (message: {
             id: string;
             role: string;
@@ -146,28 +147,12 @@ export function EnhancedChatInterface({
           })
         );
 
-        // Clear current messages
+        // Clear current messages and load the conversation messages
         clearConversation();
-
-        // We need to manually add messages to the chat service
-        // Since we can't directly access the internal state of useAiChat,
-        // we'll use a simpler approach - just add the messages to the local array
-
-        // Since we can't directly modify the state in useAiChat,
-        // we'll need a different approach. Let's try to use the public API.
-
-        // Clear existing messages first
-        clearConversation();
-
-        // Then add the messages one by one using sendMessage
-        // This is a workaround since we can't directly access the state
-
-        // We'll need to manually add the messages to the UI
-        // For now, let's just show a message to the user that the conversation has been loaded
-
-        // Note: In a real application, we would modify the useAiChat hook to support loading conversations
-        // For now, we just update the title and clear the existing messages
+        
+        // Set the loaded messages in the chat interface
         if (aiMessages.length > 0) {
+          setMessages(aiMessages);
           console.log(
             `Loaded conversation "${conversation.title}" with ${aiMessages.length} messages.`
           );
