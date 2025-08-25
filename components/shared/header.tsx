@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { User, Settings, LogOut, Bot, Menu } from "lucide-react";
 import { LoginButton } from "@/components/auth/login-button";
 import { LogoutButton } from "@/components/auth/logout-button";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 interface HeaderProps {
   onMobileMenuToggle?: () => void;
@@ -55,8 +56,9 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
           </Link>
         </nav>
 
-        {/* Right side - User menu */}
+        {/* Right side - Theme toggle and User menu */}
         <div className="flex items-center space-x-4 min-w-0 flex-1 justify-end">
+          <ThemeToggle />
           {isAuthenticated && user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -81,11 +83,12 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
                         {user.email}
                       </p>
                     )}
-                    {checkRole("admin") && (
+                    {/* Admin badge - HIDDEN */}
+                    {/* {checkRole("admin") && (
                       <Badge variant="secondary" className="w-fit">
                         Admin
                       </Badge>
-                    )}
+                    )} */}
                   </div>
                 </div>
                 <DropdownMenuSeparator />
@@ -101,14 +104,15 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
                     <span>Settings</span>
                   </Link>
                 </DropdownMenuItem>
-                {checkRole("admin") && (
+                {/* Admin Dashboard menu item - HIDDEN */}
+                {/* {checkRole("admin") && (
                   <DropdownMenuItem asChild>
                     <Link href="/admin">
                       <Settings className="mr-2 h-4 w-4" />
                       <span>Admin Dashboard</span>
                     </Link>
                   </DropdownMenuItem>
-                )}
+                )} */}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
                   <LogoutButton className="w-full justify-start p-0">

@@ -21,6 +21,7 @@ import {
   Plus,
   Clock,
 } from "lucide-react";
+import { SimpleThemeToggle } from "@/components/ui/theme-toggle";
 
 interface SidebarProps {
   className?: string;
@@ -97,12 +98,15 @@ export function Sidebar({ className }: SidebarProps) {
   return (
     <div className={cn("pb-12 w-64", className)}>
       <div className="space-y-4 py-4">
-        {/* Logo */}
+        {/* Logo and Theme Toggle */}
         <div className="px-3 py-2">
-          <Link href="/" className="flex items-center pl-3 mb-14">
-            <Bot className="h-6 w-6 mr-2" />
-            <h1 className="text-xl font-bold">LIA App</h1>
-          </Link>
+          <div className="flex items-center justify-between pl-3 mb-14">
+            <Link href="/" className="flex items-center">
+              <Bot className="h-6 w-6 mr-2" />
+              <h1 className="text-xl font-bold">LIA App</h1>
+            </Link>
+            <SimpleThemeToggle />
+          </div>
         </div>
 
         {/* Navigation */}
@@ -203,8 +207,8 @@ export function Sidebar({ className }: SidebarProps) {
           </ScrollArea>
         </div>
 
-        {/* Admin Section */}
-        {user && hasRole("admin") && (
+        {/* Admin Section - HIDDEN */}
+        {/* {user && hasRole("admin") && (
           <>
             <Separator className="mx-3" />
             <div className="px-3 py-2">
@@ -241,7 +245,7 @@ export function Sidebar({ className }: SidebarProps) {
               </div>
             </div>
           </>
-        )}
+        )} */}
       </div>
     </div>
   );

@@ -20,6 +20,7 @@ import {
   Activity,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { SimpleThemeToggle } from "@/components/ui/theme-toggle";
 
 interface NavItem {
   title: string;
@@ -44,20 +45,21 @@ const navigationItems: NavItem[] = [
     description: "AI conversations",
     badge: "New",
   },
-  {
-    title: "Analytics",
-    href: "/admin/analytics",
-    icon: BarChart3,
-    description: "Usage insights",
-    adminOnly: true,
-  },
-  {
-    title: "Users",
-    href: "/admin/users",
-    icon: Users,
-    description: "User management",
-    adminOnly: true,
-  },
+  // Admin items - HIDDEN
+  // {
+  //   title: "Analytics",
+  //   href: "/admin/analytics",
+  //   icon: BarChart3,
+  //   description: "Usage insights",
+  //   adminOnly: true,
+  // },
+  // {
+  //   title: "Users",
+  //   href: "/admin/users",
+  //   icon: Users,
+  //   description: "User management",
+  //   adminOnly: true,
+  // },
   {
     title: "Settings",
     href: "/settings",
@@ -109,6 +111,7 @@ export function MobileNav({ className, isAdmin = false }: MobileNavProps) {
                   <p className="text-xs text-muted-foreground">AI Platform</p>
                 </div>
               </div>
+              <SimpleThemeToggle />
             </div>
 
             {/* Navigation Items */}
@@ -151,7 +154,8 @@ export function MobileNav({ className, isAdmin = false }: MobileNavProps) {
                 })}
               </div>
 
-              {isAdmin && (
+              {/* Admin Tools - HIDDEN */}
+              {/* {isAdmin && (
                 <>
                   <Separator className="mx-4" />
                   <div className="p-4">
@@ -181,7 +185,7 @@ export function MobileNav({ className, isAdmin = false }: MobileNavProps) {
                     </div>
                   </div>
                 </>
-              )}
+              )} */}
             </div>
 
             {/* Footer */}

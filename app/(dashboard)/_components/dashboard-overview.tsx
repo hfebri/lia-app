@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   MessageSquare,
   FileText,
@@ -23,11 +24,13 @@ import {
   ArrowRight,
   RefreshCw,
   AlertCircle,
+  BarChart3,
 } from "lucide-react";
 import Link from "next/link";
 import { ActivityChart } from "./activity-chart";
 import { RecentConversations } from "./recent-conversations";
 import { FileAnalytics } from "./file-analytics";
+import { PopularTopics } from "./popular-topics";
 import { useUserAnalytics } from "@/hooks/use-user-analytics";
 import { DashboardSkeleton } from "./dashboard-skeleton";
 
@@ -233,15 +236,34 @@ export function DashboardOverview() {
         </Card>
 
         <Card className="hover:shadow-md transition-shadow border-0 shadow-sm">
-          <CardHeader className="pb-4">
+          <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-lg">
-              <FileText className="h-5 w-5 text-primary" />
-              File Analytics
+              <BarChart3 className="h-5 w-5 text-primary" />
+              Insights & Analytics
             </CardTitle>
-            <CardDescription>Document processing insights</CardDescription>
+            <CardDescription>
+              File processing and popular topics analysis
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <FileAnalytics data={analytics?.fileAnalytics} />
+            <Tabs defaultValue="topics" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="topics" className="flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4" />
+                  Popular Topics
+                </TabsTrigger>
+                <TabsTrigger value="files" className="flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  File Analytics
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="topics" className="mt-4">
+                <PopularTopics data={analytics?.popularTopics} />
+              </TabsContent>
+              <TabsContent value="files" className="mt-4">
+                <FileAnalytics data={analytics?.fileAnalytics} />
+              </TabsContent>
+            </Tabs>
           </CardContent>
         </Card>
       </div>
@@ -257,8 +279,8 @@ export function DashboardOverview() {
             <CardDescription>Your latest AI interactions</CardDescription>
           </CardHeader>
           <CardContent>
-            <RecentConversations 
-              data={analytics?.recentConversations} 
+            <RecentConversations
+              data={analytics?.recentConversations}
               onRename={handleRenameConversation}
             />
           </CardContent>
@@ -281,17 +303,6 @@ export function DashboardOverview() {
               <Link href="/chat">
                 <MessageSquare className="h-4 w-4 mr-2" />
                 <span className="truncate">Start New Chat</span>
-              </Link>
-            </Button>
-            <Button
-              asChild
-              variant="outline"
-              className="w-full justify-start h-10 sm:h-11"
-              size="default"
-            >
-              <Link href="/chat">
-                <FileText className="h-4 w-4 mr-2" />
-                <span className="truncate">Upload & Analyze File</span>
               </Link>
             </Button>
             <Button

@@ -2,6 +2,14 @@
 
 import { useState, useEffect } from "react";
 
+interface PopularTopic {
+  topic: string;
+  count: number;
+  percentage: number;
+  trend: "up" | "down" | "stable";
+  examples: string[];
+}
+
 interface UserAnalytics {
   stats: {
     totalConversations: number;
@@ -38,6 +46,7 @@ interface UserAnalytics {
       other: number;
     };
   };
+  popularTopics?: PopularTopic[];
 }
 
 interface UseUserAnalyticsReturn {
