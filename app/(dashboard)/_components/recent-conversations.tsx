@@ -6,14 +6,26 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
-import { Clock, MessageSquare, ArrowRight, Edit2, Check, X, MoreHorizontal } from "lucide-react";
+import { Clock, MessageSquare, ArrowRight, Edit2, Check, X, MoreHorizontal, Trash2 } from "lucide-react";
 import Link from "next/link";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface RecentConversationsProps {
   data?: Array<{
@@ -25,9 +37,10 @@ interface RecentConversationsProps {
     updatedAt: string;
   }>;
   onRename?: (id: string, newTitle: string) => Promise<void>;
+  onDelete?: (id: string) => Promise<void>;
 }
 
-export function RecentConversations({ data, onRename }: RecentConversationsProps) {
+export function RecentConversations({ data, onRename, onDelete }: RecentConversationsProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [tempTitle, setTempTitle] = useState("");
   const handleRename = async (id: string, newTitle: string) => {
@@ -63,6 +76,16 @@ export function RecentConversations({ data, onRename }: RecentConversationsProps
       handleRename(id, tempTitle);
     } else if (e.key === "Escape") {
       cancelEditing();
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!onDelete) return;
+    
+    try {
+      await onDelete(id);
+    } catch (error) {
+      console.error("Failed to delete conversation:", error);
     }
   };
 
@@ -192,6 +215,36 @@ export function RecentConversations({ data, onRename }: RecentConversationsProps
                       <Edit2 className="h-4 w-4 mr-2" />
                       Rename
                     </DropdownMenuItem>
+                    {onDelete && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              <span className="text-red-600">Delete</span>
+                            </DropdownMenuItem>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Conversation</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete &quot;{conversation.title}&quot;? This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleDelete(conversation.id)}
+                                className="bg-red-600 hover:bg-red-700"
+                              >
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}

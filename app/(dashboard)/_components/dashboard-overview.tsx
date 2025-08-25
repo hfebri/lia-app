@@ -60,6 +60,25 @@ export function DashboardOverview() {
     }
   };
 
+  const handleDeleteConversation = async (id: string) => {
+    try {
+      const response = await fetch(`/api/conversations/${id}`, {
+        method: "DELETE",
+      });
+
+      if (response.ok) {
+        // Refresh the analytics data to get updated conversation list
+        refetch();
+      } else {
+        console.error("Failed to delete conversation");
+        throw new Error("Failed to delete conversation");
+      }
+    } catch (error) {
+      console.error("Error deleting conversation:", error);
+      throw error;
+    }
+  };
+
   if (isLoading) {
     return <DashboardSkeleton />;
   }
@@ -282,6 +301,7 @@ export function DashboardOverview() {
             <RecentConversations
               data={analytics?.recentConversations}
               onRename={handleRenameConversation}
+              onDelete={handleDeleteConversation}
             />
           </CardContent>
         </Card>

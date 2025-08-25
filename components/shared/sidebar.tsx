@@ -20,8 +20,29 @@ import {
   Home,
   Plus,
   Clock,
+  MoreHorizontal,
+  Edit2,
+  Trash2,
 } from "lucide-react";
 import { SimpleThemeToggle } from "@/components/ui/theme-toggle";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface SidebarProps {
   className?: string;
@@ -92,6 +113,24 @@ export function Sidebar({ className }: SidebarProps) {
       }
     } catch (error) {
       console.error("Failed to create new conversation:", error);
+    }
+  };
+
+  // Delete conversation
+  const handleDeleteConversation = async (id: string) => {
+    try {
+      const response = await fetch(`/api/conversations/${id}`, {
+        method: "DELETE",
+      });
+
+      if (response.ok) {
+        // Refresh conversations list
+        window.location.reload();
+      } else {
+        console.error("Failed to delete conversation");
+      }
+    } catch (error) {
+      console.error("Error deleting conversation:", error);
     }
   };
 
@@ -179,28 +218,68 @@ export function Sidebar({ className }: SidebarProps) {
                 </div>
               ) : (
                 conversations.slice(0, 10).map((conversation) => (
-                  <Button
-                    key={conversation.id}
-                    variant="ghost"
-                    className="w-full justify-start h-auto p-2 text-left"
-                    asChild
-                  >
-                    <Link href={`/chat?conversation=${conversation.id}`}>
-                      <div className="flex items-start gap-2 w-full">
-                        <Clock className="h-3 w-3 mt-1 text-muted-foreground flex-shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">
-                            {conversation.title || "Untitled Chat"}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {new Date(
-                              conversation.createdAt
-                            ).toLocaleDateString()}
-                          </p>
+                  <div key={conversation.id} className="flex items-center gap-1 group">
+                    <Button
+                      variant="ghost"
+                      className="flex-1 justify-start h-auto p-2 text-left"
+                      asChild
+                    >
+                      <Link href={`/chat?conversation=${conversation.id}`}>
+                        <div className="flex items-start gap-2 w-full">
+                          <Clock className="h-3 w-3 mt-1 text-muted-foreground flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">
+                              {conversation.title || "Untitled Chat"}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(
+                                conversation.createdAt
+                              ).toLocaleDateString()}
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                    </Link>
-                  </Button>
+                      </Link>
+                    </Button>
+                    
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                        >
+                          <MoreHorizontal className="h-3 w-3" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                              <Trash2 className="h-3 w-3 mr-2" />
+                              <span className="text-red-600 text-xs">Delete</span>
+                            </DropdownMenuItem>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Conversation</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete &quot;{conversation.title || "Untitled Chat"}&quot;? This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleDeleteConversation(conversation.id)}
+                                className="bg-red-600 hover:bg-red-700"
+                              >
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 ))
               )}
             </div>
