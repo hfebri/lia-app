@@ -24,6 +24,8 @@ import {
   Upload,
   Paperclip,
   X,
+  Edit2,
+  Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -46,6 +48,8 @@ export function EnhancedChatInterface({
   const [conversationTitle, setConversationTitle] =
     useState<string>("AI Assistant");
   const [isLoadingConversation, setIsLoadingConversation] = useState(false);
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [tempTitle, setTempTitle] = useState("");
 
   // Get conversation ID from URL
   const searchParams = useSearchParams();
@@ -180,6 +184,58 @@ export function EnhancedChatInterface({
       setConversationTitle("AI Assistant");
     }
   }, [searchParams, currentConversationId, loadConversationData]);
+
+  // Rename conversation
+  const handleRenameConversation = async (newTitle: string) => {
+    if (!currentConversationId || !newTitle.trim()) {
+      setIsEditingTitle(false);
+      setTempTitle("");
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/conversations/${currentConversationId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: newTitle.trim(),
+        }),
+      });
+
+      if (response.ok) {
+        setConversationTitle(newTitle.trim());
+        setIsEditingTitle(false);
+        setTempTitle("");
+      } else {
+        console.error("Failed to rename conversation");
+        // Reset to original title on error
+        setIsEditingTitle(false);
+        setTempTitle("");
+      }
+    } catch (error) {
+      console.error("Error renaming conversation:", error);
+      setIsEditingTitle(false);
+      setTempTitle("");
+    }
+  };
+
+  const startEditingTitle = () => {
+    setTempTitle(conversationTitle);
+    setIsEditingTitle(true);
+  };
+
+  const cancelEditingTitle = () => {
+    setIsEditingTitle(false);
+    setTempTitle("");
+  };
+
+  const handleTitleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      handleRenameConversation(tempTitle);
+    } else if (e.key === "Escape") {
+      cancelEditingTitle();
+    }
+  };
 
   // Save conversation to database when sending message
   const saveToDatabase = async (content: string) => {
@@ -389,7 +445,7 @@ export function EnhancedChatInterface({
 
   return (
     <div
-      className={cn("flex h-full relative", className)}
+      className={cn("flex flex-col h-full w-full relative max-w-full overflow-hidden", className)}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -410,22 +466,65 @@ export function EnhancedChatInterface({
       )}
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-w-0 w-full min-h-0 overflow-hidden">
         {/* Header */}
-        <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shrink-0">
           <div className="flex items-center justify-between p-4">
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
                 <Brain className="h-6 w-6 text-primary" />
                 <div>
-                  <h1 className="text-lg font-semibold">
-                    {conversationTitle}
-                    {isLoadingConversation && (
-                      <span className="ml-2 inline-block">
-                        <Loader2 className="h-3 w-3 animate-spin inline" />
-                      </span>
+                  <div className="flex items-center gap-2">
+                    {isEditingTitle && currentConversationId ? (
+                      <div className="flex items-center gap-2">
+                        <Input
+                          value={tempTitle}
+                          onChange={(e) => setTempTitle(e.target.value)}
+                          onKeyDown={handleTitleKeyPress}
+                          onBlur={() => handleRenameConversation(tempTitle)}
+                          className="text-lg font-semibold h-8 px-2 min-w-[200px]"
+                          autoFocus
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRenameConversation(tempTitle)}
+                          className="h-8 w-8 p-0"
+                        >
+                          <Check className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={cancelEditingTitle}
+                          className="h-8 w-8 p-0"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 group">
+                        <h1 className="text-lg font-semibold">
+                          {conversationTitle}
+                          {isLoadingConversation && (
+                            <span className="ml-2 inline-block">
+                              <Loader2 className="h-3 w-3 animate-spin inline" />
+                            </span>
+                          )}
+                        </h1>
+                        {currentConversationId && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={startEditingTitle}
+                            className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
                     )}
-                  </h1>
+                  </div>
                   {currentModel && (
                     <p className="text-sm text-muted-foreground">
                       {currentModel.name}
@@ -464,21 +563,33 @@ export function EnhancedChatInterface({
         </div>
 
         {/* Messages Area */}
-        <div className="flex-1 overflow-hidden">
-          <ScrollArea className="h-full">
-            <div className="p-4 space-y-4">
+        <div className="flex-1 overflow-hidden min-w-0">
+          <ScrollArea className="h-full w-full">
+            <div className="p-4 space-y-4 pb-6 max-w-full">
               {messages.length === 0 ? (
                 <div className="flex items-center justify-center h-64">
-                  <div className="text-center">
-                    <Brain className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">
-                      Start a conversation
-                    </h3>
-                    <p className="text-muted-foreground mb-4">
-                      Ask questions, upload files for analysis using the
-                      paperclip button, or start typing below
-                    </p>
-                  </div>
+                  {isLoadingConversation ? (
+                    <div className="text-center">
+                      <Loader2 className="h-12 w-12 text-muted-foreground mx-auto mb-4 animate-spin" />
+                      <h3 className="text-lg font-semibold mb-2">
+                        Loading conversation...
+                      </h3>
+                      <p className="text-muted-foreground mb-4">
+                        Please wait while we fetch your messages
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="text-center">
+                      <Brain className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                      <h3 className="text-lg font-semibold mb-2">
+                        Start a conversation
+                      </h3>
+                      <p className="text-muted-foreground mb-4">
+                        Ask questions, upload files for analysis using the
+                        paperclip button, or start typing below
+                      </p>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <>
@@ -518,9 +629,9 @@ export function EnhancedChatInterface({
           </ScrollArea>
         </div>
 
-        {/* Input Area */}
-        <div className="border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="p-4 space-y-3">
+        {/* Input Area - Fixed at bottom */}
+        <div className="border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shrink-0 w-full min-w-0">
+          <div className="p-4 space-y-3 max-w-full">
             {/* Attached Files */}
             {attachedFiles.length > 0 && (
               <div className="space-y-2">
@@ -608,7 +719,7 @@ export function EnhancedChatInterface({
               )}
 
               {/* Chat Input */}
-              <div className="flex items-end gap-3 p-4 bg-muted/30 rounded-xl border border-border/60 shadow-sm transition-all duration-200 focus-within:shadow-md focus-within:border-border">
+              <div className="flex items-end gap-3 p-4 bg-muted/30 rounded-xl border border-border/60 shadow-sm transition-all duration-200 focus-within:shadow-md focus-within:border-border min-w-0 max-w-full overflow-hidden">
                 <input
                   type="file"
                   ref={(ref) => {
@@ -649,7 +760,7 @@ export function EnhancedChatInterface({
                     onKeyDown={handleKeyPress}
                     placeholder="Type your message..."
                     disabled={isLoading || isStreaming}
-                    className="border-0 bg-transparent text-sm placeholder:text-muted-foreground focus-visible:ring-0 shadow-none px-0 min-h-[40px]"
+                    className="border-0 bg-transparent text-sm placeholder:text-muted-foreground focus-visible:ring-0 shadow-none px-0 min-h-[40px] resize-none overflow-hidden"
                   />
                 </div>
 

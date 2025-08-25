@@ -34,6 +34,29 @@ import { DashboardSkeleton } from "./dashboard-skeleton";
 export function DashboardOverview() {
   const { data: analytics, isLoading, error, refetch } = useUserAnalytics();
 
+  const handleRenameConversation = async (id: string, newTitle: string) => {
+    try {
+      const response = await fetch(`/api/conversations/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: newTitle,
+        }),
+      });
+
+      if (response.ok) {
+        // Refresh the analytics data to get updated conversation list
+        refetch();
+      } else {
+        console.error("Failed to rename conversation");
+        throw new Error("Failed to rename conversation");
+      }
+    } catch (error) {
+      console.error("Error renaming conversation:", error);
+      throw error;
+    }
+  };
+
   if (isLoading) {
     return <DashboardSkeleton />;
   }
@@ -234,7 +257,10 @@ export function DashboardOverview() {
             <CardDescription>Your latest AI interactions</CardDescription>
           </CardHeader>
           <CardContent>
-            <RecentConversations data={analytics?.recentConversations} />
+            <RecentConversations 
+              data={analytics?.recentConversations} 
+              onRename={handleRenameConversation}
+            />
           </CardContent>
         </Card>
 

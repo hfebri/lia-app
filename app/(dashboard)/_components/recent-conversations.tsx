@@ -1,11 +1,19 @@
 "use client";
 
+import { useState } from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Clock, MessageSquare, ArrowRight } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Clock, MessageSquare, ArrowRight, Edit2, Check, X, MoreHorizontal } from "lucide-react";
 import Link from "next/link";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface RecentConversationsProps {
   data?: Array<{
@@ -16,9 +24,48 @@ interface RecentConversationsProps {
     createdAt: string;
     updatedAt: string;
   }>;
+  onRename?: (id: string, newTitle: string) => Promise<void>;
 }
 
-export function RecentConversations({ data }: RecentConversationsProps) {
+export function RecentConversations({ data, onRename }: RecentConversationsProps) {
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [tempTitle, setTempTitle] = useState("");
+  const handleRename = async (id: string, newTitle: string) => {
+    if (!newTitle.trim() || !onRename) {
+      setEditingId(null);
+      setTempTitle("");
+      return;
+    }
+
+    try {
+      await onRename(id, newTitle.trim());
+      setEditingId(null);
+      setTempTitle("");
+    } catch (error) {
+      console.error("Failed to rename conversation:", error);
+      setEditingId(null);
+      setTempTitle("");
+    }
+  };
+
+  const startEditing = (id: string, currentTitle: string) => {
+    setEditingId(id);
+    setTempTitle(currentTitle);
+  };
+
+  const cancelEditing = () => {
+    setEditingId(null);
+    setTempTitle("");
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent, id: string) => {
+    if (e.key === "Enter") {
+      handleRename(id, tempTitle);
+    } else if (e.key === "Escape") {
+      cancelEditing();
+    }
+  };
+
   // Function to format relative time
   const getRelativeTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -68,7 +115,7 @@ export function RecentConversations({ data }: RecentConversationsProps) {
         data.map((conversation) => (
           <div
             key={conversation.id}
-            className="flex items-center gap-4 p-4 rounded-lg border hover:bg-muted/50 transition-colors"
+            className="flex items-center gap-4 p-4 rounded-lg border hover:bg-muted/50 transition-colors group"
           >
             <Avatar>
               <AvatarFallback>
@@ -78,13 +125,44 @@ export function RecentConversations({ data }: RecentConversationsProps) {
 
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
-                <h4 className="font-medium truncate">{conversation.title}</h4>
-                <Badge
-                  variant="secondary"
-                  className="text-xs"
-                >
-                  {conversation.messageCount} msgs
-                </Badge>
+                {editingId === conversation.id ? (
+                  <div className="flex items-center gap-2 flex-1">
+                    <Input
+                      value={tempTitle}
+                      onChange={(e) => setTempTitle(e.target.value)}
+                      onKeyDown={(e) => handleKeyPress(e, conversation.id)}
+                      onBlur={() => handleRename(conversation.id, tempTitle)}
+                      className="text-sm font-medium h-6 px-2 flex-1"
+                      autoFocus
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleRename(conversation.id, tempTitle)}
+                      className="h-6 w-6 p-0"
+                    >
+                      <Check className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={cancelEditing}
+                      className="h-6 w-6 p-0"
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <h4 className="font-medium truncate flex-1">{conversation.title}</h4>
+                    <Badge
+                      variant="secondary"
+                      className="text-xs"
+                    >
+                      {conversation.messageCount} msgs
+                    </Badge>
+                  </>
+                )}
               </div>
               <p className="text-sm text-muted-foreground truncate mb-2">
                 {conversation.lastMessage}
@@ -101,11 +179,29 @@ export function RecentConversations({ data }: RecentConversationsProps) {
               </div>
             </div>
 
-            <Button asChild variant="ghost" size="sm">
-              <Link href={`/chat?conversation=${conversation.id}`}>
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-            </Button>
+            <div className="flex items-center gap-2">
+              {editingId !== conversation.id && onRename && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => startEditing(conversation.id, conversation.title)}>
+                      <Edit2 className="h-4 w-4 mr-2" />
+                      Rename
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+              
+              <Button asChild variant="ghost" size="sm">
+                <Link href={`/chat?conversation=${conversation.id}`}>
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </Button>
+            </div>
           </div>
         ))
       ) : (
