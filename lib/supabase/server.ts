@@ -27,3 +27,27 @@ export async function createClient() {
     }
   );
 }
+
+// Alternative method for route handlers
+export function createRouteHandlerClient(request: Request, response: Response) {
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          const cookies = request.headers.get('cookie');
+          return cookies?.split(';').map(cookie => {
+            const [name, value] = cookie.trim().split('=');
+            return { name, value };
+          }) || [];
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            response.headers.set('Set-Cookie', `${name}=${value}; Path=/; HttpOnly; ${options?.secure ? 'Secure;' : ''} SameSite=Lax`);
+          });
+        },
+      },
+    }
+  );
+}

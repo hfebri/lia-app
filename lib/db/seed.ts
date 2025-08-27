@@ -1,6 +1,5 @@
 import { config } from "dotenv";
 import { seedUsers } from "./seeds/users";
-import { seedTemplates } from "./seeds/templates";
 import { seedAnalytics } from "./seeds/analytics";
 
 // Load environment variables
@@ -13,11 +12,8 @@ export async function runSeed() {
   console.log("=====================================");
 
   try {
-    // Seed in order: users first, then templates (which depend on users), then analytics
+    // Seed in order: users first, then analytics
     await seedUsers();
-    console.log("");
-
-    await seedTemplates();
     console.log("");
 
     await seedAnalytics();

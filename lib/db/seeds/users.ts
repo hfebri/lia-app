@@ -22,6 +22,12 @@ export async function seedUsers() {
       isActive: true,
     },
     {
+      email: "hfebri@leverategroup.asia", // Your actual email with admin access
+      name: "H Febri",
+      role: "admin",
+      isActive: true,
+    },
+    {
       email: "demo@lia-app.com",
       name: "Demo User",
       role: "user",

@@ -4,8 +4,51 @@ import type { AIMessage } from "@/lib/ai/types";
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { messages, model = "openai/gpt-5", stream = false } = body;
+    let messages,
+      model = "openai/gpt-5",
+      stream = false,
+      files = [];
+
+    const contentType = request.headers.get("content-type") || "";
+
+    if (contentType.includes("multipart/form-data")) {
+      // Handle FormData for file uploads
+      const formData = await request.formData();
+
+      messages = JSON.parse((formData.get("messages") as string) || "[]");
+      model = (formData.get("model") as string) || "openai/gpt-5";
+      stream = formData.get("stream") === "true";
+
+      // Extract files
+      const fileEntries = Array.from(formData.entries()).filter(([key]) =>
+        key.startsWith("file_")
+      );
+      files = await Promise.all(
+        fileEntries.map(async ([, file]) => {
+          const f = file as File;
+          const buffer = await f.arrayBuffer();
+          return {
+            name: f.name,
+            type: f.type,
+            size: f.size,
+            data: Buffer.from(buffer).toString("base64"),
+          };
+        })
+      );
+    } else {
+      // Handle JSON for text-only messages or messages with base64 files
+      const body = await request.json();
+      ({ messages, model, stream } = body);
+
+      // Extract files from messages if they contain file data
+      if (messages && Array.isArray(messages)) {
+        messages.forEach((msg: any) => {
+          if (msg.files && Array.isArray(msg.files)) {
+            files.push(...msg.files);
+          }
+        });
+      }
+    }
 
     // Validate required fields
     if (!messages || !Array.isArray(messages)) {
@@ -18,11 +61,24 @@ export async function POST(request: NextRequest) {
     // Initialize AI service
     const aiService = new AIService();
 
+    // Determine provider based on model
+    let provider: "replicate" | "gemini" = "replicate";
+    if (model.startsWith("gemini")) {
+      provider = "gemini";
+    }
+
     // Convert messages to AI format
-    const aiMessages: AIMessage[] = messages.map((msg: any) => ({
-      role: msg.role as "user" | "assistant" | "system",
-      content: msg.content,
-    }));
+    const aiMessages: AIMessage[] = messages.map((msg: any, index: number) => {
+      // If this is the last user message and we have files, include them
+      const isLastUserMessage =
+        index === messages.length - 1 && msg.role === "user";
+
+      return {
+        role: msg.role as "user" | "assistant" | "system",
+        content: msg.content,
+        files: isLastUserMessage && files.length > 0 ? files : undefined,
+      };
+    });
 
     if (stream) {
       // Create streaming response
@@ -32,6 +88,7 @@ export async function POST(request: NextRequest) {
           try {
             const stream = aiService.generateStream(aiMessages, {
               model,
+              provider,
               temperature: 0.7,
               max_tokens: 1000,
             });
@@ -77,6 +134,7 @@ export async function POST(request: NextRequest) {
       // Generate non-streaming response
       const response = await aiService.generateResponse(aiMessages, {
         model,
+        provider,
         temperature: 0.7,
         max_tokens: 1000,
       });

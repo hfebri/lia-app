@@ -15,23 +15,18 @@ interface ProtectedRouteProps {
 export function ProtectedRoute({
   children,
   fallback,
-  redirectTo = "/auth/signin",
+  redirectTo = "/",
   requireActive = true,
 }: ProtectedRouteProps) {
-  // TEMPORARY: Bypass authentication for testing
-  // Remove this and uncomment the code below to re-enable authentication
-  return <>{children}</>;
-
-  /* 
-  // Original authentication code - uncomment to re-enable
-  const { isAuthenticated, isLoading, user } = useAuth();
+  const { isAuthenticated, isLoading, user, forceLogout } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      router.push(redirectTo);
+      console.log("Protected route: User not authenticated, forcing logout");
+      forceLogout();
     }
-  }, [isAuthenticated, isLoading, router, redirectTo]);
+  }, [isAuthenticated, isLoading, forceLogout]);
 
   // Show loading state
   if (isLoading) {
@@ -74,11 +69,11 @@ export function ProtectedRoute({
             Your account has been deactivated. Please contact support for
             assistance.
           </p>
+          <LoginButton />
         </div>
       </div>
     );
   }
 
   return <>{children}</>;
-  */
 }

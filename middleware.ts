@@ -3,14 +3,6 @@ import { NextResponse, type NextRequest } from "next/server";
 import { PROTECTED_ROUTES, ADMIN_ROUTES } from "./lib/auth/config";
 
 export async function middleware(request: NextRequest) {
-  // TEMPORARY: Bypass all authentication for testing
-  // Remove this return statement and uncomment the code below to re-enable authentication
-  return NextResponse.next({
-    request,
-  });
-
-  /*
-  // Original middleware code - uncomment to re-enable authentication
   let supabaseResponse = NextResponse.next({
     request,
   });
@@ -70,9 +62,9 @@ export async function middleware(request: NextRequest) {
     return supabaseResponse;
   }
 
-  // If no session and trying to access protected route, redirect to sign in
+  // If no session and trying to access protected route, redirect to home
   if (!session && isProtectedRoute) {
-    const redirectUrl = new URL("/auth/signin", request.url);
+    const redirectUrl = new URL("/", request.url);
     redirectUrl.searchParams.set("redirectTo", pathname);
     return NextResponse.redirect(redirectUrl);
   }
@@ -94,7 +86,7 @@ export async function middleware(request: NextRequest) {
 
         if (!user.isActive) {
           return NextResponse.redirect(
-            new URL("/auth/signin?error=account_inactive", request.url)
+            new URL("/?error=account_inactive", request.url)
           );
         }
 
@@ -102,22 +94,21 @@ export async function middleware(request: NextRequest) {
           return NextResponse.redirect(new URL("/unauthorized", request.url));
         }
       } else {
-        // If we can't verify user, redirect to sign in
-        return NextResponse.redirect(new URL("/auth/signin", request.url));
+        // If we can't verify user, redirect to home
+        return NextResponse.redirect(new URL("/", request.url));
       }
     } catch (error) {
       console.error("Error checking user role in middleware:", error);
-      return NextResponse.redirect(new URL("/auth/signin", request.url));
+      return NextResponse.redirect(new URL("/", request.url));
     }
   }
 
-  // If authenticated and trying to access sign-in page, redirect to dashboard
+  // If authenticated and trying to access sign-in page, redirect to home
   if (session && pathname.startsWith("/auth/signin")) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+    return NextResponse.redirect(new URL("/", request.url));
   }
 
   return supabaseResponse;
-  */
 }
 
 export const config = {

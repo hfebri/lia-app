@@ -15,6 +15,13 @@ export interface ChatMessage {
   };
 }
 
+export interface ChatFile {
+  name: string;
+  type: string;
+  size: number;
+  data: string; // base64 encoded
+}
+
 export interface StreamingChatResponse {
   content: string;
   isComplete: boolean;
@@ -54,6 +61,7 @@ export class ChatService {
    */
   async sendMessage(
     messages: ChatMessage[],
+    files: (File | ChatFile)[] = [],
     options: ChatServiceOptions = {}
   ): Promise<AIResponse> {
     const {
@@ -61,25 +69,76 @@ export class ChatService {
       temperature = 0.7,
       maxTokens = 1000,
     } = options;
+
     // Convert messages to AI format
     const aiMessages: AIMessage[] = messages.map((msg) => ({
       role: msg.role,
       content: msg.content,
     }));
 
-    const response = await fetch(`${this.baseUrl}/chat`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        messages: aiMessages,
-        model,
-        stream: false,
-        temperature,
-        maxTokens,
-      }),
-    });
+    let response: Response;
+
+    if (files.length > 0) {
+      // Check if files are File objects or ChatFile objects
+      const hasFileObjects = files.some((file) => file instanceof File);
+
+      if (hasFileObjects) {
+        // Use FormData for File objects
+        const formData = new FormData();
+        formData.append("messages", JSON.stringify(aiMessages));
+        formData.append("model", model);
+        formData.append("stream", "false");
+        formData.append("temperature", temperature.toString());
+        formData.append("maxTokens", maxTokens.toString());
+
+        files.forEach((file, index) => {
+          if (file instanceof File) {
+            formData.append(`file_${index}`, file);
+          }
+        });
+
+        response = await fetch(`${this.baseUrl}/chat`, {
+          method: "POST",
+          body: formData,
+        });
+      } else {
+        // Use JSON for ChatFile objects with base64 data
+        const chatFiles = files as ChatFile[];
+        const lastMessage = aiMessages[aiMessages.length - 1];
+        if (lastMessage && lastMessage.role === "user") {
+          lastMessage.files = chatFiles;
+        }
+
+        response = await fetch(`${this.baseUrl}/chat`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            messages: aiMessages,
+            model,
+            stream: false,
+            temperature,
+            maxTokens,
+          }),
+        });
+      }
+    } else {
+      // Use JSON for text-only messages
+      response = await fetch(`${this.baseUrl}/chat`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          messages: aiMessages,
+          model,
+          stream: false,
+          temperature,
+          maxTokens,
+        }),
+      });
+    }
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
@@ -102,6 +161,7 @@ export class ChatService {
    */
   async *sendStreamingMessage(
     messages: ChatMessage[],
+    files: (File | ChatFile)[] = [],
     options: ChatServiceOptions = {}
   ): AsyncGenerator<StreamingChatResponse> {
     const {
@@ -116,19 +176,69 @@ export class ChatService {
       content: msg.content,
     }));
 
-    const response = await fetch(`${this.baseUrl}/chat`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        messages: aiMessages,
-        model,
-        stream: true,
-        temperature,
-        maxTokens,
-      }),
-    });
+    let response: Response;
+
+    if (files.length > 0) {
+      // Check if files are File objects or ChatFile objects
+      const hasFileObjects = files.some((file) => file instanceof File);
+
+      if (hasFileObjects) {
+        // Use FormData for File objects
+        const formData = new FormData();
+        formData.append("messages", JSON.stringify(aiMessages));
+        formData.append("model", model);
+        formData.append("stream", "true");
+        formData.append("temperature", temperature.toString());
+        formData.append("maxTokens", maxTokens.toString());
+
+        files.forEach((file, index) => {
+          if (file instanceof File) {
+            formData.append(`file_${index}`, file);
+          }
+        });
+
+        response = await fetch(`${this.baseUrl}/chat`, {
+          method: "POST",
+          body: formData,
+        });
+      } else {
+        // Use JSON for ChatFile objects with base64 data
+        const chatFiles = files as ChatFile[];
+        const lastMessage = aiMessages[aiMessages.length - 1];
+        if (lastMessage && lastMessage.role === "user") {
+          lastMessage.files = chatFiles;
+        }
+
+        response = await fetch(`${this.baseUrl}/chat`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            messages: aiMessages,
+            model,
+            stream: true,
+            temperature,
+            maxTokens,
+          }),
+        });
+      }
+    } else {
+      // Use JSON for text-only messages
+      response = await fetch(`${this.baseUrl}/chat`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          messages: aiMessages,
+          model,
+          stream: true,
+          temperature,
+          maxTokens,
+        }),
+      });
+    }
 
     if (!response.ok) {
       const errorText = await response.text();

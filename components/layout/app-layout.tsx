@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Header } from "@/components/shared/header";
 import { Sidebar } from "@/components/shared/sidebar";
 import { Footer } from "@/components/shared/footer";
 import { ErrorBoundary } from "@/components/shared/error-boundary";
@@ -23,7 +22,6 @@ interface AppLayoutProps {
   children: React.ReactNode;
   className?: string;
   showSidebar?: boolean;
-  showHeader?: boolean;
   showFooter?: boolean;
 }
 
@@ -31,7 +29,6 @@ export function AppLayout({
   children,
   className,
   showSidebar = false,
-  showHeader = true,
   showFooter = true,
 }: AppLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -47,11 +44,6 @@ export function AppLayout({
   return (
     <ErrorBoundary>
       <div className="min-h-screen bg-background">
-        {/* Header - only show when not using sidebar */}
-        {showHeader && !showSidebar && (
-          <Header onMobileMenuToggle={() => setSidebarOpen(true)} />
-        )}
-
         <div className="flex">
           {/* Desktop Sidebar */}
           {showSidebar && (
@@ -98,15 +90,13 @@ export function AppLayout({
           <main
             className={cn(
               "flex-1 flex flex-col min-h-screen overflow-hidden",
-              showHeader && !showSidebar
-                ? "min-h-[calc(100vh-3.5rem)]"
-                : showSidebar
+              showSidebar
                 ? "min-h-screen md:pl-64 pt-14 md:pt-0"
                 : "min-h-screen",
               className
             )}
           >
-            <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 h-full flex flex-col">
+            <div className="h-full">
               <ErrorBoundary>{children}</ErrorBoundary>
             </div>
           </main>
@@ -122,7 +112,7 @@ export function AppLayout({
 // Specialized layouts for different sections
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
-    <AppLayout showSidebar={true} showHeader={false} showFooter={false}>
+    <AppLayout showSidebar={true} showFooter={false}>
       {children}
     </AppLayout>
   );
@@ -132,7 +122,6 @@ export function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
     <AppLayout
       showSidebar={false}
-      showHeader={true}
       showFooter={true}
       className="flex items-center justify-center"
     >
@@ -143,7 +132,7 @@ export function AuthLayout({ children }: { children: React.ReactNode }) {
 
 export function LandingLayout({ children }: { children: React.ReactNode }) {
   return (
-    <AppLayout showSidebar={false} showHeader={true} showFooter={true}>
+    <AppLayout showSidebar={false} showFooter={true}>
       {children}
     </AppLayout>
   );

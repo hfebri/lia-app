@@ -24,6 +24,9 @@ import {
   MoreHorizontal,
   Edit2,
   Trash2,
+  User,
+  LogOut,
+  RefreshCw,
 } from "lucide-react";
 import { SimpleThemeToggle } from "@/components/ui/theme-toggle";
 import {
@@ -44,6 +47,9 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { AuthButton } from "@/components/auth/auth-button";
+import { LogoutButton } from "@/components/auth/logout-button";
 
 interface SidebarProps {
   className?: string;
@@ -95,11 +101,16 @@ const adminItems: NavItem[] = [
 export const Sidebar = memo(function Sidebar({ className }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user } = useAuth();
-  const { conversations, createConversation, deleteConversation, isLoading } = useConversations();
+  const { user, isAuthenticated, refreshSession, checkRole } = useAuth();
+  const { conversations, createConversation, deleteConversation, isLoading } =
+    useConversations();
 
   // Helper function to check user role
   const hasRole = (role: string) => {
+    console.log("User object:", user);
+    console.log("User role:", user?.role);
+    console.log("Checking role:", role);
+    console.log("Has role result:", user?.role === role);
     return user?.role === role;
   };
 
@@ -128,8 +139,9 @@ export const Sidebar = memo(function Sidebar({ className }: SidebarProps) {
   };
 
   return (
-    <div className={cn("pb-12 w-64", className)}>
-      <div className="space-y-4 py-4">
+    <div className={cn("h-full w-64 flex flex-col", className)}>
+      <div className="flex-1 overflow-y-auto overflow-x-hidden">
+        <div className="space-y-4 py-4">
         {/* Logo and Theme Toggle */}
         <div className="px-3 py-2">
           <div className="flex items-center justify-between pl-3 mb-14">
@@ -202,7 +214,10 @@ export const Sidebar = memo(function Sidebar({ className }: SidebarProps) {
                 </div>
               ) : (
                 conversations.slice(0, 10).map((conversation) => (
-                  <div key={conversation.id} className="flex items-center gap-1 group">
+                  <div
+                    key={conversation.id}
+                    className="flex items-center gap-1 group"
+                  >
                     <Button
                       variant="ghost"
                       className="flex-1 justify-start h-auto p-2 text-left"
@@ -224,7 +239,7 @@ export const Sidebar = memo(function Sidebar({ className }: SidebarProps) {
                         </div>
                       </Link>
                     </Button>
-                    
+
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button
@@ -238,22 +253,32 @@ export const Sidebar = memo(function Sidebar({ className }: SidebarProps) {
                       <DropdownMenuContent align="end">
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                            <DropdownMenuItem
+                              onSelect={(e) => e.preventDefault()}
+                            >
                               <Trash2 className="h-3 w-3 mr-2" />
-                              <span className="text-red-600 text-xs">Delete</span>
+                              <span className="text-red-600 text-xs">
+                                Delete
+                              </span>
                             </DropdownMenuItem>
                           </AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>
-                              <AlertDialogTitle>Delete Conversation</AlertDialogTitle>
+                              <AlertDialogTitle>
+                                Delete Conversation
+                              </AlertDialogTitle>
                               <AlertDialogDescription>
-                                Are you sure you want to delete &quot;{conversation.title || "Untitled Chat"}&quot;? This action cannot be undone.
+                                Are you sure you want to delete &quot;
+                                {conversation.title || "Untitled Chat"}&quot;?
+                                This action cannot be undone.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
                               <AlertDialogCancel>Cancel</AlertDialogCancel>
                               <AlertDialogAction
-                                onClick={() => handleDeleteConversation(conversation.id)}
+                                onClick={() =>
+                                  handleDeleteConversation(conversation.id)
+                                }
                                 className="bg-red-600 hover:bg-red-700"
                               >
                                 Delete
@@ -270,8 +295,8 @@ export const Sidebar = memo(function Sidebar({ className }: SidebarProps) {
           </ScrollArea>
         </div>
 
-        {/* Admin Section - HIDDEN */}
-        {/* {user && hasRole("admin") && (
+        {/* Admin Section */}
+        {user && hasRole("admin") && (
           <>
             <Separator className="mx-3" />
             <div className="px-3 py-2">
@@ -308,7 +333,58 @@ export const Sidebar = memo(function Sidebar({ className }: SidebarProps) {
               </div>
             </div>
           </>
-        )} */}
+        )}
+        </div>
+      </div>
+
+      {/* User Section - Sticky at bottom */}
+      <div className="flex-shrink-0 px-3 py-4 border-t bg-background">
+          {isAuthenticated && user ? (
+            <>
+              {/* User Profile & Actions */}
+              <div className="space-y-2">
+                {/* User Info */}
+                <div className="flex items-center gap-3 px-3 py-2 bg-muted/50 rounded-lg">
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={user.image || ""} alt={user.name || ""} />
+                    <AvatarFallback>
+                      {user.name?.charAt(0) || user.email?.charAt(0) || "U"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">
+                      {user.name || "User"}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs text-muted-foreground truncate">
+                        {user.email}
+                      </p>
+                      {checkRole("admin") && (
+                        <Badge variant="secondary" className="text-xs px-1">
+                          Admin
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex justify-center mt-2">
+                  <LogoutButton variant="ghost" size="sm" className="w-full">
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Sign out
+                  </LogoutButton>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="text-center">
+              <AuthButton 
+                className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+                loginText="Sign in"
+              />
+            </div>
+          )}
       </div>
     </div>
   );

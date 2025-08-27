@@ -63,7 +63,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
 
   // Send a message with streaming response
   const sendMessage = useCallback(
-    async (content: string, stream: boolean = true) => {
+    async (content: string, files?: File[], stream: boolean = true) => {
       // Validate message
       const validation = chatService.current.validateMessage(content);
       if (!validation.isValid) {
@@ -102,6 +102,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
 
           const streamGenerator = chatService.current.sendStreamingMessage(
             allMessages,
+            files || [],
             { model: state.selectedModel }
           );
 
@@ -143,9 +144,13 @@ export function useAiChat(options: UseAiChatOptions = {}) {
           }
         } else {
           // Handle non-streaming response
-          const response = await chatService.current.sendMessage(allMessages, {
-            model: state.selectedModel,
-          });
+          const response = await chatService.current.sendMessage(
+            allMessages,
+            files || [],
+            {
+              model: state.selectedModel,
+            }
+          );
 
           const assistantMessage = chatService.current.createMessage(
             "assistant",
@@ -200,17 +205,6 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     }));
   }, []);
 
-  // Clear conversation
-  const clearConversation = useCallback(() => {
-    stopStreaming();
-    setState((prev) => ({
-      ...prev,
-      messages: [],
-      error: null,
-      streamingContent: "",
-    }));
-  }, [stopStreaming]);
-
   // Add a system message
   const addSystemMessage = useCallback(
     (content: string) => {
@@ -263,14 +257,17 @@ export function useAiChat(options: UseAiChatOptions = {}) {
   }, [state.messages, sendMessage]);
 
   // Set messages directly (for loading conversations)
-  const setMessages = useCallback((messages: ChatMessage[]) => {
-    setState((prev) => ({
-      ...prev,
-      messages: messages.slice(-maxMessages),
-      error: null,
-      streamingContent: "",
-    }));
-  }, [maxMessages]);
+  const setMessages = useCallback(
+    (messages: ChatMessage[]) => {
+      setState((prev) => ({
+        ...prev,
+        messages: messages.slice(-maxMessages),
+        error: null,
+        streamingContent: "",
+      }));
+    },
+    [maxMessages]
+  );
 
   return {
     // State
@@ -286,7 +283,6 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     sendMessage,
     stopStreaming,
     changeModel,
-    clearConversation,
     addSystemMessage,
     removeMessage,
     clearError,

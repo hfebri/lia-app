@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { useAiChat } from "@/hooks/use-ai-chat";
+import { uploadMultipleFilesStorageAction } from "@/actions/storage/file-storage-actions";
 import { ModelSelector } from "./model-selector";
 import { StreamingMessage } from "./streaming-message";
 import { AIResponse } from "./ai-response";
@@ -19,6 +20,10 @@ import {
   MessageCircle,
   AlertCircle,
   Loader2,
+  Paperclip,
+  X,
+  Image,
+  FileText,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -29,6 +34,31 @@ interface AiChatInterfaceProps {
 
 export function AiChatInterface({ className }: AiChatInterfaceProps) {
   const [inputValue, setInputValue] = useState("");
+  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+  const [isUploadingFiles, setIsUploadingFiles] = useState(false);
+
+  // Ref for the scrollable messages container
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+
+  // Ref for the input field to enable auto-focus
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Function to scroll to bottom smoothly
+  const scrollToBottom = useCallback(() => {
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTo({
+        top: messagesContainerRef.current.scrollHeight,
+        behavior: "smooth",
+      });
+    }
+  }, []);
+
+  // Function to focus the input field
+  const focusInput = useCallback(() => {
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 100); // Small delay to ensure DOM updates
+  }, []);
 
   const {
     messages,
@@ -41,7 +71,7 @@ export function AiChatInterface({ className }: AiChatInterfaceProps) {
     sendMessage,
     stopStreaming,
     changeModel,
-    clearConversation,
+
     clearError,
     loadModels,
     hasMessages,
@@ -54,12 +84,149 @@ export function AiChatInterface({ className }: AiChatInterfaceProps) {
     loadModels();
   }, [loadModels]);
 
+  // Auto-scroll to bottom when messages change (new message or AI response)
+  useEffect(() => {
+    if (messages.length > 0) {
+      // Use setTimeout to ensure DOM is updated first
+      setTimeout(() => {
+        scrollToBottom();
+      }, 100);
+    }
+  }, [messages, scrollToBottom]);
+
+  // Auto-scroll to bottom when streaming content updates
+  useEffect(() => {
+    if (isStreaming && streamingContent) {
+      // Use a shorter timeout for streaming updates for smoother experience
+      setTimeout(() => {
+        scrollToBottom();
+      }, 50);
+    }
+  }, [isStreaming, streamingContent, scrollToBottom]);
+
+  // Auto-scroll to bottom when component mounts (page load)
+  useEffect(() => {
+    // Use a longer timeout for initial load to ensure everything is rendered
+    const timer = setTimeout(() => {
+      scrollToBottom();
+      focusInput(); // Also focus the input on page load
+    }, 200);
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run on mount
+
   const handleSendMessage = async () => {
-    if (!inputValue.trim() || !canSend) return;
+    if (
+      (!inputValue.trim() && attachedFiles.length === 0) ||
+      !canSend ||
+      isUploadingFiles
+    )
+      return;
 
     const messageContent = inputValue.trim();
     setInputValue("");
-    await sendMessage(messageContent);
+
+    try {
+      if (attachedFiles.length > 0) {
+        setIsUploadingFiles(true);
+
+        // Upload files to Supabase first
+        const uploadResult = await uploadMultipleFilesStorageAction(
+          attachedFiles,
+          {
+            extractText: true,
+            analyzeWithAI: false,
+          }
+        );
+
+        if (!uploadResult.isSuccess) {
+          console.error("File upload failed:", uploadResult.message);
+          // Still send the message without files
+          await sendMessage(messageContent);
+        } else {
+          // Convert uploaded files to the format needed for AI
+          const uploadedFiles = uploadResult.data!.successful.map(
+            (fileData) => {
+              const originalFile = attachedFiles.find(
+                (f) => f.name === fileData.file?.originalName
+              );
+              return {
+                name: fileData.file?.originalName || "",
+                type: fileData.file?.mimeType || "",
+                size: fileData.file?.size || 0,
+                data: "", // We'll get the base64 data from the uploaded file
+                url: fileData.file?.url || "",
+                id: fileData.fileId || "",
+              };
+            }
+          );
+
+          // Read files as base64 for AI processing
+          const filesWithData = await Promise.all(
+            attachedFiles.map(async (file) => {
+              const base64 = await fileToBase64(file);
+              return {
+                name: file.name,
+                type: file.type,
+                size: file.size,
+                data: base64,
+              };
+            })
+          );
+
+          // Send message with files
+          await sendMessage(messageContent, filesWithData);
+        }
+
+        setAttachedFiles([]);
+        setIsUploadingFiles(false);
+      } else {
+        await sendMessage(messageContent);
+      }
+    } catch (error) {
+      console.error("Error in handleSendMessage:", error);
+      setIsUploadingFiles(false);
+    }
+
+    // Focus the input field for the next message
+    focusInput();
+  };
+
+  // Helper function to convert file to base64
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => {
+        const result = reader.result as string;
+        // Remove the data:mime/type;base64, prefix
+        const base64 = result.split(",")[1];
+        resolve(base64);
+      };
+      reader.onerror = reject;
+    });
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      // For now, we'll only support one file at a time for simplicity
+      setAttachedFiles([files[0]]);
+    }
+    // Reset the input
+    e.target.value = "";
+  };
+
+  const handleFileRemove = (index: number) => {
+    setAttachedFiles((files) => files.filter((_, i) => i !== index));
+  };
+
+  const getFileIcon = (file: File) => {
+    if (file.type.startsWith("image/")) {
+      return Image;
+    }
+    return FileText;
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -93,77 +260,70 @@ export function AiChatInterface({ className }: AiChatInterfaceProps) {
   }
 
   return (
-    <div className={cn("flex flex-col h-full", className)}>
-      {/* Header with Model Selector */}
-      <Card className="border-x-0 border-t-0 rounded-none">
-        <CardHeader className="py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2">
-                <Brain className="h-5 w-5 text-primary" />
-                <CardTitle className="text-lg">AI Chat</CardTitle>
+    <div className={cn("h-screen flex flex-col", className)}>
+      {/* Fixed Header with Model Selector */}
+      <div className="flex-shrink-0 bg-background border-b">
+        <Card className="border-x-0 border-t-0 border-b-0 rounded-none shadow-none">
+          <CardHeader className="py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <Brain className="h-5 w-5 text-primary" />
+                  <CardTitle className="text-lg">AI Chat</CardTitle>
+                </div>
+                {hasMessages && (
+                  <Badge variant="secondary">{messages.length} messages</Badge>
+                )}
               </div>
-              {hasMessages && (
-                <Badge variant="secondary">{messages.length} messages</Badge>
-              )}
+
+              <div className="flex items-center gap-2">
+                {/* Model Selector */}
+                <ModelSelector
+                  models={availableModels}
+                  selectedModel={selectedModel}
+                  onModelChange={changeModel}
+                  disabled={isLoading || isStreaming}
+                />
+              </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              {/* Model Selector */}
-              <ModelSelector
-                models={availableModels}
-                selectedModel={selectedModel}
-                onModelChange={changeModel}
-                disabled={isLoading || isStreaming}
-              />
+            {currentModel && (
+              <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                <span>Model: {currentModel.name}</span>
+                <Separator orientation="vertical" className="h-4" />
+                <span>Provider: {currentModel.provider}</span>
+                <Separator orientation="vertical" className="h-4" />
+                <span>Max tokens: {currentModel.maxTokens}</span>
+              </div>
+            )}
+          </CardHeader>
+        </Card>
+      </div>
 
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={clearConversation}
-                disabled={!hasMessages || isLoading || isStreaming}
-              >
-                Clear
-              </Button>
-            </div>
-          </div>
-
-          {currentModel && (
-            <div className="flex items-center gap-4 text-sm text-muted-foreground">
-              <span>Model: {currentModel.name}</span>
-              <Separator orientation="vertical" className="h-4" />
-              <span>Provider: {currentModel.provider}</span>
-              <Separator orientation="vertical" className="h-4" />
-              <span>Max tokens: {currentModel.maxTokens}</span>
-            </div>
-          )}
-        </CardHeader>
-      </Card>
-
-      {/* Messages Area */}
-      <div className="flex-1 flex flex-col min-h-0">
-        {!hasMessages && !isStreaming ? (
-          /* Welcome State */
-          <div className="flex-1 flex items-center justify-center p-8">
-            <div className="text-center max-w-md">
-              <Brain className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-              <h3 className="text-lg font-semibold mb-2">
-                Start a conversation
-              </h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                Ask me anything! I'm powered by {currentModel?.name || "AI"} and
-                ready to help.
-              </p>
-              {availableModels.length > 0 && (
-                <p className="text-xs text-muted-foreground">
-                  Choose your preferred model above to get started.
+      {/* Scrollable Messages Area */}
+      <div ref={messagesContainerRef} className="flex-1 overflow-auto">
+        <div className="p-4">
+          {!hasMessages && !isStreaming ? (
+            /* Welcome State */
+            <div className="flex items-center justify-center h-96">
+              <div className="text-center max-w-md">
+                <Brain className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+                <h3 className="text-lg font-semibold mb-2">
+                  Start a conversation
+                </h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Ask me anything! I'm powered by {currentModel?.name || "AI"}{" "}
+                  and ready to help.
                 </p>
-              )}
+                {availableModels.length > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Choose your preferred model above to get started.
+                  </p>
+                )}
+              </div>
             </div>
-          </div>
-        ) : (
-          /* Messages List */
-          <ScrollArea className="flex-1 p-4">
+          ) : (
+            /* Messages List */
             <div className="space-y-6 max-w-4xl mx-auto">
               {messages.map((message, index) => (
                 <div key={message.id}>
@@ -211,15 +371,71 @@ export function AiChatInterface({ className }: AiChatInterfaceProps) {
                 </div>
               )}
             </div>
-          </ScrollArea>
-        )}
+          )}
+        </div>
+      </div>
 
-        {/* Input Area */}
-        <div className="border-t bg-background p-4">
+      {/* Fixed Input Area */}
+      <div className="flex-shrink-0 bg-background border-t">
+        <div className="p-4">
           <div className="max-w-4xl mx-auto">
+            {/* File Attachments Preview */}
+            {attachedFiles.length > 0 && (
+              <div className="mb-3 flex flex-wrap gap-2">
+                {attachedFiles.map((file, index) => {
+                  const IconComponent = getFileIcon(file);
+                  return (
+                    <div
+                      key={index}
+                      className="flex items-center gap-2 bg-muted rounded-lg px-3 py-2 text-sm"
+                    >
+                      <IconComponent className="h-4 w-4" />
+                      <span className="truncate max-w-[200px]">
+                        {file.name}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-4 w-4 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                        onClick={() => handleFileRemove(index)}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
             <div className="flex items-center gap-2">
+              {/* File attachment button */}
+              <div className="relative">
+                <input
+                  type="file"
+                  accept="image/*,.pdf,.txt,.doc,.docx,.md,.csv,.json,.xml,.html"
+                  onChange={handleFileSelect}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  id="file-input"
+                />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className={cn(
+                    "shrink-0 transition-colors",
+                    attachedFiles.length > 0 &&
+                      "bg-blue-50 border-blue-200 text-blue-600 hover:bg-blue-100"
+                  )}
+                  asChild
+                >
+                  <label htmlFor="file-input" className="cursor-pointer">
+                    <Paperclip className="h-4 w-4" />
+                  </label>
+                </Button>
+              </div>
+
               <div className="flex-1 relative">
                 <Input
+                  ref={inputRef}
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   onKeyPress={handleKeyPress}
@@ -251,11 +467,19 @@ export function AiChatInterface({ className }: AiChatInterfaceProps) {
               ) : (
                 <Button
                   onClick={handleSendMessage}
-                  disabled={!inputValue.trim() || !canSend}
+                  disabled={
+                    (!inputValue.trim() && attachedFiles.length === 0) ||
+                    !canSend ||
+                    isUploadingFiles
+                  }
                   size="icon"
                   className="shrink-0"
                 >
-                  <Send className="h-4 w-4" />
+                  {isUploadingFiles ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
                 </Button>
               )}
             </div>

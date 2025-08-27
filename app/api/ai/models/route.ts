@@ -114,6 +114,51 @@ const AVAILABLE_MODELS = [
       unit: "1K tokens",
     },
   },
+  {
+    id: "gemini-2.5-flash",
+    name: "Gemini 2.5 Flash",
+    provider: "gemini",
+    description:
+      "Google's fast multimodal AI model with excellent performance for text and image analysis",
+    maxTokens: 8192,
+    contextWindow: 1000000,
+    isDefault: false,
+    capabilities: [
+      "text-generation",
+      "reasoning",
+      "code-generation",
+      "multimodal",
+      "instruction-following",
+      "creative-writing",
+    ],
+    pricing: {
+      input: 0.00015,
+      output: 0.0006,
+      unit: "1K tokens",
+    },
+  },
+  {
+    id: "gemini-2.5-flash-lite",
+    name: "Gemini 2.5 Flash Lite",
+    provider: "gemini",
+    description:
+      "Lightweight version of Gemini 2.5 Flash, optimized for speed and cost-efficiency",
+    maxTokens: 4096,
+    contextWindow: 1000000,
+    isDefault: false,
+    capabilities: [
+      "text-generation",
+      "reasoning",
+      "code-generation",
+      "instruction-following",
+      "chat",
+    ],
+    pricing: {
+      input: 0.000075,
+      output: 0.0003,
+      unit: "1K tokens",
+    },
+  },
 ];
 
 export async function GET() {

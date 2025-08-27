@@ -10,9 +10,14 @@ import {
 import { extractTextFromFile } from "@/lib/utils/text-extraction";
 
 // Initialize Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+// Temporary: Handle missing service key gracefully
+let supabase: any = null;
+if (supabaseUrl && supabaseServiceKey) {
+  supabase = createClient(supabaseUrl, supabaseServiceKey);
+}
 
 const STORAGE_BUCKET = process.env.SUPABASE_STORAGE_BUCKET || "user-files";
 
@@ -48,6 +53,13 @@ export async function uploadFile(
   options: FileUploadOptions
 ): Promise<FileUploadResult> {
   try {
+    // Check if Supabase is properly configured
+    if (!supabase) {
+      return {
+        success: false,
+        error: "File storage is not configured. Missing SUPABASE_SERVICE_ROLE_KEY environment variable.",
+      };
+    }
     // Validate file
     const validation = validateFile(file);
     if (!validation.isValid) {
@@ -188,6 +200,9 @@ export async function getFileDownloadUrl(
   filePath: string
 ): Promise<string | null> {
   try {
+    if (!supabase) {
+      return null;
+    }
     const { data } = supabase.storage
       .from(STORAGE_BUCKET)
       .getPublicUrl(filePath);
@@ -207,6 +222,9 @@ export async function deleteFile(
   userId: string
 ): Promise<boolean> {
   try {
+    if (!supabase) {
+      return false;
+    }
     // Get file record
     const fileRecord = await db.query.files.findFirst({
       where: (files, { eq, and }) =>
@@ -286,6 +304,10 @@ export async function getUserFiles(
   } = {}
 ) {
   try {
+    // Return empty array if file storage is not configured
+    if (!supabase) {
+      return [];
+    }
     const {
       page = 1,
       limit = 20,

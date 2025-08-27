@@ -13,7 +13,12 @@ export function useAuth() {
   };
 
   const checkRole = (role: UserRole): boolean => {
-    return hasRole(context.user, role);
+    console.log("useAuth - User object:", context.user);
+    console.log("useAuth - User role:", context.user?.role);
+    console.log("useAuth - Checking role:", role);
+    const result = hasRole(context.user, role);
+    console.log("useAuth - Has role result:", result);
+    return result;
   };
 
   const checkAdmin = (): boolean => {

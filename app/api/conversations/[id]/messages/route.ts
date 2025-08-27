@@ -135,13 +135,35 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         createMessage(msg.role as "user" | "assistant", msg.content)
       );
 
-      // Generate response using GPT-5
-      console.log("Generating AI response with GPT-5...");
+      // Determine provider based on model
+      let provider: "replicate" | "gemini" = "replicate";
+      const selectedModel = model || "openai/gpt-5";
+      console.log("📡 CONVERSATION API DEBUG: Raw model from request:", model);
+      console.log("📡 CONVERSATION API DEBUG: Selected model:", selectedModel);
+      console.log(
+        "📡 CONVERSATION API DEBUG: Model starts with 'gemini':",
+        selectedModel.startsWith("gemini")
+      );
+
+      if (selectedModel.startsWith("gemini")) {
+        provider = "gemini";
+        console.log("📡 CONVERSATION API DEBUG: Provider set to gemini");
+      } else {
+        console.log("📡 CONVERSATION API DEBUG: Provider remains replicate");
+      }
+
+      console.log("📡 CONVERSATION API DEBUG: Final provider:", provider);
+      console.log("📡 CONVERSATION API DEBUG: Final model:", selectedModel);
+
+      // Generate AI response
+      console.log(
+        `📡 CONVERSATION API DEBUG: Generating AI response with ${provider} provider using ${selectedModel}...`
+      );
       const aiResponse = await aiService.generateResponse(
         conversationMessages,
         {
-          provider: "replicate",
-          model: model || "openai/gpt-5",
+          provider,
+          model: selectedModel,
           temperature: 0.7,
           max_tokens: 1000,
         }

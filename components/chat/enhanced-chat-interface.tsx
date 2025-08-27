@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useAiChat } from "@/hooks/use-ai-chat";
 import { useFileUpload, type FileItem } from "@/hooks/use-file-upload";
 import { useSearchParams } from "next/navigation";
@@ -12,7 +12,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 
 import {
   Brain,
@@ -51,6 +50,29 @@ export function EnhancedChatInterface({
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [tempTitle, setTempTitle] = useState("");
 
+  // Ref for the scrollable messages container
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+
+  // Ref for the input field to enable auto-focus
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Function to scroll to bottom smoothly
+  const scrollToBottom = useCallback(() => {
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTo({
+        top: messagesContainerRef.current.scrollHeight,
+        behavior: "smooth",
+      });
+    }
+  }, []);
+
+  // Function to focus the input field
+  const focusInput = useCallback(() => {
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 100); // Small delay to ensure DOM updates
+  }, []);
+
   // Get conversation ID from URL
   const searchParams = useSearchParams();
 
@@ -73,7 +95,7 @@ export function EnhancedChatInterface({
     sendMessage,
     stopStreaming,
     changeModel,
-    clearConversation,
+
     clearError,
     loadModels,
     setMessages,
@@ -151,16 +173,11 @@ export function EnhancedChatInterface({
           })
         );
 
-        // Clear current messages and load the conversation messages
-        clearConversation();
-        
-        // Set the loaded messages in the chat interface
-        if (aiMessages.length > 0) {
-          setMessages(aiMessages);
-          console.log(
-            `Loaded conversation "${conversation.title}" with ${aiMessages.length} messages.`
-          );
-        }
+        // Set the loaded messages in the chat interface (replaces any existing messages)
+        setMessages(aiMessages);
+        console.log(
+          `Loaded conversation "${conversation.title}" with ${aiMessages.length} messages.`
+        );
       } catch (error) {
         console.error("Error loading conversation:", error);
         setConversationTitle("AI Assistant");
@@ -168,7 +185,7 @@ export function EnhancedChatInterface({
         setIsLoadingConversation(false);
       }
     },
-    [clearConversation]
+    [setMessages]
   );
 
   // Load conversation data when conversation ID changes
@@ -185,6 +202,38 @@ export function EnhancedChatInterface({
     }
   }, [searchParams, currentConversationId, loadConversationData]);
 
+  // Auto-scroll to bottom when messages change (new message or AI response)
+  useEffect(() => {
+    if (messages.length > 0) {
+      // Use setTimeout to ensure DOM is updated first
+      setTimeout(() => {
+        scrollToBottom();
+      }, 100);
+    }
+  }, [messages, scrollToBottom]);
+
+  // Auto-scroll to bottom when streaming content updates
+  useEffect(() => {
+    if (isStreaming && streamingContent) {
+      // Use a shorter timeout for streaming updates for smoother experience
+      setTimeout(() => {
+        scrollToBottom();
+      }, 50);
+    }
+  }, [isStreaming, streamingContent, scrollToBottom]);
+
+  // Auto-scroll to bottom when component mounts (page load)
+  useEffect(() => {
+    // Use a longer timeout for initial load to ensure everything is rendered
+    const timer = setTimeout(() => {
+      scrollToBottom();
+      focusInput(); // Also focus the input on page load
+    }, 200);
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run on mount
+
   // Rename conversation
   const handleRenameConversation = async (newTitle: string) => {
     if (!currentConversationId || !newTitle.trim()) {
@@ -194,13 +243,16 @@ export function EnhancedChatInterface({
     }
 
     try {
-      const response = await fetch(`/api/conversations/${currentConversationId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: newTitle.trim(),
-        }),
-      });
+      const response = await fetch(
+        `/api/conversations/${currentConversationId}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: newTitle.trim(),
+          }),
+        }
+      );
 
       if (response.ok) {
         setConversationTitle(newTitle.trim());
@@ -240,9 +292,11 @@ export function EnhancedChatInterface({
   // Save conversation to database when sending message
   const saveToDatabase = async (content: string) => {
     try {
-      console.log("saveToDatabase called with:", {
+      console.log("💾 SAVE TO DB DEBUG: saveToDatabase called with:", {
         currentConversationId,
         content: content.slice(0, 50) + "...",
+        selectedModel,
+        modelStartsWithGemini: selectedModel?.startsWith("gemini"),
       });
 
       if (currentConversationId) {
@@ -252,14 +306,21 @@ export function EnhancedChatInterface({
           currentConversationId
         );
 
+        const requestBody = {
+          content: content,
+          model: selectedModel,
+        };
+        console.log(
+          "💾 SAVE TO DB DEBUG: Request body:",
+          JSON.stringify(requestBody, null, 2)
+        );
+
         const response = await fetch(
           `/api/conversations/${currentConversationId}/messages`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              content: content,
-            }),
+            body: JSON.stringify(requestBody),
           }
         );
 
@@ -350,6 +411,9 @@ export function EnhancedChatInterface({
 
     // Also save to database for conversation history
     await saveToDatabase(fullContent);
+
+    // Focus the input field for the next message
+    focusInput();
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -445,7 +509,10 @@ export function EnhancedChatInterface({
 
   return (
     <div
-      className={cn("flex flex-col h-full w-full relative max-w-full overflow-hidden", className)}
+      className={cn(
+        "flex flex-col h-full w-full relative max-w-full overflow-hidden",
+        className
+      )}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -466,9 +533,9 @@ export function EnhancedChatInterface({
       )}
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col min-w-0 w-full min-h-0 overflow-hidden">
-        {/* Header */}
-        <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shrink-0">
+      <div className="h-screen flex flex-col">
+        {/* Fixed Header */}
+        <div className="flex-shrink-0 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div className="flex items-center justify-between p-4">
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
@@ -547,90 +614,77 @@ export function EnhancedChatInterface({
                 onModelChange={changeModel}
                 disabled={isLoading || isStreaming}
               />
-
-              {hasMessages && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={clearConversation}
-                  disabled={isLoading || isStreaming}
-                >
-                  Clear
-                </Button>
-              )}
             </div>
           </div>
         </div>
 
-        {/* Messages Area */}
-        <div className="flex-1 overflow-hidden min-w-0">
-          <ScrollArea className="h-full w-full">
-            <div className="p-4 space-y-4 pb-6 max-w-full">
-              {messages.length === 0 ? (
-                <div className="flex items-center justify-center h-64">
-                  {isLoadingConversation ? (
-                    <div className="text-center">
-                      <Loader2 className="h-12 w-12 text-muted-foreground mx-auto mb-4 animate-spin" />
-                      <h3 className="text-lg font-semibold mb-2">
-                        Loading conversation...
-                      </h3>
-                      <p className="text-muted-foreground mb-4">
-                        Please wait while we fetch your messages
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="text-center">
-                      <Brain className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                      <h3 className="text-lg font-semibold mb-2">
-                        Start a conversation
-                      </h3>
-                      <p className="text-muted-foreground mb-4">
-                        Ask questions, upload files for analysis using the
-                        paperclip button, or start typing below
-                      </p>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <>
-                  {messages.map((message, index) => {
-                    // Only show user or assistant messages
-                    if (message.role !== "user" && message.role !== "assistant")
-                      return null;
+        {/* Messages Area - Scrollable */}
+        <div ref={messagesContainerRef} className="flex-1 overflow-auto">
+          <div className="p-4 space-y-4 pb-6 max-w-full">
+            {messages.length === 0 ? (
+              <div className="flex items-center justify-center h-64">
+                {isLoadingConversation ? (
+                  <div className="text-center">
+                    <Loader2 className="h-12 w-12 text-muted-foreground mx-auto mb-4 animate-spin" />
+                    <h3 className="text-lg font-semibold mb-2">
+                      Loading conversation...
+                    </h3>
+                    <p className="text-muted-foreground mb-4">
+                      Please wait while we fetch your messages
+                    </p>
+                  </div>
+                ) : (
+                  <div className="text-center">
+                    <Brain className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">
+                      Start a conversation
+                    </h3>
+                    <p className="text-muted-foreground mb-4">
+                      Ask questions, upload files for analysis using the
+                      paperclip button, or start typing below
+                    </p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <>
+                {messages.map((message, index) => {
+                  // Only show user or assistant messages
+                  if (message.role !== "user" && message.role !== "assistant")
+                    return null;
 
-                    return (
-                      <MessageItem
-                        key={index}
-                        message={{
-                          id: message.id,
-                          content: message.content,
-                          role: message.role,
-                          conversationId: "temp-conversation",
-                          timestamp: new Date(),
-                          metadata: {
-                            model: message.model,
-                          },
-                        }}
-                      />
-                    );
-                  })}
-
-                  {isStreaming && streamingContent && (
-                    <StreamingMessage
-                      content={streamingContent}
-                      isStreaming={isStreaming}
-                      onStop={stopStreaming}
-                      model={selectedModel}
+                  return (
+                    <MessageItem
+                      key={index}
+                      message={{
+                        id: message.id,
+                        content: message.content,
+                        role: message.role,
+                        conversationId: "temp-conversation",
+                        timestamp: new Date(),
+                        metadata: {
+                          model: message.model,
+                        },
+                      }}
                     />
-                  )}
-                </>
-              )}
-            </div>
-          </ScrollArea>
+                  );
+                })}
+
+                {isStreaming && streamingContent && (
+                  <StreamingMessage
+                    content={streamingContent}
+                    isStreaming={isStreaming}
+                    onStop={stopStreaming}
+                    model={selectedModel}
+                  />
+                )}
+              </>
+            )}
+          </div>
         </div>
 
-        {/* Input Area - Fixed at bottom */}
-        <div className="border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shrink-0 w-full min-w-0">
+        {/* Fixed Input Area */}
+        <div className="flex-shrink-0 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 w-full min-w-0">
           <div className="p-4 space-y-3 max-w-full">
             {/* Attached Files */}
             {attachedFiles.length > 0 && (
@@ -755,12 +809,13 @@ export function EnhancedChatInterface({
 
                 <div className="flex-1 min-w-0">
                   <Input
+                    ref={inputRef}
                     value={inputValue}
                     onChange={(e) => setInputValue(e.target.value)}
                     onKeyDown={handleKeyPress}
                     placeholder="Type your message..."
                     disabled={isLoading || isStreaming}
-                    className="border-0 bg-transparent text-sm placeholder:text-muted-foreground focus-visible:ring-0 shadow-none px-0 min-h-[40px] resize-none overflow-hidden"
+                    className="border-0 bg-transparent text-sm placeholder:text-muted-foreground focus-visible:ring-0 shadow-none px-4 min-h-[40px] resize-none overflow-hidden"
                   />
                 </div>
 

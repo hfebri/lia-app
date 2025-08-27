@@ -4,6 +4,12 @@ export interface AIMessage {
   role: "user" | "assistant" | "system";
   content: string;
   timestamp?: Date;
+  files?: Array<{
+    name: string;
+    type: string;
+    size: number;
+    data: string; // base64 encoded
+  }>;
 }
 
 export interface AIStreamChunk {
