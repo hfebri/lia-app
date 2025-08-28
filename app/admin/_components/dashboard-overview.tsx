@@ -7,78 +7,29 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   MessageSquare,
   FileText,
-  Users,
   TrendingUp,
   Clock,
   Zap,
   Target,
-  Plus,
-  ArrowRight,
   RefreshCw,
   AlertCircle,
   BarChart3,
 } from "lucide-react";
 import Link from "next/link";
-import { ActivityChart } from "../../(admin)/_components/activity-chart";
-import { RecentConversations } from "../../(admin)/_components/recent-conversations";
-import { FileAnalytics } from "../../(admin)/_components/file-analytics";
-import { PopularTopics } from "../../(admin)/_components/popular-topics";
+import { ActivityChart } from "./activity-chart";
+import { FileAnalytics } from "./file-analytics";
+import { PopularTopics } from "./popular-topics";
 import { useUserAnalytics } from "@/hooks/use-user-analytics";
-import { DashboardSkeleton } from "../../(admin)/_components/dashboard-skeleton";
+import { DashboardSkeleton } from "./dashboard-skeleton";
 
 export function DashboardOverview() {
   const { data: analytics, isLoading, error, refetch } = useUserAnalytics();
-
-  const handleRenameConversation = async (id: string, newTitle: string) => {
-    try {
-      const response = await fetch(`/api/conversations/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: newTitle,
-        }),
-      });
-
-      if (response.ok) {
-        // Refresh the analytics data to get updated conversation list
-        refetch();
-      } else {
-        console.error("Failed to rename conversation");
-        throw new Error("Failed to rename conversation");
-      }
-    } catch (error) {
-      console.error("Error renaming conversation:", error);
-      throw error;
-    }
-  };
-
-  const handleDeleteConversation = async (id: string) => {
-    try {
-      const response = await fetch(`/api/conversations/${id}`, {
-        method: "DELETE",
-      });
-
-      if (response.ok) {
-        // Refresh only the analytics data to update the conversation list
-        // This avoids a full page reload and just updates the dashboard data
-        refetch();
-      } else {
-        console.error("Failed to delete conversation");
-        throw new Error("Failed to delete conversation");
-      }
-    } catch (error) {
-      console.error("Error deleting conversation:", error);
-      throw error;
-    }
-  };
 
   if (isLoading) {
     return <DashboardSkeleton />;
@@ -289,7 +240,7 @@ export function DashboardOverview() {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-1">
+      <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-3">
         <Card className="hover:shadow-md transition-shadow border-0 shadow-sm">
           <CardHeader className="pb-4">
             <CardTitle className="flex items-center gap-2 text-lg">

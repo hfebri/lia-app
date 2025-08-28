@@ -29,6 +29,24 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   MoreHorizontal,
   Search,
   Filter,
@@ -38,8 +56,15 @@ import {
   UserX,
   Mail,
   Calendar,
+  Trash2,
+  Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  updateUserRoleAction,
+  deleteUserAction,
+} from "@/actions/db/users-actions";
+import { toast } from "sonner";
 
 export interface User {
   id: string;
@@ -57,13 +82,26 @@ export interface User {
 interface UserTableProps {
   users: User[];
   onUserAction?: (userId: string, action: string) => void;
+  onRefresh?: () => void;
   className?: string;
 }
 
-export function UserTable({ users, onUserAction, className }: UserTableProps) {
+export function UserTable({
+  users,
+  onUserAction,
+  onRefresh,
+  className,
+}: UserTableProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [roleFilter, setRoleFilter] = useState<string>("all");
+
+  // Dialog states
+  const [roleDialogOpen, setRoleDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [selectedRole, setSelectedRole] = useState<"admin" | "user">("user");
+  const [isLoading, setIsLoading] = useState(false);
 
   const filteredUsers = users.filter((user) => {
     const matchesSearch =
@@ -124,6 +162,61 @@ export function UserTable({ users, onUserAction, className }: UserTableProps) {
     );
   };
 
+  const handleRoleChange = (user: User) => {
+    setSelectedUser(user);
+    setSelectedRole(user.role);
+    setRoleDialogOpen(true);
+  };
+
+  const handleDeleteUser = (user: User) => {
+    setSelectedUser(user);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmRoleChange = async () => {
+    if (!selectedUser) return;
+
+    setIsLoading(true);
+    try {
+      const result = await updateUserRoleAction(selectedUser.id, selectedRole);
+
+      if (result.isSuccess) {
+        toast.success(result.message);
+        onRefresh?.();
+      } else {
+        toast.error(result.message);
+      }
+    } catch (error) {
+      toast.error("Failed to update user role");
+    } finally {
+      setIsLoading(false);
+      setRoleDialogOpen(false);
+      setSelectedUser(null);
+    }
+  };
+
+  const confirmDeleteUser = async () => {
+    if (!selectedUser) return;
+
+    setIsLoading(true);
+    try {
+      const result = await deleteUserAction(selectedUser.id);
+
+      if (result.isSuccess) {
+        toast.success(result.message);
+        onRefresh?.();
+      } else {
+        toast.error(result.message);
+      }
+    } catch (error) {
+      toast.error("Failed to delete user");
+    } finally {
+      setIsLoading(false);
+      setDeleteDialogOpen(false);
+      setSelectedUser(null);
+    }
+  };
+
   return (
     <div className={cn("space-y-4", className)}>
       {/* Filters */}
@@ -134,7 +227,7 @@ export function UserTable({ users, onUserAction, className }: UserTableProps) {
             placeholder="Search users by email or name..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
+            className="!pl-10"
           />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -246,6 +339,10 @@ export function UserTable({ users, onUserAction, className }: UserTableProps) {
                         <UserCheck className="h-4 w-4 mr-2" />
                         View Details
                       </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleRoleChange(user)}>
+                        <Settings className="h-4 w-4 mr-2" />
+                        Change Role
+                      </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       {user.status === "active" ? (
                         <DropdownMenuItem
@@ -265,9 +362,10 @@ export function UserTable({ users, onUserAction, className }: UserTableProps) {
                         </DropdownMenuItem>
                       )}
                       <DropdownMenuItem
-                        onClick={() => onUserAction?.(user.id, "delete")}
+                        onClick={() => handleDeleteUser(user)}
                         className="text-destructive"
                       >
+                        <Trash2 className="h-4 w-4 mr-2" />
                         Delete User
                       </DropdownMenuItem>
                     </DropdownMenuContent>
@@ -285,6 +383,103 @@ export function UserTable({ users, onUserAction, className }: UserTableProps) {
           </div>
         )}
       </div>
+
+      {/* Role Change Dialog */}
+      <Dialog open={roleDialogOpen} onOpenChange={setRoleDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Change User Role</DialogTitle>
+            <DialogDescription>
+              Update the role for{" "}
+              {selectedUser?.fullName || selectedUser?.email}. This will change
+              their access permissions immediately.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Current Role</label>
+              <div className="flex items-center space-x-2">
+                {selectedUser && getRoleBadge(selectedUser.role)}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">New Role</label>
+              <Select
+                value={selectedRole}
+                onValueChange={(value: "admin" | "user") =>
+                  setSelectedRole(value)
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="user">
+                    <div className="flex items-center">
+                      <Users className="h-4 w-4 mr-2" />
+                      User
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="admin">
+                    <div className="flex items-center">
+                      <Shield className="h-4 w-4 mr-2" />
+                      Admin
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setRoleDialogOpen(false)}
+              disabled={isLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmRoleChange}
+              disabled={isLoading || selectedRole === selectedUser?.role}
+            >
+              {isLoading ? "Updating..." : "Update Role"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete User Account</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the account for{" "}
+              {selectedUser?.fullName || selectedUser?.email}? This action
+              cannot be undone and will permanently remove:
+              <ul className="list-disc list-inside mt-2 space-y-1">
+                <li>All user data and profile information</li>
+                <li>All conversations and message history</li>
+                <li>All uploaded files and documents</li>
+                <li>All analytics and usage data</li>
+              </ul>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isLoading}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteUser}
+              disabled={isLoading}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isLoading ? "Deleting..." : "Delete User"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
