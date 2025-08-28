@@ -187,6 +187,8 @@ Return only valid JSON in this format:
 ]`;
 
     console.log("🚀 Calling AI service for topic analysis...");
+    console.log('🤖 DEBUG: About to analyze topics with AI', { messagesCount: messages.length, conversationsCount: conversations.length });
+    debugger; // DEBUG: About to call AI service for topic analysis
     const response = await aiService.chat(analysisPrompt, {
       systemPrompt: "You are an expert data analyst specializing in conversation topic analysis. Return only valid JSON responses.",
       model: "openai/gpt-5",

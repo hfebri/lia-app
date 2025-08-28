@@ -82,6 +82,8 @@ export async function POST(request: NextRequest) {
 
     if (stream) {
       // Create streaming response
+      console.log('🚀 DEBUG: About to start streaming AI response', { messages: aiMessages, model });
+      debugger; // DEBUG: About to call AI service for streaming
       const encoder = new TextEncoder();
       const readable = new ReadableStream({
         async start(controller) {
@@ -132,6 +134,8 @@ export async function POST(request: NextRequest) {
       });
     } else {
       // Generate non-streaming response
+      console.log('🚀 DEBUG: About to generate non-streaming AI response', { messages: aiMessages, model });
+      debugger; // DEBUG: About to call AI service for non-streaming
       const response = await aiService.generateResponse(aiMessages, {
         model,
         provider,

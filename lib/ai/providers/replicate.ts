@@ -43,6 +43,7 @@ export class ReplicateProvider implements AIProvider {
       };
 
       console.log("Replicate API request:", { model, input });
+      debugger; // DEBUG: About to call Replicate API for non-streaming
 
       const output = await this.client.run(model as any, { input });
 
@@ -89,6 +90,7 @@ export class ReplicateProvider implements AIProvider {
       };
 
       console.log("Replicate streaming request:", { model, input });
+      debugger; // DEBUG: About to call Replicate API for streaming
 
       // For streaming, we use the stream method
       const stream = await this.client.stream(model as any, { input });

@@ -332,3 +332,33 @@
     - `components/shared/meta-tags.tsx`: SEO meta tags component
   - **Step Dependencies**: Step 19
   - **User Instructions**: Test application thoroughly, check all features work correctly
+
+###
+
+TEST KALAU UPLOAD FILE, TERJADINYA DI REPLICATE APA DI LAPTOP (KASIH DEBUGGER WAKTU PANGGIL API)
+KALAU PINDAH MENU JANGAN REFRESH CHAT HISTORY
+
+- metricsnya by department - company level - per individu
+- bisa filter by month/day/year
+  Metricnya:
+- Total active user
+- daily active rate - misal ada 100 employee, perharinya ternyata cuma 60 orang yang aktif perhari
+- total conversation
+- total message: output + input
+- response time
+  Diagram:
+- total text
+- total image uploaded
+- total file uploaded
+
+top 10 popular keywords/topic
+
+recent conversations di home hapus aja
+
+AI SURVEY
+seberapa helpful ai help daily works, pake percentage
+seberapa improve
+
+AGENTS UNTUK SOCIAL MEDIA
+
+GD dan art untuk video

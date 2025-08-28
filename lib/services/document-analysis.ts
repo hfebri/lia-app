@@ -89,6 +89,8 @@ export async function analyzeDocument(
     });
 
     // Get AI service and analyze
+    console.log('📄 DEBUG: About to analyze document with AI', { fileId, filename: file.originalName, model });
+    debugger; // DEBUG: About to call AI service for document analysis
     const aiService = getAIService();
     const response = await aiService.generateResponse(
       [
