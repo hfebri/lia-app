@@ -217,9 +217,9 @@ export function ConversationActions({
           <DialogHeader>
             <DialogTitle>Delete Conversation</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete "{conversation.title}"? This
-              action cannot be undone and will permanently remove all messages
-              in this conversation.
+              Are you sure you want to delete &quot;{conversation.title}&quot;?
+              This action cannot be undone and will permanently remove all
+              messages in this conversation.
             </DialogDescription>
           </DialogHeader>
 

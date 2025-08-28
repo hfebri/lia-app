@@ -312,8 +312,8 @@ export function AiChatInterface({ className }: AiChatInterfaceProps) {
                   Start a conversation
                 </h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Ask me anything! I'm powered by {currentModel?.name || "AI"}{" "}
-                  and ready to help.
+                  Ask me anything! I&apos;m powered by{" "}
+                  {currentModel?.name || "AI"} and ready to help.
                 </p>
                 {availableModels.length > 0 && (
                   <p className="text-xs text-muted-foreground">

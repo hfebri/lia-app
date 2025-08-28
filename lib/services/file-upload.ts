@@ -57,7 +57,8 @@ export async function uploadFile(
     if (!supabase) {
       return {
         success: false,
-        error: "File storage is not configured. Missing SUPABASE_SERVICE_ROLE_KEY environment variable.",
+        error:
+          "File storage is not configured. Missing SUPABASE_SERVICE_ROLE_KEY environment variable.",
       };
     }
     // Validate file
@@ -318,7 +319,7 @@ export async function getUserFiles(
 
     const offset = (page - 1) * limit;
 
-    let query = db.query.files.findMany({
+    const query = db.query.files.findMany({
       where: (files, { eq, and }) => {
         const conditions = [eq(files.userId, userId), eq(files.isActive, true)];
 

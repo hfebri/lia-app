@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, createContext, useContext } from "react";
 import { Sidebar } from "@/components/shared/sidebar";
 import { Footer } from "@/components/shared/footer";
 import { ErrorBoundary } from "@/components/shared/error-boundary";
@@ -91,8 +91,8 @@ export function AppLayout({
             className={cn(
               "flex-1 flex flex-col min-h-screen overflow-hidden",
               showSidebar
-                ? "min-h-screen md:pl-64 pt-14 md:pt-0"
-                : "min-h-screen",
+                ? "min-h-screen md:pl-64 md:pr-6 pt-14 md:pt-0"
+                : "min-h-screen px-6",
               className
             )}
           >

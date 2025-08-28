@@ -69,7 +69,7 @@ export default function ErrorPage({ error, reset }: ErrorPageProps) {
           </div>
           <CardTitle className="text-3xl">Application Error</CardTitle>
           <p className="text-muted-foreground mt-2 text-lg">
-            We're sorry, but something went wrong with the application.
+            We&apos;re sorry, but something went wrong with the application.
           </p>
         </CardHeader>
 

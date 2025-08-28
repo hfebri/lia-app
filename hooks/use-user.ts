@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useAuth } from "./use-auth";
 import type { User } from "../db/types";
 
@@ -165,22 +165,35 @@ export function useUser(options: UseUserOptions = {}) {
     setError(null);
   }, []);
 
-  return {
-    // Current user
-    user,
+  // Memoize the return value to prevent unnecessary re-renders
+  return useMemo(
+    () => ({
+      // Current user
+      user,
 
-    // State
-    isUpdating,
-    error,
+      // State
+      isUpdating,
+      error,
 
-    // Actions
-    updateProfile,
-    changeRole,
-    deactivateUser,
-    reactivateUser,
-    clearError,
+      // Actions
+      updateProfile,
+      changeRole,
+      deactivateUser,
+      reactivateUser,
+      clearError,
 
-    // Helpers
-    isOwnProfile: (userId: string) => user?.id === userId,
-  };
+      // Helpers
+      isOwnProfile: (userId: string) => user?.id === userId,
+    }),
+    [
+      user,
+      isUpdating,
+      error,
+      updateProfile,
+      changeRole,
+      deactivateUser,
+      reactivateUser,
+      clearError,
+    ]
+  );
 }

@@ -69,7 +69,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           error,
         } = await supabase.auth.getSession();
 
-        console.log("📱 Initial session result:", { session: !!session, error, userEmail: session?.user?.email });
+        console.log("📱 Initial session result:", {
+          session: !!session,
+          error,
+          userEmail: session?.user?.email,
+        });
 
         if (error) {
           console.error("❌ Error getting session:", error);
@@ -79,7 +83,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.log("✅ Setting session state");
           setSession(session);
           if (session?.user) {
-            console.log("👤 Session has user, fetching profile for:", session.user.email);
+            console.log(
+              "👤 Session has user, fetching profile for:",
+              session.user.email
+            );
             await fetchUserProfile(session.user.email!);
           } else {
             console.log("❌ No user in initial session");
@@ -104,11 +111,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log("🔄 Auth state change event:", event);
       console.log("📱 Session object:", session);
       console.log("👤 Session user:", session?.user);
-      
+
       setSession(session);
 
       if (session?.user) {
-        console.log("✅ User found in session, fetching profile for:", session.user.email);
+        console.log(
+          "✅ User found in session, fetching profile for:",
+          session.user.email
+        );
         await fetchUserProfile(session.user.email!);
       } else {
         console.log("❌ No user in session, clearing user state");
@@ -121,7 +131,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, [supabase, fetchUserProfile]);
 
-  const signInWithGoogle = async () => {
+  const signInWithGoogle = useCallback(async () => {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
@@ -142,9 +152,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error("Sign in error:", error);
       throw error;
     }
-  };
+  }, [supabase]);
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     try {
       const { error } = await supabase.auth.signOut();
       if (error) {
@@ -153,13 +163,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       setUser(null);
       setSession(null);
-      // Redirect to home page after logout
-      window.location.href = '/';
+      // Redirect to sign-in page after logout
+      window.location.href = "/signin";
     } catch (error) {
       console.error("Sign out error:", error);
       throw error;
     }
-  };
+  }, [supabase]);
 
   // Force logout if user is not authenticated
   const forceLogout = useCallback(async () => {
@@ -168,13 +178,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await supabase.auth.signOut();
       setUser(null);
       setSession(null);
-      window.location.href = '/';
+      window.location.href = "/signin";
     } catch (error) {
       console.error("Error during force logout:", error);
     }
   }, [supabase]);
 
-  const refreshSession = async () => {
+  const refreshSession = useCallback(async () => {
     try {
       const {
         data: { session },
@@ -193,7 +203,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error("Error refreshing session:", error);
     }
-  };
+  }, [supabase, fetchUserProfile]);
 
   // Check for authentication issues and auto-logout
   useEffect(() => {
@@ -203,16 +213,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [isLoading, session, user, forceLogout]);
 
-  const value: AuthContextType = {
-    user,
-    session,
-    isLoading,
-    isAuthenticated: !!user && user.isActive,
-    signInWithGoogle,
-    signOut,
-    refreshSession,
-    forceLogout,
-  };
+  // Memoize the context value to prevent unnecessary re-renders
+  const value: AuthContextType = useMemo(
+    () => ({
+      user,
+      session,
+      isLoading,
+      isAuthenticated: !!user && user.isActive,
+      signInWithGoogle,
+      signOut,
+      refreshSession,
+      forceLogout,
+    }),
+    [
+      user,
+      session,
+      isLoading,
+      signInWithGoogle,
+      signOut,
+      refreshSession,
+      forceLogout,
+    ]
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

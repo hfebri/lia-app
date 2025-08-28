@@ -42,11 +42,13 @@ export async function POST(request: NextRequest) {
 
       // Extract files from messages if they contain file data
       if (messages && Array.isArray(messages)) {
-        messages.forEach((msg: any) => {
-          if (msg.files && Array.isArray(msg.files)) {
-            files.push(...msg.files);
+        messages.forEach(
+          (msg: { files?: unknown[]; [key: string]: unknown }) => {
+            if (msg.files && Array.isArray(msg.files)) {
+              files.push(...msg.files);
+            }
           }
-        });
+        );
       }
     }
 
@@ -68,21 +70,34 @@ export async function POST(request: NextRequest) {
     }
 
     // Convert messages to AI format
-    const aiMessages: AIMessage[] = messages.map((msg: any, index: number) => {
-      // If this is the last user message and we have files, include them
-      const isLastUserMessage =
-        index === messages.length - 1 && msg.role === "user";
+    const aiMessages: AIMessage[] = messages.map(
+      (
+        msg: {
+          role: string;
+          content: string;
+          files?: unknown[];
+          [key: string]: unknown;
+        },
+        index: number
+      ) => {
+        // If this is the last user message and we have files, include them
+        const isLastUserMessage =
+          index === messages.length - 1 && msg.role === "user";
 
-      return {
-        role: msg.role as "user" | "assistant" | "system",
-        content: msg.content,
-        files: isLastUserMessage && files.length > 0 ? files : undefined,
-      };
-    });
+        return {
+          role: msg.role as "user" | "assistant" | "system",
+          content: msg.content,
+          files: isLastUserMessage && files.length > 0 ? files : undefined,
+        };
+      }
+    );
 
     if (stream) {
       // Create streaming response
-      console.log('🚀 DEBUG: About to start streaming AI response', { messages: aiMessages, model });
+      console.log("🚀 DEBUG: About to start streaming AI response", {
+        messages: aiMessages,
+        model,
+      });
       debugger; // DEBUG: About to call AI service for streaming
       const encoder = new TextEncoder();
       const readable = new ReadableStream({
@@ -134,7 +149,10 @@ export async function POST(request: NextRequest) {
       });
     } else {
       // Generate non-streaming response
-      console.log('🚀 DEBUG: About to generate non-streaming AI response', { messages: aiMessages, model });
+      console.log("🚀 DEBUG: About to generate non-streaming AI response", {
+        messages: aiMessages,
+        model,
+      });
       debugger; // DEBUG: About to call AI service for non-streaming
       const response = await aiService.generateResponse(aiMessages, {
         model,

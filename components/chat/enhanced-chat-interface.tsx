@@ -45,6 +45,7 @@ interface EnhancedChatInterfaceProps {
 export function EnhancedChatInterface({
   className,
 }: EnhancedChatInterfaceProps) {
+  // Render count tracking
   const [inputValue, setInputValue] = useState("");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [attachedFiles, setAttachedFiles] = useState<FileItem[]>([]);
@@ -82,7 +83,6 @@ export function EnhancedChatInterface({
     sendMessage,
     stopStreaming,
     changeModel,
-    clearConversation,
     clearError,
     loadModels,
     setMessages,
@@ -161,8 +161,8 @@ export function EnhancedChatInterface({
         );
 
         // Clear current messages and load the conversation messages
-        clearConversation();
-        
+        setMessages([]);
+
         // Set the loaded messages in the chat interface
         if (aiMessages.length > 0) {
           setMessages(aiMessages);
@@ -177,7 +177,7 @@ export function EnhancedChatInterface({
         setIsLoadingConversation(false);
       }
     },
-    [clearConversation]
+    [setMessages]
   );
 
   // Load conversation data when conversation ID changes
@@ -203,13 +203,16 @@ export function EnhancedChatInterface({
     }
 
     try {
-      const response = await fetch(`/api/conversations/${currentConversationId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: newTitle.trim(),
-        }),
-      });
+      const response = await fetch(
+        `/api/conversations/${currentConversationId}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: newTitle.trim(),
+          }),
+        }
+      );
 
       if (response.ok) {
         setConversationTitle(newTitle.trim());
@@ -384,22 +387,24 @@ export function EnhancedChatInterface({
 
       // Refresh files to get the newly uploaded files
       await refreshFiles();
-      
+
       // Get the user's files to find the ones we just uploaded
       const response = await fetch("/api/files");
       const result = await response.json();
-      
+
       if (result.success) {
         const userFiles = result.data.files;
         // Get the most recently uploaded files (matching our uploaded files by name)
-        const recentlyUploaded = userFiles.filter((file: FileItem) => 
-          selectedFiles.some(selectedFile => 
-            selectedFile.name === file.originalName
+        const recentlyUploaded = userFiles
+          .filter((file: FileItem) =>
+            selectedFiles.some(
+              (selectedFile) => selectedFile.name === file.originalName
+            )
           )
-        ).slice(0, selectedFiles.length); // Only take as many as we uploaded
-        
+          .slice(0, selectedFiles.length); // Only take as many as we uploaded
+
         // Add these files to attachedFiles for the chat
-        setAttachedFiles(prev => [...prev, ...recentlyUploaded]);
+        setAttachedFiles((prev) => [...prev, ...recentlyUploaded]);
       }
 
       setSelectedFiles([]);
@@ -483,7 +488,10 @@ export function EnhancedChatInterface({
 
   return (
     <div
-      className={cn("flex flex-col h-full w-full relative max-w-full overflow-hidden", className)}
+      className={cn(
+        "flex flex-col h-full w-full relative max-w-full",
+        className
+      )}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -504,9 +512,9 @@ export function EnhancedChatInterface({
       )}
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col min-w-0 w-full min-h-0 overflow-hidden">
-        {/* Header */}
-        <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shrink-0">
+      <div className="flex-1 flex flex-col min-w-0 w-full min-h-0">
+        {/* Header - Fixed at top */}
+        <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shrink-0 sticky top-0 z-10">
           <div className="flex items-center justify-between p-4">
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
@@ -590,7 +598,7 @@ export function EnhancedChatInterface({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={clearConversation}
+                  onClick={() => setMessages([])}
                   disabled={isLoading || isStreaming}
                 >
                   Clear
@@ -600,10 +608,10 @@ export function EnhancedChatInterface({
           </div>
         </div>
 
-        {/* Messages Area */}
-        <div className="flex-1 overflow-hidden min-w-0">
+        {/* Messages Area - Scrollable */}
+        <div className="flex-1 overflow-hidden min-w-0 relative">
           <ScrollArea className="h-full w-full">
-            <div className="p-4 space-y-4 pb-6 max-w-full">
+            <div className="p-4 space-y-4 pb-4 max-w-full">
               {messages.length === 0 ? (
                 <div className="flex items-center justify-center h-64">
                   {isLoadingConversation ? (
@@ -668,7 +676,7 @@ export function EnhancedChatInterface({
         </div>
 
         {/* Input Area - Fixed at bottom */}
-        <div className="border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shrink-0 w-full min-w-0">
+        <div className="border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shrink-0 w-full min-w-0 sticky bottom-0 z-10">
           <div className="p-4 space-y-3 max-w-full">
             {/* Attached Files */}
             {attachedFiles.length > 0 && (
@@ -793,7 +801,10 @@ export function EnhancedChatInterface({
                 </Button>
 
                 {/* Attach existing files button */}
-                <DropdownMenu open={showFilePicker} onOpenChange={setShowFilePicker}>
+                <DropdownMenu
+                  open={showFilePicker}
+                  onOpenChange={setShowFilePicker}
+                >
                   <DropdownMenuTrigger asChild>
                     <Button
                       variant="ghost"
@@ -810,33 +821,39 @@ export function EnhancedChatInterface({
                       <h4 className="font-medium text-sm">Attach Files</h4>
                       {userFiles.length === 0 ? (
                         <p className="text-sm text-muted-foreground">
-                          No files uploaded yet. Use the paperclip button to upload files first.
+                          No files uploaded yet. Use the paperclip button to
+                          upload files first.
                         </p>
                       ) : (
                         <ScrollArea className="max-h-48">
                           <div className="space-y-2">
-                            {userFiles.filter(file => 
-                              !attachedFiles.some(attached => attached.id === file.id)
-                            ).map((file) => (
-                              <div
-                                key={file.id}
-                                className="flex items-center justify-between p-2 hover:bg-accent rounded-md cursor-pointer"
-                                onClick={() => handleAttachExistingFile(file)}
-                              >
-                                <div className="flex items-center space-x-2 min-w-0 flex-1">
-                                  <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
-                                  <div className="min-w-0">
-                                    <p className="text-sm font-medium truncate">
-                                      {file.originalName}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">
-                                      {Math.round(file.size / 1024)} KB
-                                    </p>
+                            {userFiles
+                              .filter(
+                                (file) =>
+                                  !attachedFiles.some(
+                                    (attached) => attached.id === file.id
+                                  )
+                              )
+                              .map((file) => (
+                                <div
+                                  key={file.id}
+                                  className="flex items-center justify-between p-2 hover:bg-accent rounded-md cursor-pointer"
+                                  onClick={() => handleAttachExistingFile(file)}
+                                >
+                                  <div className="flex items-center space-x-2 min-w-0 flex-1">
+                                    <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                                    <div className="min-w-0">
+                                      <p className="text-sm font-medium truncate">
+                                        {file.originalName}
+                                      </p>
+                                      <p className="text-xs text-muted-foreground">
+                                        {Math.round(file.size / 1024)} KB
+                                      </p>
+                                    </div>
                                   </div>
+                                  <Plus className="h-4 w-4 text-muted-foreground shrink-0" />
                                 </div>
-                                <Plus className="h-4 w-4 text-muted-foreground shrink-0" />
-                              </div>
-                            ))}
+                              ))}
                           </div>
                         </ScrollArea>
                       )}

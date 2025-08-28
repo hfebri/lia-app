@@ -202,7 +202,7 @@ async function extractFromRTF(buffer: Buffer): Promise<TextExtractionResult> {
     const rtfContent = buffer.toString("utf-8");
 
     // Basic RTF to text conversion (removes RTF control codes)
-    let text = rtfContent
+    const text = rtfContent
       .replace(/\\[a-z]+\d*\s?/g, "") // Remove RTF control words
       .replace(/[{}]/g, "") // Remove braces
       .replace(/\\\\/g, "\\") // Unescape backslashes

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { Conversation } from "@/lib/types/chat";
 import { useUser } from "@/hooks/use-user";
 
@@ -247,15 +247,29 @@ export function useConversations() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  return {
-    ...state,
-    loadConversations,
-    refreshConversations,
-    loadMoreConversations,
-    createConversation,
-    updateConversation,
-    deleteConversation,
-    searchConversations,
-    clearError,
-  };
+  // Memoize the return value to prevent unnecessary re-renders
+  return useMemo(
+    () => ({
+      ...state,
+      loadConversations,
+      refreshConversations,
+      loadMoreConversations,
+      createConversation,
+      updateConversation,
+      deleteConversation,
+      searchConversations,
+      clearError,
+    }),
+    [
+      state,
+      loadConversations,
+      refreshConversations,
+      loadMoreConversations,
+      createConversation,
+      updateConversation,
+      deleteConversation,
+      searchConversations,
+      clearError,
+    ]
+  );
 }
