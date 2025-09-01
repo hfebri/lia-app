@@ -2,7 +2,7 @@
 
 import { Suspense } from "react";
 import { DashboardOverview } from "../(dashboard)/_components/dashboard-overview";
-import { DashboardSkeleton } from "../(dashboard)/_components/dashboard-skeleton";
+import { DashboardSkeleton } from "./_components/dashboard-skeleton";
 import { Shield } from "lucide-react";
 
 export default async function AdminDashboardPage() {
