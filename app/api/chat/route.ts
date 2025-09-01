@@ -4,7 +4,6 @@ import type { AIMessage } from "@/lib/ai/types";
 
 export async function POST(request: NextRequest) {
   try {
-    console.log("🔍 CHAT API DIAGNOSTIC: POST request received");
     let messages,
       model = "openai/gpt-5",
       stream = false,
@@ -41,13 +40,6 @@ export async function POST(request: NextRequest) {
       const body = await request.json();
       ({ messages, model, stream } = body);
 
-      console.log("🔍 CHAT API DIAGNOSTIC: JSON body parsed:", {
-        model,
-        stream,
-        messageCount: messages?.length || 0,
-        modelStartsWithGemini: model?.startsWith("gemini") || false,
-      });
-
       // Extract files from messages if they contain file data
       if (messages && Array.isArray(messages)) {
         messages.forEach(
@@ -73,29 +65,9 @@ export async function POST(request: NextRequest) {
 
     // Determine provider based on model - NO FALLBACK LOGIC
     let provider: "replicate" | "gemini" = "replicate";
-    console.log("🔍 CHAT API DIAGNOSTIC: Provider detection logic:", {
-      model,
-      modelType: typeof model,
-      modelStartsWithGemini: model?.startsWith("gemini"),
-      modelLength: model?.length,
-    });
-
     if (model.startsWith("gemini")) {
       provider = "gemini";
-      console.log(
-        "🎯 CHAT API: Gemini model detected, routing to Gemini API (NO FALLBACK)"
-      );
-    } else {
-      console.log(
-        "🎯 CHAT API: Non-Gemini model detected, routing to Replicate API"
-      );
     }
-
-    console.log("🔍 CHAT API DIAGNOSTIC: Final routing decision:", {
-      model,
-      provider,
-      willCallGemini: provider === "gemini",
-    });
 
     // Convert messages to AI format
     const aiMessages: AIMessage[] = messages.map(
@@ -122,10 +94,6 @@ export async function POST(request: NextRequest) {
 
     if (stream) {
       // Create streaming response
-      console.log("🚀 DEBUG: About to start streaming AI response", {
-        messages: aiMessages,
-        model,
-      });
       const encoder = new TextEncoder();
       const readable = new ReadableStream({
         async start(controller) {
@@ -182,10 +150,6 @@ export async function POST(request: NextRequest) {
       });
     } else {
       // Generate non-streaming response
-      console.log("🚀 DEBUG: About to generate non-streaming AI response", {
-        messages: aiMessages,
-        model,
-      });
       const response = await aiService.generateResponse(aiMessages, {
         model,
         provider,

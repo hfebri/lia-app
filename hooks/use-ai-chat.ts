@@ -64,14 +64,6 @@ export function useAiChat(options: UseAiChatOptions = {}) {
   // Send a message with streaming response
   const sendMessage = useCallback(
     async (content: string, files?: File[], stream: boolean = true) => {
-      console.log("🔍 AI CHAT HOOK DIAGNOSTIC: sendMessage called with:", {
-        selectedModel: state.selectedModel,
-        modelStartsWithGemini: state.selectedModel.startsWith("gemini"),
-        hasFiles: !!files && files.length > 0,
-        fileCount: files?.length || 0,
-        stream,
-      });
-
       // Validate message
       const validation = chatService.current.validateMessage(content);
       if (!validation.isValid) {
@@ -90,6 +82,17 @@ export function useAiChat(options: UseAiChatOptions = {}) {
       if (isGeminiModel && files && files.length > 0) {
         const fileData = await Promise.all(
           files.map(async (file) => {
+            // Check if file already has base64 data (from direct processing)
+            if ((file as any).data) {
+              return {
+                name: file.name,
+                type: (file as any).type || file.type,
+                size: file.size,
+                data: (file as any).data,
+              };
+            }
+
+            // Otherwise, convert file to base64
             const arrayBuffer = await file.arrayBuffer();
             const base64Data = btoa(
               new Uint8Array(arrayBuffer).reduce(
@@ -136,15 +139,6 @@ export function useAiChat(options: UseAiChatOptions = {}) {
           let accumulatedContent = "";
           let assistantMessageId = "";
 
-          console.log(
-            "🔍 AI CHAT HOOK DIAGNOSTIC: About to call streaming service with:",
-            {
-              model: state.selectedModel,
-              messageCount: allMessages.length,
-              fileCount: files?.length || 0,
-            }
-          );
-
           const streamGenerator = chatService.current.sendStreamingMessage(
             allMessages,
             { model: state.selectedModel }
@@ -188,13 +182,9 @@ export function useAiChat(options: UseAiChatOptions = {}) {
           }
         } else {
           // Handle non-streaming response
-          const response = await chatService.current.sendMessage(
-            allMessages,
-            files || [],
-            {
-              model: state.selectedModel,
-            }
-          );
+          const response = await chatService.current.sendMessage(allMessages, {
+            model: state.selectedModel,
+          });
 
           const assistantMessage = chatService.current.createMessage(
             "assistant",

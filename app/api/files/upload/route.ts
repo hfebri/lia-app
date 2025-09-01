@@ -4,6 +4,29 @@ import { uploadFile, uploadFiles } from "@/lib/services/file-upload";
 
 export async function POST(request: NextRequest) {
   try {
+    // Check Supabase configuration first
+    if (
+      !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+      !process.env.SUPABASE_SERVICE_ROLE_KEY
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "File upload service not configured. Missing Supabase environment variables.",
+          details: {
+            supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL
+              ? "✓ Present"
+              : "✗ Missing NEXT_PUBLIC_SUPABASE_URL",
+            serviceKey: process.env.SUPABASE_SERVICE_ROLE_KEY
+              ? "✓ Present"
+              : "✗ Missing SUPABASE_SERVICE_ROLE_KEY",
+          },
+        },
+        { status: 500 }
+      );
+    }
+
     const session = await getCurrentSession();
 
     // TEMPORARY: Use mock user ID when no session (for testing)

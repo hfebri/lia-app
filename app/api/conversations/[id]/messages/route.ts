@@ -138,31 +138,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       // Determine provider based on model - NO FALLBACK LOGIC
       let provider: "replicate" | "gemini" = "replicate";
       const selectedModel = model || "openai/gpt-5";
-      console.log("📡 CONVERSATION API DEBUG: Raw model from request:", model);
-      console.log("📡 CONVERSATION API DEBUG: Selected model:", selectedModel);
-      console.log(
-        "📡 CONVERSATION API DEBUG: Model starts with 'gemini':",
-        selectedModel.startsWith("gemini")
-      );
 
       if (selectedModel.startsWith("gemini")) {
         provider = "gemini";
-        console.log(
-          "🎯 CONVERSATION API: Gemini model detected, routing to Gemini API (NO FALLBACK)"
-        );
-      } else {
-        console.log(
-          "🎯 CONVERSATION API: Non-Gemini model detected, routing to Replicate API"
-        );
       }
 
-      console.log("📡 CONVERSATION API DEBUG: Final provider:", provider);
-      console.log("📡 CONVERSATION API DEBUG: Final model:", selectedModel);
-
       // Generate AI response
-      console.log(
-        `📡 CONVERSATION API DEBUG: Generating AI response with ${provider} provider using ${selectedModel}...`
-      );
       const aiResponse = await aiService.generateResponse(
         conversationMessages,
         {
@@ -172,8 +153,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           max_tokens: 1000,
         }
       );
-
-      console.log("AI response received:", aiResponse);
 
       // Add the assistant message
       const assistantMessage = await ConversationService.addMessage(

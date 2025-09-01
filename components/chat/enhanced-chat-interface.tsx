@@ -35,6 +35,10 @@ import {
   Library,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  processFileForAI,
+  validateFileForAI,
+} from "@/lib/utils/file-processing";
 
 // FileItem interface is now imported from the hook
 
@@ -192,9 +196,6 @@ export function EnhancedChatInterface({
         // Set the loaded messages in the chat interface
         if (aiMessages.length > 0) {
           setMessages(aiMessages);
-          console.log(
-            `Loaded conversation "${conversation.title}" with ${aiMessages.length} messages.`
-          );
 
           // Scroll to bottom after loading conversation
           setTimeout(scrollToBottom, 100);
@@ -281,27 +282,8 @@ export function EnhancedChatInterface({
   // Save conversation to database when sending message
   const saveToDatabase = async (content: string) => {
     try {
-      console.log("🔍 FRONTEND DIAGNOSTIC: saveToDatabase called with:", {
-        currentConversationId,
-        content: content.slice(0, 50) + "...",
-        selectedModel,
-        modelStartsWithGemini: selectedModel.startsWith("gemini"),
-      });
-
       if (currentConversationId) {
         // If we have a current conversation ID, add message to that conversation
-        console.log(
-          "Adding message to existing conversation:",
-          currentConversationId
-        );
-
-        console.log(
-          "🔍 FRONTEND DIAGNOSTIC: About to call conversations API with:",
-          {
-            endpoint: `/api/conversations/${currentConversationId}/messages`,
-            payload: { content, model: selectedModel },
-          }
-        );
 
         const response = await fetch(
           `/api/conversations/${currentConversationId}/messages`,
@@ -322,12 +304,9 @@ export function EnhancedChatInterface({
             response.status,
             errorText
           );
-        } else {
-          console.log("Message added successfully");
         }
       } else {
         // Create a new conversation
-        console.log("Creating new conversation");
 
         const response = await fetch("/api/conversations", {
           method: "POST",
@@ -348,7 +327,6 @@ export function EnhancedChatInterface({
         } else {
           // Get the new conversation ID and set it
           const result = await response.json();
-          console.log("Conversation created successfully:", result);
 
           if (result.success && result.data) {
             setCurrentConversationId(result.data.id);
@@ -358,8 +336,6 @@ export function EnhancedChatInterface({
             const url = new URL(window.location.href);
             url.searchParams.set("conversation", result.data.id);
             window.history.pushState({}, "", url);
-
-            console.log("URL updated with conversation ID:", result.data.id);
           }
         }
       }
@@ -380,41 +356,89 @@ export function EnhancedChatInterface({
     const messageContent = inputValue.trim();
     let messageFiles = [...attachedFiles];
 
-    // If there are selected files (not yet uploaded), upload them first
+    // Handle file processing based on model type
+    const isGeminiModel = selectedModel.startsWith("gemini");
+
     if (selectedFiles.length > 0) {
-      try {
-        await uploadFiles(selectedFiles, {
-          extractText: true,
-          analyzeWithAI: true,
-          conversationId: currentConversationId || undefined,
-        });
+      if (isGeminiModel) {
+        // For Gemini models: Process files directly to base64 (no Supabase upload)
+        try {
+          const processedFiles = [];
 
-        // Refresh files to get the newly uploaded files
-        await refreshFiles();
+          for (const file of selectedFiles) {
+            // Validate file before processing
+            const validation = validateFileForAI(file);
+            if (!validation.isValid) {
+              console.error(`File validation failed: ${validation.error}`);
+              // You could show a toast/error message here
+              continue;
+            }
 
-        // Get the user's files to find the ones we just uploaded
-        const response = await fetch("/api/files");
-        const result = await response.json();
+            // Convert file to base64 for Gemini
+            const fileData = await processFileForAI(file);
+            processedFiles.push({
+              id: `temp-${Date.now()}-${Math.random()}`, // Temporary ID
+              filename: file.name, // For FileItem compatibility
+              originalName: file.name,
+              mimeType: file.type,
+              size: file.size,
+              url: undefined, // No URL for base64 files
+              uploadStatus: "completed" as const, // For FileItem compatibility
+              analysisStatus: "completed" as const, // For FileItem compatibility
+              uploadedAt: new Date(), // For FileItem compatibility
+              metadata: {
+                data: fileData.data, // Base64 data for AI processing
+                type: file.type, // For compatibility with AI message format
+                isBase64: true, // Flag to indicate this is base64 data
+              },
+            });
+          }
 
-        if (result.success) {
-          const userFiles = result.data.files;
-          // Get the most recently uploaded files (matching our uploaded files by name)
-          const recentlyUploaded = userFiles
-            .filter((file: FileItem) =>
-              selectedFiles.some(
-                (selectedFile) => selectedFile.name === file.originalName
-              )
-            )
-            .slice(0, selectedFiles.length); // Only take as many as we uploaded
+          // Add processed files to message
+          messageFiles = [...messageFiles, ...processedFiles];
 
-          // Add these files to the message files
-          messageFiles = [...messageFiles, ...recentlyUploaded];
+          // Clear selected files after processing
+          setSelectedFiles([]);
+        } catch (error) {
+          console.error("File processing failed:", error);
+          return;
         }
+      } else {
+        // For non-Gemini models: Upload to Supabase as before
+        try {
+          await uploadFiles(selectedFiles, {
+            extractText: true,
+            analyzeWithAI: true,
+            conversationId: currentConversationId || undefined,
+          });
 
-        setSelectedFiles([]);
-      } catch (error) {
-        console.error("File upload failed:", error);
-        return; // Don't send message if file upload fails
+          // Refresh files to get the newly uploaded files
+          await refreshFiles();
+
+          // Get the user's files to find the ones we just uploaded
+          const response = await fetch("/api/files");
+          const result = await response.json();
+
+          if (result.success) {
+            const userFiles = result.data.files;
+            // Get the most recently uploaded files (matching our uploaded files by name)
+            const recentlyUploaded = userFiles
+              .filter((file: FileItem) =>
+                selectedFiles.some(
+                  (selectedFile) => selectedFile.name === file.originalName
+                )
+              )
+              .slice(0, selectedFiles.length); // Only take as many as we uploaded
+
+            // Add these files to the message files
+            messageFiles = [...messageFiles, ...recentlyUploaded];
+          }
+
+          setSelectedFiles([]);
+        } catch (error) {
+          console.error("File upload failed:", error);
+          return; // Don't send message if file upload fails
+        }
       }
     }
 
@@ -441,29 +465,38 @@ export function EnhancedChatInterface({
     }
 
     // Send message to AI - pass files if using Gemini model
-    const isGeminiModel = selectedModel.startsWith("gemini");
-    if (
-      isGeminiModel &&
-      (messageFiles.length > 0 || selectedFiles.length > 0)
-    ) {
-      // Combine files from attached files and selected files
+    if (isGeminiModel && messageFiles.length > 0) {
+      // For Gemini models, pass files with their data directly
       const allFiles: File[] = [];
 
-      // Add selected files directly (they're already File objects)
-      allFiles.push(...selectedFiles);
-
-      // Convert attached file data back to File objects for Gemini
+      // Process message files for Gemini
       if (messageFiles.length > 0) {
-        const fileObjects = await Promise.all(
-          messageFiles.map(async (fileItem) => {
+        for (const fileItem of messageFiles) {
+          if (fileItem.metadata?.isBase64 && fileItem.metadata?.data) {
+            // File has base64 data (processed directly for Gemini)
+            // Convert base64 back to File object for sendMessage compatibility
+            const binaryString = atob(fileItem.metadata.data);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+              bytes[i] = binaryString.charCodeAt(i);
+            }
+            const blob = new Blob([bytes], { type: fileItem.metadata.type });
+            const file = new File([blob], fileItem.originalName, {
+              type: fileItem.metadata.type,
+            });
+            // Attach the base64 data to the file for AI processing
+            (file as any).data = fileItem.metadata.data;
+            allFiles.push(file);
+          } else if (fileItem.url) {
+            // File has URL (from Supabase) - fetch and convert to File
             const response = await fetch(fileItem.url);
             const blob = await response.blob();
-            return new File([blob], fileItem.originalName, {
+            const file = new File([blob], fileItem.originalName, {
               type: fileItem.mimeType,
             });
-          })
-        );
-        allFiles.push(...fileObjects);
+            allFiles.push(file);
+          }
+        }
       }
 
       await sendMessage(messageContent, allFiles);

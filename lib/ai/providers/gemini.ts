@@ -29,21 +29,12 @@ export class GeminiProvider implements AIProvider {
     options: AIGenerationOptions = {}
   ): Promise<AIResponse> {
     try {
-      console.log(
-        "🎯 GEMINI PROVIDER: generateResponse called - using GEMINI API (not Replicate)"
-      );
       const {
         model = "gemini-2.5-flash",
         // temperature = 0.7, // Currently unused by Gemini API
         // max_tokens = 1000, // Currently unused by Gemini API
         system_prompt,
       } = options;
-      console.log("🎯 GEMINI PROVIDER: Using model:", model);
-      console.log(
-        "🎯 GEMINI PROVIDER: API Key configured:",
-        !!process.env.GEMINI_API_KEY
-      );
-      console.log("🎯 GEMINI PROVIDER: Messages count:", messages.length);
 
       // Format messages for Gemini API
       const contents = this.formatMessagesForAPI(messages, system_prompt);
@@ -54,10 +45,6 @@ export class GeminiProvider implements AIProvider {
         },
       };
 
-      console.log("🎯 GEMINI PROVIDER: About to call generateContent...");
-      console.log("🎯 GEMINI PROVIDER: Request config:", { model, config });
-      console.log("🎯 GEMINI PROVIDER: Contents length:", contents.length);
-
       // Generate content with config
       const response = await this.client.models.generateContent({
         model,
@@ -65,34 +52,18 @@ export class GeminiProvider implements AIProvider {
         contents,
       });
 
-      console.log("🎯 GEMINI PROVIDER: Response received successfully");
-      console.log("🎯 GEMINI PROVIDER: Response type:", typeof response);
-
       // Extract content from response
       const content = response.text || "";
-      console.log(
-        "🎯 GEMINI PROVIDER: Extracted content length:",
-        content.length
-      );
 
       return {
         content,
         model,
         provider: this.name,
-        usage: this.extractUsage(response),
+        usage: this.extractUsage(response as any),
       };
     } catch (error) {
-      console.error("🎯 GEMINI PROVIDER: Error occurred!", error);
-      console.error("🎯 GEMINI PROVIDER: Error type:", typeof error);
-      console.error(
-        "🎯 GEMINI PROVIDER: Error message:",
-        error instanceof Error ? error.message : String(error)
-      );
-      console.error(
-        "🎯 GEMINI PROVIDER: Error stack:",
-        error instanceof Error ? error.stack : "No stack trace"
-      );
-      throw this.handleError(error, options.model);
+      console.error("Gemini generateResponse error:", error);
+      throw this.handleError(error as Error, options.model);
     }
   }
 
@@ -101,22 +72,12 @@ export class GeminiProvider implements AIProvider {
     options: AIGenerationOptions = {}
   ): AsyncGenerator<AIStreamChunk> {
     try {
-      console.log(
-        "🎯 GEMINI PROVIDER: generateStream called - using GEMINI API (not Replicate)"
-      );
       const {
         model = "gemini-2.5-flash",
         // temperature = 0.7, // Currently unused by Gemini API
         // max_tokens = 1000, // Currently unused by Gemini API
         system_prompt,
       } = options;
-
-      console.log(
-        "🎯 GEMINI PROVIDER: Streaming request with model:",
-        model,
-        "| Messages:",
-        messages.length
-      );
 
       // Format messages for Gemini API
       const contents = this.formatMessagesForAPI(messages, system_prompt);
@@ -145,7 +106,7 @@ export class GeminiProvider implements AIProvider {
           yield {
             content: text,
             isComplete: false,
-            usage: this.extractUsage(chunk),
+            usage: this.extractUsage(chunk as any),
           };
         }
       }
@@ -156,7 +117,7 @@ export class GeminiProvider implements AIProvider {
       };
     } catch (error) {
       console.error("Gemini generateStream error:", error);
-      throw this.handleError(error, options.model);
+      throw this.handleError(error as Error, options.model);
     }
   }
 
@@ -170,10 +131,6 @@ export class GeminiProvider implements AIProvider {
       inlineData?: { data: string; mimeType: string };
     }>;
   }> {
-    console.log("🔥 GEMINI DEBUG: formatMessagesForAPI called");
-    console.log("🔥 GEMINI DEBUG: Input messages count:", messages.length);
-    console.log("🔥 GEMINI DEBUG: System prompt:", systemPrompt);
-
     const contents: Array<{
       role: string;
       parts: Array<{
@@ -184,7 +141,6 @@ export class GeminiProvider implements AIProvider {
 
     // Add system prompt if provided
     if (systemPrompt) {
-      console.log("🔥 GEMINI DEBUG: Adding system prompt to contents");
       contents.push({
         role: "user",
         parts: [{ text: systemPrompt }],
@@ -196,66 +152,34 @@ export class GeminiProvider implements AIProvider {
     }
 
     // Convert messages to Gemini format
-    console.log("🔥 GEMINI DEBUG: Starting message conversion loop");
     for (let i = 0; i < messages.length; i++) {
       const message = messages[i];
-      console.log(
-        `🔥 GEMINI DEBUG: Processing message ${i + 1}/${messages.length}:`,
-        {
-          role: message.role,
-          content:
-            message.content?.substring(0, 100) +
-            (message.content?.length > 100 ? "..." : ""),
-          hasFiles: !!message.files && message.files.length > 0,
-          fileCount: message.files?.length || 0,
-        }
-      );
 
       let role: string = message.role;
 
       // Map roles to Gemini format
       if (role === "assistant") {
-        console.log("🔥 GEMINI DEBUG: Mapping 'assistant' role to 'model'");
         role = "model";
       } else if (role === "system") {
-        console.log("🔥 GEMINI DEBUG: Skipping system message (handled above)");
         continue;
       }
-      console.log("🔥 GEMINI DEBUG: Final role for this message:", role);
 
       const parts: Array<{
         text?: string;
         inlineData?: { data: string; mimeType: string };
       }> = [];
-      console.log("🔥 GEMINI DEBUG: Building parts for message");
 
       // Add text content if present
       if (message.content) {
-        console.log("🔥 GEMINI DEBUG: Adding text content to parts");
         parts.push({ text: message.content });
-      } else {
-        console.log("🔥 GEMINI DEBUG: No text content for this message");
       }
 
       // Add files if present (multimodal support)
       if (message.files && message.files.length > 0) {
-        console.log(
-          `🔥 GEMINI DEBUG: Processing ${message.files.length} files`
-        );
         for (let j = 0; j < message.files.length; j++) {
           const file = message.files[j];
-          console.log(`🔥 GEMINI DEBUG: Processing file ${j + 1}:`, {
-            name: file.name,
-            type: file.type,
-            size: file.size,
-            isImage: file.type.startsWith("image/"),
-            dataLength: file.data?.length || 0,
-          });
 
           // For files (images, PDFs, etc.), use inlineData format as per Gemini API
-          console.log(
-            `🔥 GEMINI DEBUG: Adding file as inlineData - ${file.type}`
-          );
           parts.push({
             inlineData: {
               data: file.data, // base64 data
@@ -263,36 +187,16 @@ export class GeminiProvider implements AIProvider {
             },
           });
         }
-      } else {
-        console.log("🔥 GEMINI DEBUG: No files for this message");
       }
-
-      console.log(
-        `🔥 GEMINI DEBUG: Final parts count for this message: ${parts.length}`
-      );
-      console.log(
-        "🔥 GEMINI DEBUG: Parts content:",
-        JSON.stringify(parts, null, 2)
-      );
 
       // Only add the message if it has content
       if (parts.length > 0) {
-        console.log("🔥 GEMINI DEBUG: Adding message to contents");
         contents.push({
           role,
           parts,
         });
-      } else {
-        console.log("🔥 GEMINI DEBUG: Skipping message - no parts");
       }
     }
-
-    console.log("🔥 GEMINI DEBUG: Message conversion complete");
-    console.log(`🔥 GEMINI DEBUG: Final contents count: ${contents.length}`);
-    console.log(
-      "🔥 GEMINI DEBUG: Final contents:",
-      JSON.stringify(contents, null, 2)
-    );
 
     return contents;
   }

@@ -74,10 +74,6 @@ export class ChatService {
       files: msg.files, // Include files for multimodal support
     }));
 
-    console.log("🚀 DEBUG: ChatService sending non-streaming message", {
-      messages: aiMessages,
-      model,
-    });
     const response = await fetch(`${this.baseUrl}/chat`, {
       method: "POST",
       headers: {
@@ -121,17 +117,6 @@ export class ChatService {
       maxTokens = 1000,
     } = options;
 
-    console.log(
-      "🔍 CHAT SERVICE DIAGNOSTIC: sendStreamingMessage called with:",
-      {
-        model,
-        defaultModel: "openai/gpt-5",
-        optionsModel: options.model,
-        modelStartsWithGemini: model.startsWith("gemini"),
-        messageCount: messages.length,
-      }
-    );
-
     // Convert messages to AI format
     const aiMessages: AIMessage[] = messages.map((msg) => ({
       role: msg.role,
@@ -139,20 +124,6 @@ export class ChatService {
       files: msg.files, // Include files for multimodal support
     }));
 
-    console.log("🚀 DEBUG: ChatService sending streaming message", {
-      messages: aiMessages,
-      model,
-    });
-    console.log("🔍 CHAT SERVICE DIAGNOSTIC: About to call /api/chat with:", {
-      endpoint: `${this.baseUrl}/chat`,
-      payload: {
-        messages: aiMessages,
-        model,
-        stream: true,
-        temperature,
-        maxTokens,
-      },
-    });
     const response = await fetch(`${this.baseUrl}/chat`, {
       method: "POST",
       headers: {
