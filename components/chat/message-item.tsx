@@ -5,7 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { User, Bot, Clock } from "lucide-react";
+import { User, Bot, Clock, FileText, Image, File } from "lucide-react";
 
 interface MessageItemProps {
   message: Message;
@@ -18,6 +18,24 @@ export function MessageItem({
 }: MessageItemProps) {
   const isUser = message.role === "user";
   const isAssistant = message.role === "assistant";
+
+  const getFileIcon = (fileType: string) => {
+    if (fileType.startsWith("image/")) {
+      return <Image className="h-3 w-3" />;
+    }
+    if (fileType === "application/pdf") {
+      return <FileText className="h-3 w-3" />;
+    }
+    return <File className="h-3 w-3" />;
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return "0 Bytes";
+    const k = 1024;
+    const sizes = ["Bytes", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+  };
 
   const formatTime = (timestamp: Date) => {
     try {
@@ -87,7 +105,52 @@ export function MessageItem({
           />
 
           <div className="relative text-sm leading-relaxed whitespace-pre-wrap break-words">
+            {/* File attachments - show above content for user messages */}
+            {isUser && message.files && message.files.length > 0 && (
+              <div className="mb-3 space-y-2">
+                {message.files.map((file, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center gap-2 p-2 rounded-lg bg-white/10 backdrop-blur-sm border border-white/20"
+                  >
+                    {getFileIcon(file.type)}
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-xs truncate">
+                        {file.name}
+                      </div>
+                      <div className="text-xs opacity-75">
+                        {formatFileSize(file.size)}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {message.content}
+
+            {/* File attachments - show below content for assistant messages */}
+            {isAssistant && message.files && message.files.length > 0 && (
+              <div className="mt-3 space-y-2">
+                {message.files.map((file, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 border border-border/40"
+                  >
+                    {getFileIcon(file.type)}
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-xs truncate">
+                        {file.name}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {formatFileSize(file.size)}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {isStreaming && (
               <span className="inline-flex items-center ml-2">
                 <span className="w-1 h-1 bg-current rounded-full animate-pulse" />

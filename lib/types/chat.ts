@@ -9,6 +9,12 @@ export interface Message {
     tokens?: number;
     finish_reason?: string;
   };
+  files?: Array<{
+    name: string;
+    type: string;
+    size: number;
+    data?: string; // base64 encoded data (optional for display)
+  }>;
 }
 
 export interface Conversation {

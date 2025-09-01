@@ -210,6 +210,16 @@ function SidebarComponent({ className }: SidebarProps) {
               <h2 className="text-lg font-semibold tracking-tight">
                 Chat History
               </h2>
+              <Button
+                onClick={handleNewChat}
+                size="sm"
+                variant="outline"
+                className="h-6 w-6 p-0"
+                disabled={isLoading}
+                title="Start new chat"
+              >
+                <Plus className="h-3 w-3" />
+              </Button>
             </div>
 
             <ScrollArea className="h-48">

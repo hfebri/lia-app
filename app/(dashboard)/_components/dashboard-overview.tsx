@@ -26,7 +26,6 @@ import {
   AlertCircle,
   BarChart3,
 } from "lucide-react";
-import Link from "next/link";
 import { ActivityChart } from "../../(admin)/_components/activity-chart";
 import { RecentConversations } from "../../(admin)/_components/recent-conversations";
 import { FileAnalytics } from "../../(admin)/_components/file-analytics";
@@ -299,16 +298,6 @@ export function DashboardOverview() {
             <CardDescription>Get started with common tasks</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Button
-              asChild
-              className="w-full justify-start h-10 sm:h-11"
-              size="default"
-            >
-              <Link href="/chat">
-                <MessageSquare className="h-4 w-4 mr-2" />
-                <span className="truncate">Start New Chat</span>
-              </Link>
-            </Button>
             <Button
               variant="outline"
               className="w-full justify-start h-10 sm:h-11"
