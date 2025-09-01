@@ -20,6 +20,8 @@ const getModelIcon = (modelId?: string) => {
     return <Sparkles className="h-4 w-4 text-purple-500" />;
   if (modelId.includes("gpt-4"))
     return <Brain className="h-4 w-4 text-blue-500" />;
+  if (modelId.includes("gemini"))
+    return <Sparkles className="h-4 w-4 text-orange-500" />;
   return <Zap className="h-4 w-4 text-green-500" />;
 };
 
@@ -28,6 +30,9 @@ const getModelName = (modelId?: string) => {
   if (modelId.includes("gpt-5")) return "GPT-5";
   if (modelId.includes("gpt-4")) return "GPT-4";
   if (modelId.includes("gpt-3.5")) return "GPT-3.5";
+  if (modelId.includes("gemini-2.5-flash-lite")) return "Gemini 2.5 Flash Lite";
+  if (modelId.includes("gemini-2.5-flash")) return "Gemini 2.5 Flash";
+  if (modelId.includes("gemini")) return "Gemini";
   return modelId.split("/").pop() || "AI Assistant";
 };
 

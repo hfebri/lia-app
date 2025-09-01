@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useAiChat } from "@/hooks/use-ai-chat";
 import { useFileUpload, type FileItem } from "@/hooks/use-file-upload";
 import { useSearchParams } from "next/navigation";
@@ -60,6 +60,10 @@ export function EnhancedChatInterface({
   const [tempTitle, setTempTitle] = useState("");
   const [showFilePicker, setShowFilePicker] = useState(false);
 
+  // Ref for auto-scrolling to bottom
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
   // Get conversation ID from URL
   const searchParams = useSearchParams();
 
@@ -98,6 +102,28 @@ export function EnhancedChatInterface({
     loadModels();
     refreshFiles();
   }, [loadModels, refreshFiles]);
+
+  // Scroll to bottom function
+  const scrollToBottom = useCallback(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "end",
+      });
+    }
+  }, []);
+
+  // Auto-scroll when messages change
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, scrollToBottom]);
+
+  // Auto-scroll when streaming content changes
+  useEffect(() => {
+    if (isStreaming && streamingContent) {
+      scrollToBottom();
+    }
+  }, [streamingContent, isStreaming, scrollToBottom]);
 
   // Function to load conversation data from the database
   const loadConversationData = useCallback(
@@ -169,6 +195,9 @@ export function EnhancedChatInterface({
           console.log(
             `Loaded conversation "${conversation.title}" with ${aiMessages.length} messages.`
           );
+
+          // Scroll to bottom after loading conversation
+          setTimeout(scrollToBottom, 100);
         }
       } catch (error) {
         console.error("Error loading conversation:", error);
@@ -177,7 +206,7 @@ export function EnhancedChatInterface({
         setIsLoadingConversation(false);
       }
     },
-    [setMessages]
+    [setMessages, scrollToBottom]
   );
 
   // Load conversation data when conversation ID changes
@@ -252,9 +281,11 @@ export function EnhancedChatInterface({
   // Save conversation to database when sending message
   const saveToDatabase = async (content: string) => {
     try {
-      console.log("saveToDatabase called with:", {
+      console.log("🔍 FRONTEND DIAGNOSTIC: saveToDatabase called with:", {
         currentConversationId,
         content: content.slice(0, 50) + "...",
+        selectedModel,
+        modelStartsWithGemini: selectedModel.startsWith("gemini"),
       });
 
       if (currentConversationId) {
@@ -264,6 +295,14 @@ export function EnhancedChatInterface({
           currentConversationId
         );
 
+        console.log(
+          "🔍 FRONTEND DIAGNOSTIC: About to call conversations API with:",
+          {
+            endpoint: `/api/conversations/${currentConversationId}/messages`,
+            payload: { content, model: selectedModel },
+          }
+        );
+
         const response = await fetch(
           `/api/conversations/${currentConversationId}/messages`,
           {
@@ -271,6 +310,7 @@ export function EnhancedChatInterface({
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               content: content,
+              model: selectedModel, // Pass the selected model to ensure proper routing
             }),
           }
         );
@@ -329,11 +369,54 @@ export function EnhancedChatInterface({
   };
 
   const handleSendMessage = async () => {
-    if (!inputValue.trim() && attachedFiles.length === 0) return;
+    if (
+      !inputValue.trim() &&
+      attachedFiles.length === 0 &&
+      selectedFiles.length === 0
+    )
+      return;
     if (!canSend) return;
 
     const messageContent = inputValue.trim();
-    const messageFiles = [...attachedFiles];
+    let messageFiles = [...attachedFiles];
+
+    // If there are selected files (not yet uploaded), upload them first
+    if (selectedFiles.length > 0) {
+      try {
+        await uploadFiles(selectedFiles, {
+          extractText: true,
+          analyzeWithAI: true,
+          conversationId: currentConversationId || undefined,
+        });
+
+        // Refresh files to get the newly uploaded files
+        await refreshFiles();
+
+        // Get the user's files to find the ones we just uploaded
+        const response = await fetch("/api/files");
+        const result = await response.json();
+
+        if (result.success) {
+          const userFiles = result.data.files;
+          // Get the most recently uploaded files (matching our uploaded files by name)
+          const recentlyUploaded = userFiles
+            .filter((file: FileItem) =>
+              selectedFiles.some(
+                (selectedFile) => selectedFile.name === file.originalName
+              )
+            )
+            .slice(0, selectedFiles.length); // Only take as many as we uploaded
+
+          // Add these files to the message files
+          messageFiles = [...messageFiles, ...recentlyUploaded];
+        }
+
+        setSelectedFiles([]);
+      } catch (error) {
+        console.error("File upload failed:", error);
+        return; // Don't send message if file upload fails
+      }
+    }
 
     setInputValue("");
     setAttachedFiles([]);
@@ -357,11 +440,42 @@ export function EnhancedChatInterface({
       fullContent = `${messageContent}\n\nAttached files:\n${fileContext}`;
     }
 
-    // Send message to AI
-    await sendMessage(fullContent);
+    // Send message to AI - pass files if using Gemini model
+    const isGeminiModel = selectedModel.startsWith("gemini");
+    if (
+      isGeminiModel &&
+      (messageFiles.length > 0 || selectedFiles.length > 0)
+    ) {
+      // Combine files from attached files and selected files
+      const allFiles: File[] = [];
+
+      // Add selected files directly (they're already File objects)
+      allFiles.push(...selectedFiles);
+
+      // Convert attached file data back to File objects for Gemini
+      if (messageFiles.length > 0) {
+        const fileObjects = await Promise.all(
+          messageFiles.map(async (fileItem) => {
+            const response = await fetch(fileItem.url);
+            const blob = await response.blob();
+            return new File([blob], fileItem.originalName, {
+              type: fileItem.mimeType,
+            });
+          })
+        );
+        allFiles.push(...fileObjects);
+      }
+
+      await sendMessage(messageContent, allFiles);
+    } else {
+      await sendMessage(fullContent);
+    }
 
     // Also save to database for conversation history
     await saveToDatabase(fullContent);
+
+    // Scroll to bottom after sending message
+    setTimeout(scrollToBottom, 100);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -373,44 +487,6 @@ export function EnhancedChatInterface({
 
   const handleFileRemove = (index: number) => {
     setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const handleFileUpload = async () => {
-    if (selectedFiles.length === 0) return;
-
-    try {
-      await uploadFiles(selectedFiles, {
-        extractText: true,
-        analyzeWithAI: true,
-        conversationId: currentConversationId || undefined,
-      });
-
-      // Refresh files to get the newly uploaded files
-      await refreshFiles();
-
-      // Get the user's files to find the ones we just uploaded
-      const response = await fetch("/api/files");
-      const result = await response.json();
-
-      if (result.success) {
-        const userFiles = result.data.files;
-        // Get the most recently uploaded files (matching our uploaded files by name)
-        const recentlyUploaded = userFiles
-          .filter((file: FileItem) =>
-            selectedFiles.some(
-              (selectedFile) => selectedFile.name === file.originalName
-            )
-          )
-          .slice(0, selectedFiles.length); // Only take as many as we uploaded
-
-        // Add these files to attachedFiles for the chat
-        setAttachedFiles((prev) => [...prev, ...recentlyUploaded]);
-      }
-
-      setSelectedFiles([]);
-    } catch (error) {
-      console.error("File upload failed:", error);
-    }
   };
 
   // Drag and drop handlers
@@ -512,9 +588,9 @@ export function EnhancedChatInterface({
       )}
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col min-w-0 w-full min-h-0">
+      <div className="flex-1 flex flex-col min-w-0 w-full h-full">
         {/* Header - Fixed at top */}
-        <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shrink-0 sticky top-0 z-10">
+        <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shrink-0 z-10">
           <div className="flex items-center justify-between p-4">
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
@@ -610,8 +686,8 @@ export function EnhancedChatInterface({
 
         {/* Messages Area - Scrollable */}
         <div className="flex-1 overflow-hidden min-w-0 relative">
-          <ScrollArea className="h-full w-full">
-            <div className="p-4 space-y-4 pb-4 max-w-full">
+          <ScrollArea className="h-full w-full" ref={scrollAreaRef}>
+            <div className="p-4 space-y-4 pb-4 max-w-full min-h-full">
               {messages.length === 0 ? (
                 <div className="flex items-center justify-center h-64">
                   {isLoadingConversation ? (
@@ -671,12 +747,15 @@ export function EnhancedChatInterface({
                   )}
                 </>
               )}
+
+              {/* Invisible div to scroll to */}
+              <div ref={messagesEndRef} />
             </div>
           </ScrollArea>
         </div>
 
         {/* Input Area - Fixed at bottom */}
-        <div className="border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shrink-0 w-full min-w-0 sticky bottom-0 z-10">
+        <div className="border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shrink-0 w-full min-w-0 z-10">
           <div className="p-4 space-y-3 max-w-full">
             {/* Attached Files */}
             {attachedFiles.length > 0 && (
@@ -725,7 +804,7 @@ export function EnhancedChatInterface({
 
             {/* Input Row */}
             <div className="space-y-3">
-              {/* Uploaded Files Preview */}
+              {/* Selected Files Preview - Will upload when message is sent */}
               {selectedFiles.length > 0 && (
                 <div className="flex flex-wrap gap-2 px-4">
                   {selectedFiles.map((file, index) => (
@@ -745,22 +824,10 @@ export function EnhancedChatInterface({
                       </Button>
                     </div>
                   ))}
-                  {selectedFiles.length > 0 && (
-                    <Button
-                      onClick={handleFileUpload}
-                      size="sm"
-                      className="h-8 px-3 text-xs"
-                      disabled={isUploading}
-                    >
-                      {isUploading ? (
-                        <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                      ) : (
-                        <Upload className="h-3 w-3 mr-1" />
-                      )}
-                      Upload {selectedFiles.length} file
-                      {selectedFiles.length > 1 ? "s" : ""}
-                    </Button>
-                  )}
+                  <div className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Upload className="h-3 w-3" />
+                    Will upload when message is sent
+                  </div>
                 </div>
               )}
 
@@ -876,15 +943,20 @@ export function EnhancedChatInterface({
                   onClick={isStreaming ? stopStreaming : handleSendMessage}
                   disabled={
                     !isStreaming &&
-                    ((!inputValue.trim() && attachedFiles.length === 0) ||
-                      !canSend)
+                    ((!inputValue.trim() &&
+                      attachedFiles.length === 0 &&
+                      selectedFiles.length === 0) ||
+                      !canSend ||
+                      isUploading)
                   }
                   size="icon"
                   className={cn(
                     "shrink-0 h-10 w-10 transition-all duration-200",
                     isStreaming
                       ? "bg-destructive hover:bg-destructive/90 text-white"
-                      : (!inputValue.trim() && attachedFiles.length === 0) ||
+                      : (!inputValue.trim() &&
+                          attachedFiles.length === 0 &&
+                          selectedFiles.length === 0) ||
                         !canSend
                       ? "bg-muted text-muted-foreground hover:bg-muted"
                       : "bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg"
@@ -892,7 +964,7 @@ export function EnhancedChatInterface({
                 >
                   {isStreaming ? (
                     <Square className="h-4 w-4" />
-                  ) : isLoading ? (
+                  ) : isLoading || isUploading ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <Send className="h-4 w-4" />

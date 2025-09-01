@@ -29,12 +29,21 @@ export class GeminiProvider implements AIProvider {
     options: AIGenerationOptions = {}
   ): Promise<AIResponse> {
     try {
+      console.log(
+        "🎯 GEMINI PROVIDER: generateResponse called - using GEMINI API (not Replicate)"
+      );
       const {
         model = "gemini-2.5-flash",
         // temperature = 0.7, // Currently unused by Gemini API
         // max_tokens = 1000, // Currently unused by Gemini API
         system_prompt,
       } = options;
+      console.log("🎯 GEMINI PROVIDER: Using model:", model);
+      console.log(
+        "🎯 GEMINI PROVIDER: API Key configured:",
+        !!process.env.GEMINI_API_KEY
+      );
+      console.log("🎯 GEMINI PROVIDER: Messages count:", messages.length);
 
       // Format messages for Gemini API
       const contents = this.formatMessagesForAPI(messages, system_prompt);
@@ -45,6 +54,10 @@ export class GeminiProvider implements AIProvider {
         },
       };
 
+      console.log("🎯 GEMINI PROVIDER: About to call generateContent...");
+      console.log("🎯 GEMINI PROVIDER: Request config:", { model, config });
+      console.log("🎯 GEMINI PROVIDER: Contents length:", contents.length);
+
       // Generate content with config
       const response = await this.client.models.generateContent({
         model,
@@ -52,8 +65,15 @@ export class GeminiProvider implements AIProvider {
         contents,
       });
 
+      console.log("🎯 GEMINI PROVIDER: Response received successfully");
+      console.log("🎯 GEMINI PROVIDER: Response type:", typeof response);
+
       // Extract content from response
       const content = response.text || "";
+      console.log(
+        "🎯 GEMINI PROVIDER: Extracted content length:",
+        content.length
+      );
 
       return {
         content,
@@ -62,7 +82,16 @@ export class GeminiProvider implements AIProvider {
         usage: this.extractUsage(response),
       };
     } catch (error) {
-      console.error("Gemini generateResponse error:", error);
+      console.error("🎯 GEMINI PROVIDER: Error occurred!", error);
+      console.error("🎯 GEMINI PROVIDER: Error type:", typeof error);
+      console.error(
+        "🎯 GEMINI PROVIDER: Error message:",
+        error instanceof Error ? error.message : String(error)
+      );
+      console.error(
+        "🎯 GEMINI PROVIDER: Error stack:",
+        error instanceof Error ? error.stack : "No stack trace"
+      );
       throw this.handleError(error, options.model);
     }
   }
@@ -72,6 +101,9 @@ export class GeminiProvider implements AIProvider {
     options: AIGenerationOptions = {}
   ): AsyncGenerator<AIStreamChunk> {
     try {
+      console.log(
+        "🎯 GEMINI PROVIDER: generateStream called - using GEMINI API (not Replicate)"
+      );
       const {
         model = "gemini-2.5-flash",
         // temperature = 0.7, // Currently unused by Gemini API
@@ -79,10 +111,12 @@ export class GeminiProvider implements AIProvider {
         system_prompt,
       } = options;
 
-      console.log("Gemini streaming request:", {
+      console.log(
+        "🎯 GEMINI PROVIDER: Streaming request with model:",
         model,
-        messages: messages.length,
-      });
+        "| Messages:",
+        messages.length
+      );
 
       // Format messages for Gemini API
       const contents = this.formatMessagesForAPI(messages, system_prompt);

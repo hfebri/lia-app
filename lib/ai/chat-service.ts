@@ -13,6 +13,12 @@ export interface ChatMessage {
     completion_tokens: number;
     total_tokens: number;
   };
+  files?: Array<{
+    name: string;
+    type: string;
+    size: number;
+    data: string; // base64 encoded
+  }>;
 }
 
 export interface StreamingChatResponse {
@@ -65,10 +71,13 @@ export class ChatService {
     const aiMessages: AIMessage[] = messages.map((msg) => ({
       role: msg.role,
       content: msg.content,
+      files: msg.files, // Include files for multimodal support
     }));
 
-    console.log('🚀 DEBUG: ChatService sending non-streaming message', { messages: aiMessages, model });
-    debugger; // DEBUG: About to call chat API from ChatService (non-streaming)
+    console.log("🚀 DEBUG: ChatService sending non-streaming message", {
+      messages: aiMessages,
+      model,
+    });
     const response = await fetch(`${this.baseUrl}/chat`, {
       method: "POST",
       headers: {
@@ -112,14 +121,38 @@ export class ChatService {
       maxTokens = 1000,
     } = options;
 
+    console.log(
+      "🔍 CHAT SERVICE DIAGNOSTIC: sendStreamingMessage called with:",
+      {
+        model,
+        defaultModel: "openai/gpt-5",
+        optionsModel: options.model,
+        modelStartsWithGemini: model.startsWith("gemini"),
+        messageCount: messages.length,
+      }
+    );
+
     // Convert messages to AI format
     const aiMessages: AIMessage[] = messages.map((msg) => ({
       role: msg.role,
       content: msg.content,
+      files: msg.files, // Include files for multimodal support
     }));
 
-    console.log('🚀 DEBUG: ChatService sending streaming message', { messages: aiMessages, model });
-    debugger; // DEBUG: About to call chat API from ChatService (streaming)
+    console.log("🚀 DEBUG: ChatService sending streaming message", {
+      messages: aiMessages,
+      model,
+    });
+    console.log("🔍 CHAT SERVICE DIAGNOSTIC: About to call /api/chat with:", {
+      endpoint: `${this.baseUrl}/chat`,
+      payload: {
+        messages: aiMessages,
+        model,
+        stream: true,
+        temperature,
+        maxTokens,
+      },
+    });
     const response = await fetch(`${this.baseUrl}/chat`, {
       method: "POST",
       headers: {
@@ -168,8 +201,19 @@ export class ChatService {
             try {
               const parsed = JSON.parse(data);
 
+              // Handle error in streaming response
               if (parsed.error) {
-                throw new Error(parsed.error);
+                // If it's already marked as error, just yield it as content
+                if (parsed.content) {
+                  yield {
+                    content: parsed.content,
+                    isComplete: true,
+                    usage: parsed.usage,
+                  };
+                  return;
+                } else {
+                  throw new Error(parsed.error);
+                }
               }
 
               // Only yield if there's actual content or if it's the completion marker

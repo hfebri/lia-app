@@ -353,8 +353,6 @@ KALAU PINDAH MENU JANGAN REFRESH CHAT HISTORY
 
 top 10 popular keywords/topic
 
-recent conversations di home hapus aja
-
 AI SURVEY
 seberapa helpful ai help daily works, pake percentage
 seberapa improve

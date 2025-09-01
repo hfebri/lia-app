@@ -64,6 +64,14 @@ export function useAiChat(options: UseAiChatOptions = {}) {
   // Send a message with streaming response
   const sendMessage = useCallback(
     async (content: string, files?: File[], stream: boolean = true) => {
+      console.log("🔍 AI CHAT HOOK DIAGNOSTIC: sendMessage called with:", {
+        selectedModel: state.selectedModel,
+        modelStartsWithGemini: state.selectedModel.startsWith("gemini"),
+        hasFiles: !!files && files.length > 0,
+        fileCount: files?.length || 0,
+        stream,
+      });
+
       // Validate message
       const validation = chatService.current.validateMessage(content);
       if (!validation.isValid) {
@@ -74,8 +82,36 @@ export function useAiChat(options: UseAiChatOptions = {}) {
         return;
       }
 
-      // Create user message
-      const userMessage = chatService.current.createMessage("user", content);
+      // Create user message with files for Gemini models
+      let userMessage = chatService.current.createMessage("user", content);
+
+      // If using Gemini model and files are provided, convert them to base64
+      const isGeminiModel = state.selectedModel.startsWith("gemini");
+      if (isGeminiModel && files && files.length > 0) {
+        const fileData = await Promise.all(
+          files.map(async (file) => {
+            const arrayBuffer = await file.arrayBuffer();
+            const base64Data = btoa(
+              new Uint8Array(arrayBuffer).reduce(
+                (data, byte) => data + String.fromCharCode(byte),
+                ""
+              )
+            );
+            return {
+              name: file.name,
+              type: file.type,
+              size: file.size,
+              data: base64Data,
+            };
+          })
+        );
+
+        // Add files to the user message for Gemini
+        userMessage = {
+          ...userMessage,
+          files: fileData,
+        };
+      }
 
       setState((prev) => ({
         ...prev,
@@ -100,9 +136,17 @@ export function useAiChat(options: UseAiChatOptions = {}) {
           let accumulatedContent = "";
           let assistantMessageId = "";
 
+          console.log(
+            "🔍 AI CHAT HOOK DIAGNOSTIC: About to call streaming service with:",
+            {
+              model: state.selectedModel,
+              messageCount: allMessages.length,
+              fileCount: files?.length || 0,
+            }
+          );
+
           const streamGenerator = chatService.current.sendStreamingMessage(
             allMessages,
-            files || [],
             { model: state.selectedModel }
           );
 

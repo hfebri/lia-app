@@ -212,10 +212,33 @@ export class AIService {
   }
 
   /**
-   * Get provider instance
+   * Get provider instance with strict provider routing (no fallbacks)
    */
   private getProvider(providerName: string): AIProvider | undefined {
-    return this.providers.get(providerName);
+    const provider = this.providers.get(providerName);
+
+    // Strict provider routing - always throw error if requested provider is not available
+    if (!provider) {
+      console.error(
+        `🚀 AI SERVICE DEBUG: ${providerName} provider not available`
+      );
+
+      if (providerName === "gemini") {
+        throw new Error(
+          "Gemini provider not initialized. Please check your GEMINI_API_KEY configuration."
+        );
+      } else if (providerName === "replicate") {
+        throw new Error(
+          "Replicate provider not initialized. Please check your REPLICATE_API_TOKEN configuration."
+        );
+      } else {
+        throw new Error(
+          `${providerName} provider not available. Please check your configuration.`
+        );
+      }
+    }
+
+    return provider;
   }
 
   /**

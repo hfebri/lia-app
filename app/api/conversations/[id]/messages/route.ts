@@ -135,7 +135,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         createMessage(msg.role as "user" | "assistant", msg.content)
       );
 
-      // Determine provider based on model
+      // Determine provider based on model - NO FALLBACK LOGIC
       let provider: "replicate" | "gemini" = "replicate";
       const selectedModel = model || "openai/gpt-5";
       console.log("📡 CONVERSATION API DEBUG: Raw model from request:", model);
@@ -147,9 +147,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
       if (selectedModel.startsWith("gemini")) {
         provider = "gemini";
-        console.log("📡 CONVERSATION API DEBUG: Provider set to gemini");
+        console.log(
+          "🎯 CONVERSATION API: Gemini model detected, routing to Gemini API (NO FALLBACK)"
+        );
       } else {
-        console.log("📡 CONVERSATION API DEBUG: Provider remains replicate");
+        console.log(
+          "🎯 CONVERSATION API: Non-Gemini model detected, routing to Replicate API"
+        );
       }
 
       console.log("📡 CONVERSATION API DEBUG: Final provider:", provider);
