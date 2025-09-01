@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ConversationService } from "@/lib/services/conversation";
-import { getCurrentSession } from "@/lib/auth/session";
+import { requireAuthenticatedUser } from "@/lib/auth/session";
 import { getAIService, createMessage } from "@/lib/ai/service";
 
 interface RouteParams {
@@ -10,10 +10,7 @@ interface RouteParams {
 // GET /api/conversations/[id]/messages - Get messages for a conversation
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
-    const session = await getCurrentSession();
-
-    // TEMPORARY: Use mock user ID when no session (for testing)
-    const userId = session?.user?.id || "12345678-1234-1234-1234-123456789abc";
+    const { userId } = await requireAuthenticatedUser();
 
     const conversationId = params.id;
 
@@ -28,10 +25,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    // TEMPORARY: Skip ownership check for testing
-    // if (conversation.userId !== userId) {
-    //   return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    // }
+    // Check if user owns this conversation
+    if (conversation.userId !== userId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get("page") || "1");
@@ -60,6 +57,15 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     });
   } catch (error) {
     console.error("Error fetching messages:", error);
+
+    // Handle authentication errors
+    if (error instanceof Error && error.message === "Authentication required") {
+      return NextResponse.json(
+        { success: false, error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
     return NextResponse.json(
       {
         success: false,
@@ -74,10 +80,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 // POST /api/conversations/[id]/messages - Send a message
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
-    const session = await getCurrentSession();
-
-    // TEMPORARY: Use mock user ID when no session (for testing)
-    const userId = session?.user?.id || "12345678-1234-1234-1234-123456789abc";
+    const { userId } = await requireAuthenticatedUser();
 
     const conversationId = params.id;
     const body = await request.json();
@@ -101,10 +104,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    // TEMPORARY: Skip ownership check for testing
-    // if (conversation.userId !== userId) {
-    //   return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    // }
+    // Check if user owns this conversation
+    if (conversation.userId !== userId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
     // Add the user message
     const userMessage = await ConversationService.addMessage(
@@ -211,6 +214,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
   } catch (error) {
     console.error("Error sending message:", error);
+
+    // Handle authentication errors
+    if (error instanceof Error && error.message === "Authentication required") {
+      return NextResponse.json(
+        { success: false, error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
     return NextResponse.json(
       {
         success: false,

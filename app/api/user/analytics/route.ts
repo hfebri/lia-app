@@ -1,26 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ConversationService } from "@/lib/services/conversation";
-import { getCurrentSession } from "@/lib/auth/session";
+import { requireAuthenticatedUser } from "@/lib/auth/session";
 import { analyzeConversationTopics } from "@/lib/services/topic-analysis";
 import { getAIService } from "@/lib/ai/service";
 
 // GET /api/user/analytics - Get user's dashboard analytics
 export async function GET(request: NextRequest) {
   try {
-    const session = await getCurrentSession();
-
-    // TEMPORARY: Use mock user ID when no session (for testing)
-    const userId = session?.user?.id || "12345678-1234-1234-1234-123456789abc";
+    const { userId } = await requireAuthenticatedUser();
 
     const { searchParams } = new URL(request.url);
     const period = searchParams.get("period") || "30"; // days
     const periodDays = parseInt(period);
 
     // Get user's conversations for analytics
-    const conversations = await ConversationService.getUserConversations(userId, {
-      page: 1,
-      limit: 1000, // Get all for analytics
-    });
+    const conversations = await ConversationService.getUserConversations(
+      userId,
+      {
+        page: 1,
+        limit: 1000, // Get all for analytics
+      }
+    );
 
     // Calculate date range
     const endDate = new Date();
@@ -30,23 +30,30 @@ export async function GET(request: NextRequest) {
     // Get messages for analytics
     let totalMessages = 0;
     let totalFiles = 0;
-    const dailyActivity: Record<string, { messages: number; conversations: number }> = {};
+    const dailyActivity: Record<
+      string,
+      { messages: number; conversations: number }
+    > = {};
     const recentConversations = [];
 
     for (const conversation of conversations.conversations.slice(0, 10)) {
       try {
-        const messages = await ConversationService.getMessages(conversation.id, {
-          page: 1,
-          limit: 1000,
-          sortOrder: "asc",
-        });
+        const messages = await ConversationService.getMessages(
+          conversation.id,
+          {
+            page: 1,
+            limit: 1000,
+            sortOrder: "asc",
+          }
+        );
 
         totalMessages += messages.messages.length;
-        
+
         // Count files in messages
         for (const message of messages.messages) {
           if (message.metadata && (message.metadata as any).files) {
-            totalFiles += ((message.metadata as any).files as any[]).length || 0;
+            totalFiles +=
+              ((message.metadata as any).files as any[]).length || 0;
           }
         }
 
@@ -56,7 +63,8 @@ export async function GET(request: NextRequest) {
           recentConversations.push({
             id: conversation.id,
             title: conversation.title || "Untitled Chat",
-            lastMessage: lastMessage?.content?.substring(0, 100) + "..." || "No messages",
+            lastMessage:
+              lastMessage?.content?.substring(0, 100) + "..." || "No messages",
             messageCount: messages.messages.length,
             createdAt: conversation.createdAt,
             updatedAt: conversation.updatedAt,
@@ -67,7 +75,7 @@ export async function GET(request: NextRequest) {
         for (const message of messages.messages) {
           const messageDate = new Date(message.createdAt);
           if (messageDate >= startDate && messageDate <= endDate) {
-            const dateKey = messageDate.toISOString().split('T')[0];
+            const dateKey = messageDate.toISOString().split("T")[0];
             if (!dailyActivity[dateKey]) {
               dailyActivity[dateKey] = { messages: 0, conversations: 0 };
             }
@@ -78,31 +86,41 @@ export async function GET(request: NextRequest) {
         // Count conversations per day
         const convDate = new Date(conversation.createdAt);
         if (convDate >= startDate && convDate <= endDate) {
-          const dateKey = convDate.toISOString().split('T')[0];
+          const dateKey = convDate.toISOString().split("T")[0];
           if (!dailyActivity[dateKey]) {
             dailyActivity[dateKey] = { messages: 0, conversations: 0 };
           }
           dailyActivity[dateKey].conversations += 1;
         }
       } catch (error) {
-        console.error(`Error fetching messages for conversation ${conversation.id}:`, error);
+        console.error(
+          `Error fetching messages for conversation ${conversation.id}:`,
+          error
+        );
       }
     }
 
     // Calculate trends using AI-powered analysis
-    const trendsAnalysis = await generateAIInsights(conversations.conversations, totalMessages, totalFiles);
+    const trendsAnalysis = await generateAIInsights(
+      conversations.conversations,
+      totalMessages,
+      totalFiles
+    );
     const messagesTrend = trendsAnalysis.messagesTrend;
-    
+
     // Generate activity chart data for the last 7 days
     const chartData = [];
     for (let i = 6; i >= 0; i--) {
       const date = new Date();
       date.setDate(date.getDate() - i);
-      const dateKey = date.toISOString().split('T')[0];
-      const activity = dailyActivity[dateKey] || { messages: 0, conversations: 0 };
-      
+      const dateKey = date.toISOString().split("T")[0];
+      const activity = dailyActivity[dateKey] || {
+        messages: 0,
+        conversations: 0,
+      };
+
       chartData.push({
-        day: date.toLocaleDateString('en-US', { weekday: 'short' }),
+        day: date.toLocaleDateString("en-US", { weekday: "short" }),
         date: dateKey,
         messages: activity.messages,
         conversations: activity.conversations,
@@ -123,7 +141,12 @@ export async function GET(request: NextRequest) {
         },
         trends: {
           conversations: trendsAnalysis.conversationsTrend,
-          messages: messagesTrend > 0 ? `+${messagesTrend}%` : messagesTrend < 0 ? `${messagesTrend}%` : "0%",
+          messages:
+            messagesTrend > 0
+              ? `+${messagesTrend}%`
+              : messagesTrend < 0
+              ? `${messagesTrend}%`
+              : "0%",
           files: trendsAnalysis.filesTrend,
           responseTime: trendsAnalysis.responseTimeTrend,
         },
@@ -143,6 +166,15 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error fetching user analytics:", error);
+
+    // Handle authentication errors
+    if (error instanceof Error && error.message === "Authentication required") {
+      return NextResponse.json(
+        { success: false, error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
     return NextResponse.json(
       {
         success: false,
@@ -168,23 +200,30 @@ async function getPopularTopicsForUser(userId?: string) {
         percentage: 100.0,
         trend: "stable",
         examples: ["Various discussions..."],
-        keywords: ["help", "question", "chat"]
-      }
+        keywords: ["help", "question", "chat"],
+      },
     ];
   }
 }
 
-async function generateAIInsights(conversations: any[], totalMessages: number, totalFiles: number) {
+async function generateAIInsights(
+  conversations: any[],
+  totalMessages: number,
+  totalFiles: number
+) {
   try {
     const aiService = getAIService();
-    
+
     // Create a summary of user activity for AI analysis
     const activitySummary = `
 User Activity Summary:
 - Total Conversations: ${conversations.length}
 - Total Messages: ${totalMessages}
 - Total Files Processed: ${totalFiles}
-- Recent Conversations: ${conversations.slice(0, 5).map(c => c.title || "Untitled").join(", ")}
+- Recent Conversations: ${conversations
+      .slice(0, 5)
+      .map((c) => c.title || "Untitled")
+      .join(", ")}
 - Activity Period: Last 30 days
 `;
 
@@ -212,37 +251,47 @@ Return only valid JSON:
 }`;
 
     const response = await aiService.chat(insightsPrompt, {
-      systemPrompt: "You are an expert data analyst providing realistic user engagement trends. Return only valid JSON responses.",
+      systemPrompt:
+        "You are an expert data analyst providing realistic user engagement trends. Return only valid JSON responses.",
       model: "openai/gpt-5",
-      provider: "replicate"
+      provider: "replicate",
     });
 
     // Parse AI response
     const cleanResponse = response.trim();
     const jsonMatch = cleanResponse.match(/\{[\s\S]*\}/);
-    
+
     if (jsonMatch) {
       const insights = JSON.parse(jsonMatch[0]);
       return insights;
     }
-    
-    throw new Error("No valid JSON found in AI insights response");
 
+    throw new Error("No valid JSON found in AI insights response");
   } catch (error) {
     console.error("AI insights generation failed:", error);
-    
+
     // Fallback to calculated trends
     const previousPeriodMessages = Math.floor(totalMessages * 0.8);
-    const messagesTrend = totalMessages > 0 
-      ? Math.round(((totalMessages - previousPeriodMessages) / previousPeriodMessages) * 100)
-      : 0;
-    
+    const messagesTrend =
+      totalMessages > 0
+        ? Math.round(
+            ((totalMessages - previousPeriodMessages) /
+              previousPeriodMessages) *
+              100
+          )
+        : 0;
+
     return {
-      conversationsTrend: conversations.length > 5 ? "+12%" : conversations.length > 0 ? "+5%" : "0%",
+      conversationsTrend:
+        conversations.length > 5
+          ? "+12%"
+          : conversations.length > 0
+          ? "+5%"
+          : "0%",
       messagesTrend: messagesTrend,
       filesTrend: totalFiles > 3 ? "+8%" : totalFiles > 0 ? "+3%" : "0%",
       responseTimeTrend: "-5%",
-      avgResponseTime: "1.2s"
+      avgResponseTime: "1.2s",
     };
   }
 }

@@ -34,11 +34,6 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
 }
 
 export async function getCurrentSession() {
-  // TEMPORARY: Skip Supabase session in testing mode
-  if (process.env.NODE_ENV === "development") {
-    return null;
-  }
-
   const supabase = await createServerClient();
 
   try {
@@ -56,6 +51,19 @@ export async function getCurrentSession() {
     console.error("Error getting current session:", error);
     return null;
   }
+}
+
+export async function requireAuthenticatedUser(): Promise<{
+  userId: string;
+  user: AuthUser;
+}> {
+  const user = await getCurrentUser();
+
+  if (!user) {
+    throw new Error("Authentication required");
+  }
+
+  return { userId: user.id, user };
 }
 
 // Database user operations

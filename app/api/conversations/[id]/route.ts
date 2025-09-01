@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ConversationService } from "@/lib/services/conversation";
-import { getCurrentSession } from "@/lib/auth/session";
+import { requireAuthenticatedUser } from "@/lib/auth/session";
 
 interface RouteParams {
   params: { id: string };
@@ -9,10 +9,7 @@ interface RouteParams {
 // GET /api/conversations/[id] - Get specific conversation
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
-    const session = await getCurrentSession();
-
-    // TEMPORARY: Use mock user ID when no session (for testing)
-    const userId = session?.user?.id || "12345678-1234-1234-1234-123456789abc";
+    const { userId } = await requireAuthenticatedUser();
 
     const conversationId = params.id;
     const conversation = await ConversationService.getConversation(
@@ -26,11 +23,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    // TEMPORARY: Skip ownership check for testing
     // Check if user owns this conversation
-    // if (conversation.userId !== userId) {
-    //   return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    // }
+    if (conversation.userId !== userId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
     return NextResponse.json({
       success: true,
@@ -38,6 +34,15 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     });
   } catch (error) {
     console.error("Error fetching conversation:", error);
+
+    // Handle authentication errors
+    if (error instanceof Error && error.message === "Authentication required") {
+      return NextResponse.json(
+        { success: false, error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
     return NextResponse.json(
       {
         success: false,
@@ -52,10 +57,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 // PUT /api/conversations/[id] - Update conversation
 export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
-    const session = await getCurrentSession();
-
-    // TEMPORARY: Use mock user ID when no session (for testing)
-    const userId = session?.user?.id || "12345678-1234-1234-1234-123456789abc";
+    const { userId } = await requireAuthenticatedUser();
 
     const conversationId = params.id;
     const body = await request.json();
@@ -72,10 +74,10 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    // TEMPORARY: Skip ownership check for testing
-    // if (existingConversation.userId !== userId) {
-    //   return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    // }
+    // Check if user owns this conversation
+    if (existingConversation.userId !== userId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
     // Update conversation
     const updates: any = {};
@@ -102,6 +104,15 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     });
   } catch (error) {
     console.error("Error updating conversation:", error);
+
+    // Handle authentication errors
+    if (error instanceof Error && error.message === "Authentication required") {
+      return NextResponse.json(
+        { success: false, error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
     return NextResponse.json(
       {
         success: false,
@@ -116,10 +127,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 // DELETE /api/conversations/[id] - Delete conversation
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
-    const session = await getCurrentSession();
-
-    // TEMPORARY: Use mock user ID when no session (for testing)
-    const userId = session?.user?.id || "12345678-1234-1234-1234-123456789abc";
+    const { userId } = await requireAuthenticatedUser();
 
     const conversationId = params.id;
 
@@ -134,10 +142,10 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    // TEMPORARY: Skip ownership check for testing
-    // if (conversation.userId !== userId) {
-    //   return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    // }
+    // Check if user owns this conversation
+    if (conversation.userId !== userId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
     // Delete conversation
     const deleted = await ConversationService.deleteConversation(
@@ -157,6 +165,15 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     });
   } catch (error) {
     console.error("Error deleting conversation:", error);
+
+    // Handle authentication errors
+    if (error instanceof Error && error.message === "Authentication required") {
+      return NextResponse.json(
+        { success: false, error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
     return NextResponse.json(
       {
         success: false,

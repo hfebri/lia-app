@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ConversationService } from "@/lib/services/conversation";
-import { getCurrentSession } from "@/lib/auth/session";
+import { requireAuthenticatedUser } from "@/lib/auth/session";
 
 // GET /api/conversations - Get user's conversations
 export async function GET(request: NextRequest) {
   try {
-    const session = await getCurrentSession();
-
-    // TEMPORARY: Use mock user ID when no session (for testing)
-    const userId = session?.user?.id || "12345678-1234-1234-1234-123456789abc";
+    const { userId } = await requireAuthenticatedUser();
 
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get("page") || "1");
@@ -46,6 +43,15 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error fetching conversations:", error);
+
+    // Handle authentication errors
+    if (error instanceof Error && error.message === "Authentication required") {
+      return NextResponse.json(
+        { success: false, error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
     return NextResponse.json(
       {
         success: false,
@@ -60,10 +66,7 @@ export async function GET(request: NextRequest) {
 // POST /api/conversations - Create new conversation
 export async function POST(request: NextRequest) {
   try {
-    const session = await getCurrentSession();
-
-    // TEMPORARY: Use mock user ID when no session (for testing)
-    const userId = session?.user?.id || "12345678-1234-1234-1234-123456789abc";
+    const { userId } = await requireAuthenticatedUser();
 
     const body = await request.json();
     const { title, initialMessage } = body;
@@ -79,6 +82,15 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error creating conversation:", error);
+
+    // Handle authentication errors
+    if (error instanceof Error && error.message === "Authentication required") {
+      return NextResponse.json(
+        { success: false, error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
     return NextResponse.json(
       {
         success: false,
