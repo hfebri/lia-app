@@ -8,7 +8,7 @@ import {
   getFileById,
 } from "@/lib/services/file-upload";
 import { ActionState } from "@/types";
-import { auth } from "@clerk/nextjs/server";
+import { requireAuthenticatedUser } from "@/lib/auth/session";
 
 export interface FileUploadData {
   success: boolean;
@@ -36,13 +36,7 @@ export async function uploadFileStorageAction(
   }
 ): Promise<ActionState<FileUploadData>> {
   try {
-    const { userId } = await auth();
-    if (!userId) {
-      return {
-        isSuccess: false,
-        message: "Authentication required",
-      };
-    }
+    const { userId } = await requireAuthenticatedUser();
 
     const file = formData.get("file") as File;
     if (!file) {
@@ -96,13 +90,7 @@ export async function uploadMultipleFilesStorageAction(
   }>
 > {
   try {
-    const { userId } = await auth();
-    if (!userId) {
-      return {
-        isSuccess: false,
-        message: "Authentication required",
-      };
-    }
+    const { userId } = await requireAuthenticatedUser();
 
     if (!files || files.length === 0) {
       return {
@@ -142,13 +130,7 @@ export async function getUserFilesStorageAction(options?: {
   analysisStatus?: "pending" | "processing" | "completed" | "error";
 }): Promise<ActionState<any[]>> {
   try {
-    const { userId } = await auth();
-    if (!userId) {
-      return {
-        isSuccess: false,
-        message: "Authentication required",
-      };
-    }
+    const { userId } = await requireAuthenticatedUser();
 
     const files = await getUserFiles(userId, options);
 
@@ -170,13 +152,7 @@ export async function getFileByIdStorageAction(
   fileId: string
 ): Promise<ActionState<any>> {
   try {
-    const { userId } = await auth();
-    if (!userId) {
-      return {
-        isSuccess: false,
-        message: "Authentication required",
-      };
-    }
+    const { userId } = await requireAuthenticatedUser();
 
     const file = await getFileById(fileId, userId);
 
@@ -205,13 +181,7 @@ export async function deleteFileStorageAction(
   fileId: string
 ): Promise<ActionState<void>> {
   try {
-    const { userId } = await auth();
-    if (!userId) {
-      return {
-        isSuccess: false,
-        message: "Authentication required",
-      };
-    }
+    const { userId } = await requireAuthenticatedUser();
 
     const success = await deleteFile(fileId, userId);
 

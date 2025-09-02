@@ -1,7 +1,12 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { AppError, handleError, getUserFriendlyMessage, isRetryableError } from "@/lib/utils/error-handling";
+import {
+  AppError,
+  handleError,
+  getUserFriendlyMessage,
+  isRetryableError,
+} from "@/lib/utils/error-handling";
 import { toast } from "sonner";
 
 export interface ErrorState {
@@ -29,6 +34,10 @@ export interface UseErrorHandlerReturn {
   clearError: () => void;
   retry: () => Promise<void>;
   canRetry: boolean;
+  withErrorHandling: <T extends any[], R>(
+    fn: (...args: T) => Promise<R>,
+    context?: Record<string, any>
+  ) => (...args: T) => Promise<R | null>;
 }
 
 export function useErrorHandler(
@@ -50,35 +59,9 @@ export function useErrorHandler(
     lastRetryAt: null,
   });
 
-  const [retryFunction, setRetryFunction] = useState<(() => Promise<void>) | null>(null);
-
-  const captureError = useCallback((
-    error: unknown,
-    context?: Record<string, any>
-  ) => {
-    const appError = handleError(error, context);
-    
-    setErrorState(prev => ({
-      ...prev,
-      error: appError,
-      isRetrying: false,
-    }));
-
-    // Show toast notification if enabled
-    if (showToast) {
-      const message = getUserFriendlyMessage(appError);
-      toast.error(message, {
-        description: appError.code ? `Error code: ${appError.code}` : undefined,
-        action: isRetryableError(appError) && prev => prev.retryCount < maxRetries ? {
-          label: "Retry",
-          onClick: () => retry(),
-        } : undefined,
-      });
-    }
-
-    // Call custom error handler
-    onError?.(appError);
-  }, [showToast, onError, maxRetries]);
+  const [retryFunction, setRetryFunction] = useState<
+    (() => Promise<void>) | null
+  >(null);
 
   const clearError = useCallback(() => {
     setErrorState({
@@ -91,24 +74,28 @@ export function useErrorHandler(
   }, []);
 
   const retry = useCallback(async () => {
-    if (!errorState.error || !retryFunction || errorState.retryCount >= maxRetries) {
+    if (
+      !errorState.error ||
+      !retryFunction ||
+      errorState.retryCount >= maxRetries
+    ) {
       return;
     }
 
-    setErrorState(prev => ({
+    setErrorState((prev) => ({
       ...prev,
       isRetrying: true,
     }));
 
     // Add delay before retry
-    await new Promise(resolve => setTimeout(resolve, retryDelay));
+    await new Promise((resolve) => setTimeout(resolve, retryDelay));
 
     try {
       await retryFunction();
-      
+
       // Success - clear error
       clearError();
-      
+
       // Show success toast
       if (showToast) {
         toast.success("Operation completed successfully");
@@ -116,8 +103,8 @@ export function useErrorHandler(
     } catch (error) {
       const newRetryCount = errorState.retryCount + 1;
       const appError = handleError(error);
-      
-      setErrorState(prev => ({
+
+      setErrorState((prev) => ({
         ...prev,
         error: appError,
         isRetrying: false,
@@ -153,6 +140,39 @@ export function useErrorHandler(
     clearError,
   ]);
 
+  const captureError = useCallback(
+    (error: unknown, context?: Record<string, any>) => {
+      const appError = handleError(error, context);
+
+      setErrorState((prev) => ({
+        ...prev,
+        error: appError,
+        isRetrying: false,
+      }));
+
+      // Show toast notification if enabled
+      if (showToast) {
+        const message = getUserFriendlyMessage(appError);
+        toast.error(message, {
+          description: appError.code
+            ? `Error code: ${appError.code}`
+            : undefined,
+          action:
+            isRetryableError(appError) && errorState.retryCount < maxRetries
+              ? {
+                  label: "Retry",
+                  onClick: () => retry(),
+                }
+              : undefined,
+        });
+      }
+
+      // Call custom error handler
+      onError?.(appError);
+    },
+    [showToast, onError, maxRetries, errorState.retryCount, retry]
+  );
+
   // Function to set a retry function
   const setRetryFn = useCallback((fn: () => Promise<void>) => {
     setRetryFunction(() => fn);
@@ -160,12 +180,13 @@ export function useErrorHandler(
 
   const canRetry = Boolean(
     errorState.error &&
-    isRetryableError(errorState.error) &&
-    errorState.retryCount < maxRetries &&
-    !errorState.isRetrying &&
-    retryFunction
+      isRetryableError(errorState.error) &&
+      errorState.retryCount < maxRetries &&
+      !errorState.isRetrying &&
+      retryFunction
   );
 
+  // Return the error handler interface
   return {
     error: errorState.error,
     isRetrying: errorState.isRetrying,
@@ -176,23 +197,28 @@ export function useErrorHandler(
     retry,
     canRetry,
     // Helper method to wrap async functions with error handling
-    withErrorHandling: useCallback(<T extends any[], R>(
-      fn: (...args: T) => Promise<R>,
-      context?: Record<string, any>
-    ) => {
-      setRetryFn(() => () => fn(...([] as any)));
-      
-      return async (...args: T): Promise<R | null> => {
-        try {
-          clearError();
-          const result = await fn(...args);
-          return result;
-        } catch (error) {
-          captureError(error, { ...context, functionName: fn.name });
-          return null;
-        }
-      };
-    }, [captureError, clearError, setRetryFn]),
+    withErrorHandling: useCallback(
+      <T extends any[], R>(
+        fn: (...args: T) => Promise<R>,
+        context?: Record<string, any>
+      ) => {
+        setRetryFn(async () => {
+          await fn(...([] as any));
+        });
+
+        return async (...args: T): Promise<R | null> => {
+          try {
+            clearError();
+            const result = await fn(...args);
+            return result;
+          } catch (error) {
+            captureError(error, { ...context, functionName: fn.name });
+            return null;
+          }
+        };
+      },
+      [captureError, clearError, setRetryFn]
+    ),
   };
 }
 
@@ -203,27 +229,30 @@ export function useApiErrorHandler(options: UseErrorHandlerOptions = {}) {
     showToast: options.showToast ?? true,
   });
 
-  const handleApiCall = useCallback(async <T>(
-    apiCall: () => Promise<T>,
-    context?: Record<string, any>
-  ): Promise<T | null> => {
-    try {
-      errorHandler.clearError();
-      const result = await apiCall();
-      return result;
-    } catch (error) {
-      // Enhanced API error context
-      const apiContext = {
-        ...context,
-        timestamp: new Date().toISOString(),
-        userAgent: navigator?.userAgent,
-        url: window?.location.href,
-      };
-      
-      errorHandler.captureError(error, apiContext);
-      return null;
-    }
-  }, [errorHandler]);
+  const handleApiCall = useCallback(
+    async <T>(
+      apiCall: () => Promise<T>,
+      context?: Record<string, any>
+    ): Promise<T | null> => {
+      try {
+        errorHandler.clearError();
+        const result = await apiCall();
+        return result;
+      } catch (error) {
+        // Enhanced API error context
+        const apiContext = {
+          ...context,
+          timestamp: new Date().toISOString(),
+          userAgent: navigator?.userAgent,
+          url: window?.location.href,
+        };
+
+        errorHandler.captureError(error, apiContext);
+        return null;
+      }
+    },
+    [errorHandler]
+  );
 
   return {
     ...errorHandler,
@@ -234,18 +263,18 @@ export function useApiErrorHandler(options: UseErrorHandlerOptions = {}) {
 // Hook for form error handling
 export function useFormErrorHandler(options: UseErrorHandlerOptions = {}) {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  
+
   const errorHandler = useErrorHandler({
     ...options,
     showToast: options.showToast ?? false, // Usually don't show toast for form errors
   });
 
   const setFieldError = useCallback((field: string, message: string) => {
-    setFieldErrors(prev => ({ ...prev, [field]: message }));
+    setFieldErrors((prev) => ({ ...prev, [field]: message }));
   }, []);
 
   const clearFieldError = useCallback((field: string) => {
-    setFieldErrors(prev => {
+    setFieldErrors((prev) => {
       const newErrors = { ...prev };
       delete newErrors[field];
       return newErrors;
@@ -273,14 +302,14 @@ export function useFormErrorHandler(options: UseErrorHandlerOptions = {}) {
 }
 
 // Global error handler hook
-export function useGlobalErrorHandler() {
+export function useGlobalErrorHandler(): void {
   useEffect(() => {
     const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
-      console.error('Unhandled promise rejection:', event.reason);
-      
+      console.error("Unhandled promise rejection:", event.reason);
+
       // Prevent the default browser behavior
       event.preventDefault();
-      
+
       // Show a user-friendly error message
       toast.error("An unexpected error occurred", {
         description: "Our team has been notified. Please try again.",
@@ -288,20 +317,23 @@ export function useGlobalErrorHandler() {
     };
 
     const handleError = (event: ErrorEvent) => {
-      console.error('Global error:', event.error);
-      
+      console.error("Global error:", event.error);
+
       // Show a user-friendly error message
       toast.error("Something went wrong", {
         description: "Please refresh the page and try again.",
       });
     };
 
-    window.addEventListener('unhandledrejection', handleUnhandledRejection);
-    window.addEventListener('error', handleError);
+    window.addEventListener("unhandledrejection", handleUnhandledRejection);
+    window.addEventListener("error", handleError);
 
     return () => {
-      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
-      window.removeEventListener('error', handleError);
+      window.removeEventListener(
+        "unhandledrejection",
+        handleUnhandledRejection
+      );
+      window.removeEventListener("error", handleError);
     };
   }, []);
 }

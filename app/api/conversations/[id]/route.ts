@@ -3,15 +3,16 @@ import { ConversationService } from "@/lib/services/conversation";
 import { requireAuthenticatedUser } from "@/lib/auth/session";
 
 interface RouteParams {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
 // GET /api/conversations/[id] - Get specific conversation
 export async function GET(request: NextRequest, { params }: RouteParams) {
+  const resolvedParams = await params;
   try {
     const { userId } = await requireAuthenticatedUser();
 
-    const conversationId = params.id;
+    const conversationId = resolvedParams.id;
     const conversation = await ConversationService.getConversation(
       conversationId
     );
@@ -56,10 +57,11 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
 // PUT /api/conversations/[id] - Update conversation
 export async function PUT(request: NextRequest, { params }: RouteParams) {
+  const resolvedParams = await params;
   try {
     const { userId } = await requireAuthenticatedUser();
 
-    const conversationId = params.id;
+    const conversationId = resolvedParams.id;
     const body = await request.json();
     const { title, metadata } = body;
 
@@ -80,7 +82,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     }
 
     // Update conversation
-    const updates: any = {};
+    const updates: { title?: string; metadata?: Record<string, unknown> } = {};
     if (title !== undefined) updates.title = title;
     if (metadata !== undefined) updates.metadata = metadata;
 
@@ -126,10 +128,11 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
 // DELETE /api/conversations/[id] - Delete conversation
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
+  const resolvedParams = await params;
   try {
     const { userId } = await requireAuthenticatedUser();
 
-    const conversationId = params.id;
+    const conversationId = resolvedParams.id;
 
     // First check if conversation exists and user owns it
     const conversation = await ConversationService.getConversation(

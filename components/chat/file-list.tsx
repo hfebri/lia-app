@@ -225,9 +225,9 @@ export function FileList({
                 <div key={file.id}>
                   <FileAttachment
                     file={file}
-                    onView={onFileSelect}
-                    onDownload={onFileDownload}
-                    onAnalyze={onFileAnalyze}
+                    onView={onFileSelect as any}
+                    onDownload={onFileDownload as any}
+                    onAnalyze={onFileAnalyze as any}
                     compact
                     className={cn(
                       "cursor-pointer transition-colors",

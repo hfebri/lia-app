@@ -176,7 +176,7 @@ export function AiChatInterface({ className }: AiChatInterfaceProps) {
           );
 
           // Send message with files
-          await sendMessage(messageContent, filesWithData);
+          await sendMessage(messageContent, filesWithData as unknown as File[]);
         }
 
         setAttachedFiles([]);

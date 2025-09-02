@@ -119,7 +119,7 @@ export async function analyzeDocument(
       .set({
         analysisStatus: "completed",
         metadata: {
-          ...file.metadata,
+          ...(file.metadata || {}),
           analysis: {
             ...analysis,
             statistics: {
@@ -316,7 +316,7 @@ export async function getFileAnalysis(fileId: string) {
       id: file.id,
       filename: file.originalName,
       analysisStatus: file.analysisStatus,
-      analysis: file.metadata?.analysis || null,
+      analysis: (file.metadata as any)?.analysis || null,
       extractedText: file.extractedText,
       createdAt: file.createdAt,
       updatedAt: file.updatedAt,

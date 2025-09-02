@@ -1,6 +1,7 @@
 "use client";
 
 import { Toaster } from "@/components/ui/sonner";
+import { toast } from "sonner";
 
 export function ToastProvider() {
   return (

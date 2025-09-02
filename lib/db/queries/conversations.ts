@@ -91,10 +91,18 @@ export async function getConversationsByUserId(
   } = params;
   const offset = (page - 1) * limit;
 
-  const orderBy =
-    sortOrder === "asc"
-      ? asc(conversations[sortBy as keyof typeof conversations])
-      : desc(conversations[sortBy as keyof typeof conversations]);
+  // Validate sortBy against actual table columns
+  const validSortColumns = {
+    id: conversations.id,
+    title: conversations.title,
+    userId: conversations.userId,
+    createdAt: conversations.createdAt,
+    updatedAt: conversations.updatedAt,
+  };
+  
+  const sortColumn = validSortColumns[sortBy as keyof typeof validSortColumns] || conversations.updatedAt;
+
+  const orderBy = sortOrder === "asc" ? asc(sortColumn) : desc(sortColumn);
 
   const [conversationList, totalCount] = await Promise.all([
     db

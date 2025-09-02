@@ -6,7 +6,8 @@
       "Bash(mkdir:*)",
       "Bash(cp:*)",
       "Bash(npx tsc:*)",
-      "Bash(npx eslint:*)"
+      "Bash(npx eslint:*)",
+      "Bash(npm install:*)"
     ],
     "deny": [],
     "ask": []

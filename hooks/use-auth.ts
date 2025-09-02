@@ -3,7 +3,8 @@
 import { useMemo, useCallback } from "react";
 import { useAuthContext } from "../components/auth/auth-provider";
 import { hasPermission, hasRole, isAdmin } from "../lib/auth/permissions";
-import type { Permission, UserRole } from "../lib/auth/permissions";
+import type { Permission } from "../lib/auth/permissions";
+import type { UserRole } from "../db/types";
 
 export function useAuth() {
   const context = useAuthContext();

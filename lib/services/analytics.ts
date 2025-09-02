@@ -102,7 +102,7 @@ export async function getAnalyticsData(
       .from(users)
       .where(
         gte(
-          users.lastActiveAt,
+          users.updatedAt,
           new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
         )
       );
@@ -136,13 +136,13 @@ export async function getAnalyticsData(
 
     const fileUploads = dailyMetricsData.map((metric) => ({
       date: metric.date,
-      count: metric.totalFiles || 0,
+      count: 0, // totalFiles not available in schema yet
     }));
 
     // Calculate user growth (mock data for now)
     const userGrowth = dailyMetricsData.map((metric, index) => ({
       date: metric.date,
-      newUsers: metric.newUsers || Math.floor(Math.random() * 20) + 5,
+      newUsers: Math.floor(Math.random() * 20) + 5, // newUsers not available in schema yet
       totalUsers:
         metric.totalUsers ||
         totalUsers - (dailyMetricsData.length - index) * 10,
@@ -422,7 +422,7 @@ export async function updateDailyMetrics(
         .select({ count: count() })
         .from(users)
         .where(
-          sql`${users.lastActiveAt} >= ${dayStart} AND ${users.lastActiveAt} < ${dayEnd}`
+          sql`${users.updatedAt} >= ${dayStart} AND ${users.updatedAt} < ${dayEnd}`
         ),
       db
         .select({ count: count() })
@@ -450,24 +450,23 @@ export async function updateDailyMetrics(
       .values({
         date: dateStr,
         totalUsers: totalUsers[0]?.count || 0,
-        newUsers: newUsers[0]?.count || 0,
+        // newUsers: newUsers[0]?.count || 0, // Field not in schema yet
         activeUsers: activeUsers[0]?.count || 0,
         totalMessages: totalMessages[0]?.count || 0,
         totalConversations: totalConversations[0]?.count || 0,
-        totalFiles: totalFiles[0]?.count || 0,
-        avgResponseTime: Math.random() * 2000 + 500, // Mock response time
+        // totalFiles: totalFiles[0]?.count || 0, // Field not in schema yet
+        // avgResponseTime: Math.random() * 2000 + 500, // Field not in schema yet
       })
       .onConflictDoUpdate({
         target: dailyMetrics.date,
         set: {
           totalUsers: sql`excluded.total_users`,
-          newUsers: sql`excluded.new_users`,
+          // newUsers: sql`excluded.new_users`, // Field not in schema yet
           activeUsers: sql`excluded.active_users`,
           totalMessages: sql`excluded.total_messages`,
           totalConversations: sql`excluded.total_conversations`,
-          totalFiles: sql`excluded.total_files`,
-          avgResponseTime: sql`excluded.avg_response_time`,
-          updatedAt: new Date(),
+          // totalFiles: sql`excluded.total_files`, // Field not in schema yet
+          // avgResponseTime: sql`excluded.avg_response_time`, // Field not in schema yet
         },
       });
   } catch (error) {

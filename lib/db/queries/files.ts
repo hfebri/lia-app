@@ -17,7 +17,7 @@ export async function getFileById(id: string): Promise<File | null> {
 // Get file with user info
 export async function getFileWithUser(
   id: string
-): Promise<FileWithAnalysis | null> {
+): Promise<(File & { user: { id: string; name: string | null; email: string } }) | null> {
   const result = await db.query.files.findFirst({
     where: eq(files.id, id),
     with: {
@@ -95,10 +95,20 @@ export async function getFilesByUserId(
   } = params;
   const offset = (page - 1) * limit;
 
-  const orderBy =
-    sortOrder === "asc"
-      ? asc(files[sortBy as keyof typeof files])
-      : desc(files[sortBy as keyof typeof files]);
+  // Validate sortBy against actual table columns
+  const validSortColumns = {
+    id: files.id,
+    filename: files.filename,
+    originalName: files.originalName,
+    createdAt: files.createdAt,
+    updatedAt: files.updatedAt,
+    size: files.size,
+    mimeType: files.mimeType,
+  };
+  
+  const sortColumn = validSortColumns[sortBy as keyof typeof validSortColumns] || files.createdAt;
+
+  const orderBy = sortOrder === "asc" ? asc(sortColumn) : desc(sortColumn);
 
   const [fileList, totalCount] = await Promise.all([
     db
@@ -338,7 +348,7 @@ export async function getStorageUsedByUser(userId: string): Promise<number> {
 // Get recent files across all users (admin)
 export async function getRecentFiles(
   limit: number = 20
-): Promise<FileWithAnalysis[]> {
+): Promise<(File & { user: { id: string; name: string | null; email: string } })[]> {
   return db.query.files.findMany({
     where: eq(files.isActive, true),
     limit,

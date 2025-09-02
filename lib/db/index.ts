@@ -6,7 +6,6 @@ export * from "../../db/types";
 export * as userQueries from "./queries/users";
 export * as conversationQueries from "./queries/conversations";
 export * as messageQueries from "./queries/messages";
-export * as templateQueries from "./queries/templates";
 export * as fileQueries from "./queries/files";
 export * as analyticsQueries from "./queries/analytics";
 
@@ -38,16 +37,6 @@ export {
   updateMessage,
   deleteMessage,
 } from "./queries/messages";
-
-export {
-  // Template operations
-  getTemplateById,
-  getTemplateWithUsage,
-  createTemplate,
-  updateTemplate,
-  getPublicTemplates,
-  getTemplatesByCategory,
-} from "./queries/templates";
 
 export {
   // File operations

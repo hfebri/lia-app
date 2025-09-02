@@ -28,11 +28,11 @@ const convertToUserTableFormat = (dbUsers: SelectUser[]) => {
   return dbUsers.map((user) => ({
     id: user.id,
     email: user.email,
-    fullName: user.fullName || undefined,
-    avatarUrl: user.avatarUrl || undefined,
+    fullName: user.name || undefined,
+    avatarUrl: user.image || undefined,
     role: user.role as "admin" | "user",
     status: "active" as const, // You might want to add this to your schema
-    lastActive: user.lastActive || user.updatedAt,
+    lastActive: user.updatedAt,
     createdAt: user.createdAt,
     messageCount: 0, // You'll need to join with messages to get real counts
     fileCount: 0, // You'll need to join with files to get real counts
@@ -41,7 +41,16 @@ const convertToUserTableFormat = (dbUsers: SelectUser[]) => {
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<SelectUser[]>([]);
-  const [userStats, setUserStats] = useState<any[]>([]);
+  const [userStats, setUserStats] = useState<Array<{
+    title: string;
+    value: string;
+    change: {
+      value: number;
+      type: 'increase' | 'decrease';
+      period: string;
+    };
+    icon: React.ComponentType;
+  }>>([]);
   const [loading, setLoading] = useState(true);
 
   const loadData = async () => {
@@ -52,13 +61,13 @@ export default function AdminUsersPage() {
         getUserStatsAction(),
       ]);
 
-      if (usersResult.isSuccess) {
+      if (usersResult.isSuccess && usersResult.data) {
         setUsers(usersResult.data);
       } else {
         toast.error(usersResult.message);
       }
 
-      if (statsResult.isSuccess) {
+      if (statsResult.isSuccess && statsResult.data) {
         const stats = statsResult.data;
         setUserStats([
           {
@@ -70,7 +79,6 @@ export default function AdminUsersPage() {
               period: "last month",
             },
             icon: Users,
-            description: "All registered users",
           },
           {
             title: "Active Today",
@@ -81,7 +89,6 @@ export default function AdminUsersPage() {
               period: "yesterday",
             },
             icon: Activity,
-            description: "Users active in last 24h",
           },
           {
             title: "New Registrations",
@@ -92,13 +99,16 @@ export default function AdminUsersPage() {
               period: "last week",
             },
             icon: TrendingUp,
-            description: "New users this week",
           },
           {
             title: "Admin Users",
             value: stats.adminUsers.toString(),
+            change: {
+              value: 0,
+              type: "increase" as const,
+              period: "no change",
+            },
             icon: Shield,
-            description: "Users with admin privileges",
           },
         ]);
       } else {

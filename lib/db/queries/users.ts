@@ -76,10 +76,20 @@ export async function getUsers(params: PaginationParams = {}) {
   } = params;
   const offset = (page - 1) * limit;
 
-  const orderBy =
-    sortOrder === "asc"
-      ? asc(users[sortBy as keyof typeof users])
-      : desc(users[sortBy as keyof typeof users]);
+  // Validate sortBy against actual table columns
+  const validSortColumns = {
+    id: users.id,
+    name: users.name,
+    email: users.email,
+    role: users.role,
+    isActive: users.isActive,
+    createdAt: users.createdAt,
+    updatedAt: users.updatedAt,
+  };
+  
+  const sortColumn = validSortColumns[sortBy as keyof typeof validSortColumns] || users.createdAt;
+
+  const orderBy = sortOrder === "asc" ? asc(sortColumn) : desc(sortColumn);
 
   const [userList, totalCount] = await Promise.all([
     db

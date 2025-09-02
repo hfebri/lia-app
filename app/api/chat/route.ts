@@ -7,7 +7,12 @@ export async function POST(request: NextRequest) {
     let messages,
       model = "openai/gpt-5",
       stream = false,
-      files: any[] = [];
+      files: Array<{
+        name: string;
+        type: string;
+        size: number;
+        data: string;
+      }> = [];
 
     const contentType = request.headers.get("content-type") || "";
 
@@ -45,7 +50,12 @@ export async function POST(request: NextRequest) {
         messages.forEach(
           (msg: { files?: unknown[]; [key: string]: unknown }) => {
             if (msg.files && Array.isArray(msg.files)) {
-              files.push(...msg.files);
+              files.push(...(msg.files as Array<{
+                name: string;
+                type: string;
+                size: number;
+                data: string;
+              }>));
             }
           }
         );

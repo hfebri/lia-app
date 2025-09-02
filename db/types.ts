@@ -3,7 +3,6 @@ import {
   users,
   conversations,
   messages,
-  templates,
   files,
   analytics,
   dailyMetrics,
@@ -25,9 +24,9 @@ export type Message = InferSelectModel<typeof messages>;
 export type NewMessage = InferInsertModel<typeof messages>;
 export type MessageRole = (typeof messageRoleEnum.enumValues)[number];
 
-// Template types
-export type Template = InferSelectModel<typeof templates>;
-export type NewTemplate = InferInsertModel<typeof templates>;
+// Template types (commented out as schema doesn't exist yet)
+// export type Template = InferSelectModel<typeof templates>;
+// export type NewTemplate = InferInsertModel<typeof templates>;
 
 // File types
 export type File = InferSelectModel<typeof files>;
@@ -43,7 +42,7 @@ export type NewDailyMetrics = InferInsertModel<typeof dailyMetrics>;
 export type ConversationWithMessages = Conversation & {
   messages: Message[];
   user: User;
-  template?: Template;
+  // template?: Template; // Commented out as schema doesn't exist yet
 };
 
 export type ConversationWithLastMessage = Conversation & {
@@ -57,10 +56,10 @@ export type UserWithStats = User & {
   totalTokensUsed: number;
 };
 
-export type TemplateWithUsage = Template & {
-  usageCount: number;
-  creator?: User;
-};
+// export type TemplateWithUsage = Template & {
+//   usageCount: number;
+//   creator?: User;
+// };
 
 export type FileWithAnalysis = File & {
   user: User;

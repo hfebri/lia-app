@@ -4,15 +4,16 @@ import { requireAuthenticatedUser } from "@/lib/auth/session";
 import { getAIService, createMessage } from "@/lib/ai/service";
 
 interface RouteParams {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
 // GET /api/conversations/[id]/messages - Get messages for a conversation
 export async function GET(request: NextRequest, { params }: RouteParams) {
+  const resolvedParams = await params;
   try {
     const { userId } = await requireAuthenticatedUser();
 
-    const conversationId = params.id;
+    const conversationId = resolvedParams.id;
 
     // Check if conversation exists and user owns it
     const conversation = await ConversationService.getConversation(
@@ -79,10 +80,11 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
 // POST /api/conversations/[id]/messages - Send a message
 export async function POST(request: NextRequest, { params }: RouteParams) {
+  const resolvedParams = await params;
   try {
     const { userId } = await requireAuthenticatedUser();
 
-    const conversationId = params.id;
+    const conversationId = resolvedParams.id;
     const body = await request.json();
     const { content, model } = body;
 

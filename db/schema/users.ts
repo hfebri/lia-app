@@ -7,7 +7,7 @@ import {
   boolean,
   pgEnum,
 } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
+import { relations, InferSelectModel } from "drizzle-orm";
 
 // User role enum
 export const userRoleEnum = pgEnum("user_role", ["user", "admin"]);
@@ -31,6 +31,9 @@ export const usersRelations = relations(users, ({ many }) => ({
   files: many(files),
   analytics: many(analytics),
 }));
+
+// Type inference for users table
+export type SelectUser = InferSelectModel<typeof users>;
 
 // Import other tables for relations (will be defined in other files)
 import { conversations } from "./conversations";
