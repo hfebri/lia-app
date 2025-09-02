@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AIService } from "@/lib/ai/service";
+import { requireAuthenticatedUser } from "@/lib/auth/session";
 import type { AIMessage } from "@/lib/ai/types";
 
 export async function POST(request: NextRequest) {
   try {
+    // Require authentication for all chat requests
+    await requireAuthenticatedUser();
     let messages,
       model = "openai/gpt-5",
       stream = false,

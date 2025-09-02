@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentSession } from "@/lib/auth/session";
+import { requireAuthenticatedUser } from "@/lib/auth/session";
 import { uploadFile, uploadFiles } from "@/lib/services/file-upload";
 
 export async function POST(request: NextRequest) {
@@ -27,10 +27,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const session = await getCurrentSession();
-
-    // TEMPORARY: Use mock user ID when no session (for testing)
-    const userId = session?.user?.id || "12345678-1234-1234-1234-123456789abc";
+    const { userId } = await requireAuthenticatedUser();
 
     const formData = await request.formData();
     const files = formData.getAll("files") as File[];
@@ -98,6 +95,14 @@ export async function POST(request: NextRequest) {
       });
     }
   } catch (error) {
+    // Handle authentication errors
+    if (error instanceof Error && error.message === "Authentication required") {
+      return NextResponse.json(
+        { success: false, error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
     return NextResponse.json(
       {
         success: false,

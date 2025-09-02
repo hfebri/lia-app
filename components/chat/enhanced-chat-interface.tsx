@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import { useAuth } from "@/hooks/use-auth";
 import { useAiChat } from "@/hooks/use-ai-chat";
 import { useFileUpload, type FileItem } from "@/hooks/use-file-upload";
 import { useSearchParams } from "next/navigation";
@@ -49,6 +50,8 @@ interface EnhancedChatInterfaceProps {
 export function EnhancedChatInterface({
   className,
 }: EnhancedChatInterfaceProps) {
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
+
   // Render count tracking
   const [inputValue, setInputValue] = useState("");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -332,6 +335,11 @@ export function EnhancedChatInterface({
   };
 
   const handleSendMessage = async () => {
+    // Prevent sending messages if not authenticated
+    if (!isAuthenticated) {
+      return;
+    }
+
     if (
       !inputValue.trim() &&
       attachedFiles.length === 0 &&
@@ -949,8 +957,8 @@ export function EnhancedChatInterface({
                     value={inputValue}
                     onChange={(e) => setInputValue(e.target.value)}
                     onKeyDown={handleKeyPress}
-                    placeholder="Type your message..."
-                    disabled={isLoading || isStreaming}
+                    placeholder={!isAuthenticated ? "Please sign in to chat..." : "Type your message..."}
+                    disabled={!isAuthenticated || isAuthLoading || isLoading || isStreaming}
                     className="border-0 bg-transparent text-sm placeholder:text-muted-foreground focus-visible:ring-0 shadow-none px-0 min-h-[40px] resize-none overflow-hidden"
                   />
                 </div>
@@ -958,12 +966,13 @@ export function EnhancedChatInterface({
                 <Button
                   onClick={isStreaming ? stopStreaming : handleSendMessage}
                   disabled={
-                    !isStreaming &&
+                    !isAuthenticated ||
+                    (!isStreaming &&
                     ((!inputValue.trim() &&
                       attachedFiles.length === 0 &&
                       selectedFiles.length === 0) ||
                       !canSend ||
-                      isUploading)
+                      isUploading))
                   }
                   size="icon"
                   className={cn(
