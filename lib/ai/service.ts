@@ -18,23 +18,6 @@ export class AIService {
   private config: AIServiceConfig;
 
   constructor(config?: Partial<AIServiceConfig>) {
-    console.log("🏗️ AI SERVICE CONSTRUCTOR DEBUG: Constructor called");
-    console.log(
-      "🏗️ AI SERVICE CONSTRUCTOR DEBUG: Environment variables check:"
-    );
-    console.log(
-      "🏗️ AI SERVICE CONSTRUCTOR DEBUG: REPLICATE_API_TOKEN:",
-      !!process.env.REPLICATE_API_TOKEN
-    );
-    console.log(
-      "🏗️ AI SERVICE CONSTRUCTOR DEBUG: GEMINI_API_KEY:",
-      !!process.env.GEMINI_API_KEY
-    );
-    console.log(
-      "🏗️ AI SERVICE CONSTRUCTOR DEBUG: GEMINI_API_KEY length:",
-      process.env.GEMINI_API_KEY?.length || 0
-    );
-
     this.config = {
       defaultProvider: "replicate",
       providers: {
