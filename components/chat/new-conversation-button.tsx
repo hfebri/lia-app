@@ -61,7 +61,6 @@ export function NewConversationButton({
       setInitialMessage("");
       setIsOpen(false);
     } catch (error) {
-      console.error("Failed to create conversation:", error);
     } finally {
       setIsLoading(false);
     }
@@ -74,7 +73,6 @@ export function NewConversationButton({
     try {
       await onCreateConversation({});
     } catch (error) {
-      console.error("Failed to create conversation:", error);
     } finally {
       setIsLoading(false);
     }

@@ -68,7 +68,6 @@ export async function uploadFileStorageAction(
       data: result,
     };
   } catch (error) {
-    console.error("Error uploading file:", error);
     return {
       isSuccess: false,
       message: "Failed to upload file",
@@ -114,7 +113,6 @@ export async function uploadMultipleFilesStorageAction(
       data: result,
     };
   } catch (error) {
-    console.error("Error uploading files:", error);
     return {
       isSuccess: false,
       message: "Failed to upload files",
@@ -140,7 +138,6 @@ export async function getUserFilesStorageAction(options?: {
       data: files,
     };
   } catch (error) {
-    console.error("Error getting user files:", error);
     return {
       isSuccess: false,
       message: "Failed to get files",
@@ -169,7 +166,6 @@ export async function getFileByIdStorageAction(
       data: file,
     };
   } catch (error) {
-    console.error("Error getting file:", error);
     return {
       isSuccess: false,
       message: "Failed to get file",
@@ -198,7 +194,6 @@ export async function deleteFileStorageAction(
       data: undefined,
     };
   } catch (error) {
-    console.error("Error deleting file:", error);
     return {
       isSuccess: false,
       message: "Failed to delete file",

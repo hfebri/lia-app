@@ -42,8 +42,6 @@ export class ReplicateProvider implements AIProvider {
         top_p,
       };
 
-      console.log("Replicate API request:", { model, input });
-
       const output = await this.client.run(model as any, { input });
 
       // Handle the response - Replicate returns an array of content
@@ -60,7 +58,6 @@ export class ReplicateProvider implements AIProvider {
         },
       };
     } catch (error) {
-      console.error("Replicate API error:", error);
       throw this.handleError(error, options.model);
     }
   }
@@ -87,8 +84,6 @@ export class ReplicateProvider implements AIProvider {
         max_tokens,
         top_p,
       };
-
-      console.log("Replicate streaming request:", { model, input });
 
       // For streaming, we use the stream method
       const stream = await this.client.stream(model as any, { input });
@@ -130,7 +125,6 @@ export class ReplicateProvider implements AIProvider {
         };
       }
     } catch (error) {
-      console.error("Replicate streaming error:", error);
       throw this.handleError(error, options.model);
     }
   }

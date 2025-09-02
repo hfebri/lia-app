@@ -4,8 +4,6 @@ import { eq } from "drizzle-orm";
 import type { NewUser } from "../../../db/types";
 
 export async function seedUsers() {
-  console.log("🌱 Seeding users...");
-
   // Default admin user data
   const adminUsers: NewUser[] = [
     {
@@ -54,16 +52,11 @@ export async function seedUsers() {
             updatedAt: new Date(),
           })
           .returning();
-
-        console.log(`✅ Created ${userData.role} user: ${userData.email}`);
       } else {
-        console.log(`⏭️  User already exists: ${userData.email}`);
+
       }
     }
-
-    console.log("✅ Users seeded successfully!");
   } catch (error) {
-    console.error("❌ Error seeding users:", error);
     throw error;
   }
 }

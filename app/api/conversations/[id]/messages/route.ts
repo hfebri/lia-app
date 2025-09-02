@@ -57,7 +57,6 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       },
     });
   } catch (error) {
-    console.error("Error fetching messages:", error);
 
     // Handle authentication errors
     if (error instanceof Error && error.message === "Authentication required") {
@@ -184,7 +183,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         },
       });
     } catch (aiError) {
-      console.error("AI service error:", aiError);
 
       // Fallback to a simple response if AI fails
       const assistantMessage = await ConversationService.addMessage(
@@ -215,7 +213,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       });
     }
   } catch (error) {
-    console.error("Error sending message:", error);
 
     // Handle authentication errors
     if (error instanceof Error && error.message === "Authentication required") {

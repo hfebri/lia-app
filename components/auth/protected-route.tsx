@@ -23,7 +23,7 @@ export function ProtectedRoute({
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      console.log("Protected route: User not authenticated, forcing logout");
+
       forceLogout();
     }
   }, [isAuthenticated, isLoading, forceLogout]);

@@ -27,7 +27,6 @@ export async function GET(request: NextRequest) {
       data: popularTopics,
     });
   } catch (error) {
-    console.error("Popular topics API error:", error);
     return NextResponse.json(
       {
         success: false,

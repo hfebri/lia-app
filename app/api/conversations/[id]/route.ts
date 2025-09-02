@@ -34,7 +34,6 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       data: ConversationService.formatConversationForResponse(conversation),
     });
   } catch (error) {
-    console.error("Error fetching conversation:", error);
 
     // Handle authentication errors
     if (error instanceof Error && error.message === "Authentication required") {
@@ -105,7 +104,6 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       ),
     });
   } catch (error) {
-    console.error("Error updating conversation:", error);
 
     // Handle authentication errors
     if (error instanceof Error && error.message === "Authentication required") {
@@ -167,7 +165,6 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       message: "Conversation deleted successfully",
     });
   } catch (error) {
-    console.error("Error deleting conversation:", error);
 
     // Handle authentication errors
     if (error instanceof Error && error.message === "Authentication required") {

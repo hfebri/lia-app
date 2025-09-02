@@ -305,7 +305,6 @@ export function useFormErrorHandler(options: UseErrorHandlerOptions = {}) {
 export function useGlobalErrorHandler(): void {
   useEffect(() => {
     const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
-      console.error("Unhandled promise rejection:", event.reason);
 
       // Prevent the default browser behavior
       event.preventDefault();
@@ -317,7 +316,6 @@ export function useGlobalErrorHandler(): void {
     };
 
     const handleError = (event: ErrorEvent) => {
-      console.error("Global error:", event.error);
 
       // Show a user-friendly error message
       toast.error("Something went wrong", {

@@ -53,7 +53,6 @@ export function useAiChat(options: UseAiChatOptions = {}) {
         selectedModel: prev.selectedModel || modelsData.defaultModel,
       }));
     } catch (error) {
-      console.error("Failed to load models:", error);
       setState((prev) => ({
         ...prev,
         error: error instanceof Error ? error.message : "Failed to load models",
@@ -202,7 +201,6 @@ export function useAiChat(options: UseAiChatOptions = {}) {
           }));
         }
       } catch (error) {
-        console.error("Chat error:", error);
         setState((prev) => ({
           ...prev,
           error:

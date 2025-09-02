@@ -55,7 +55,6 @@ export function RecentConversations({ data, onRename, onDelete }: RecentConversa
       setEditingId(null);
       setTempTitle("");
     } catch (error) {
-      console.error("Failed to rename conversation:", error);
       setEditingId(null);
       setTempTitle("");
     }
@@ -85,7 +84,6 @@ export function RecentConversations({ data, onRename, onDelete }: RecentConversa
     try {
       await onDelete(id);
     } catch (error) {
-      console.error("Failed to delete conversation:", error);
     }
   };
 

@@ -46,7 +46,6 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       },
     });
   } catch (error) {
-    console.error("Get file API error:", error);
     return NextResponse.json(
       { success: false, error: "Failed to get file" },
       { status: 500 }
@@ -118,7 +117,6 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       },
     });
   } catch (error) {
-    console.error("Update file API error:", error);
     return NextResponse.json(
       { success: false, error: "Failed to update file" },
       { status: 500 }
@@ -150,7 +148,6 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       message: "File deleted successfully",
     });
   } catch (error) {
-    console.error("Delete file API error:", error);
     return NextResponse.json(
       { success: false, error: "Failed to delete file" },
       { status: 500 }

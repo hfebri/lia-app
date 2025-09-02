@@ -13,8 +13,6 @@ async function runMigrations() {
     throw new Error("DATABASE_URL environment variable is not set");
   }
 
-  console.log("🚀 Starting database migrations...");
-
   // Create connection for migrations
   const migrationClient = postgres(databaseUrl, { max: 1 });
   const db = drizzle(migrationClient);
@@ -22,9 +20,8 @@ async function runMigrations() {
   try {
     // Run migrations
     await migrate(db, { migrationsFolder: "./db/migrations" });
-    console.log("✅ Database migrations completed successfully!");
+
   } catch (error) {
-    console.error("❌ Migration failed:", error);
     throw error;
   } finally {
     // Close the connection
@@ -38,11 +35,10 @@ export { runMigrations };
 if (require.main === module) {
   runMigrations()
     .then(() => {
-      console.log("Migration process completed");
+
       process.exit(0);
     })
     .catch((error) => {
-      console.error("Migration process failed:", error);
       process.exit(1);
     });
 }

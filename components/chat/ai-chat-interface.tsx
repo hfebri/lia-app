@@ -141,7 +141,6 @@ export function AiChatInterface({ className }: AiChatInterfaceProps) {
         );
 
         if (!uploadResult.isSuccess) {
-          console.error("File upload failed:", uploadResult.message);
           // Still send the message without files
           await sendMessage(messageContent);
         } else {
@@ -185,7 +184,6 @@ export function AiChatInterface({ className }: AiChatInterfaceProps) {
         await sendMessage(messageContent);
       }
     } catch (error) {
-      console.error("Error in handleSendMessage:", error);
       setIsUploadingFiles(false);
     }
 

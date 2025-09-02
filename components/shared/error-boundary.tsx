@@ -71,7 +71,6 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error("ErrorBoundary caught an error:", error, errorInfo);
 
     this.setState({
       error,
@@ -84,14 +83,7 @@ export class ErrorBoundary extends Component<Props, State> {
     // Log error for monitoring (in production, this would go to error tracking service)
     if (process.env.NODE_ENV === "production") {
       // TODO: Send to error tracking service (Sentry, LogRocket, etc.)
-      console.error("Production error:", {
-        error: error.toString(),
-        errorInfo,
-        errorId: this.state.errorId,
-        url: window.location.href,
-        userAgent: navigator.userAgent,
-        timestamp: new Date().toISOString(),
-      });
+      // Production error logging would go here
     }
   }
 

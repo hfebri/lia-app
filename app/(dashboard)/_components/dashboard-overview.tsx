@@ -50,11 +50,9 @@ export function DashboardOverview() {
         // Refresh the analytics data to get updated conversation list
         refetch();
       } else {
-        console.error("Failed to rename conversation");
         throw new Error("Failed to rename conversation");
       }
     } catch (error) {
-      console.error("Error renaming conversation:", error);
       throw error;
     }
   };
@@ -70,11 +68,9 @@ export function DashboardOverview() {
         // This avoids a full page reload and just updates the dashboard data
         refetch();
       } else {
-        console.error("Failed to delete conversation");
         throw new Error("Failed to delete conversation");
       }
     } catch (error) {
-      console.error("Error deleting conversation:", error);
       throw error;
     }
   };

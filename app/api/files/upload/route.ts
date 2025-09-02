@@ -98,7 +98,6 @@ export async function POST(request: NextRequest) {
       });
     }
   } catch (error) {
-    console.error("File upload API error:", error);
     return NextResponse.json(
       {
         success: false,
@@ -184,7 +183,6 @@ export async function GET() {
       },
     });
   } catch (error) {
-    console.error("Upload config API error:", error);
     return NextResponse.json(
       { success: false, error: "Failed to get upload configuration" },
       { status: 500 }

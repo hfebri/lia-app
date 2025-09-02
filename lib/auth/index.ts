@@ -28,7 +28,6 @@ export async function getAuthUser(): Promise<AuthUser | null> {
 
     return dbUser;
   } catch (error) {
-    console.error("Error getting auth user:", error);
     return null;
   }
 }
@@ -79,7 +78,6 @@ export async function getUserFromDatabase(
       updatedAt: user.updatedAt,
     };
   } catch (error) {
-    console.error("Error getting user from database:", error);
     return null;
   }
 }
@@ -159,7 +157,6 @@ export async function createOrUpdateUser(supabaseUser: {
       };
     }
   } catch (error) {
-    console.error("Error creating/updating user:", error);
     return null;
   }
 }

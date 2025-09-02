@@ -49,7 +49,6 @@ export async function extractTextFromFile(
         };
     }
   } catch (error) {
-    console.error("Text extraction error:", error);
     return {
       success: false,
       error:

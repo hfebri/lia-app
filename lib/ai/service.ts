@@ -35,15 +35,8 @@ export class AIService {
       ...config,
     };
 
-    console.log(
-      "🏗️ AI SERVICE CONSTRUCTOR DEBUG: Final config:",
-      JSON.stringify(this.config, null, 2)
-    );
-    console.log(
-      "🏗️ AI SERVICE CONSTRUCTOR DEBUG: About to initialize providers..."
-    );
     this.initializeProviders();
-    console.log("🏗️ AI SERVICE CONSTRUCTOR DEBUG: Providers initialized");
+
   }
 
   private initializeProviders() {
@@ -52,15 +45,11 @@ export class AIService {
       try {
         const replicateProvider = ReplicateProvider.create();
         this.providers.set("replicate", replicateProvider);
-        console.log("✅ Replicate provider initialized");
+
       } catch (error) {
-        console.error("❌ Failed to initialize Replicate provider:", error);
       }
     } else {
       // Initialize mock provider for testing when no API key is available
-      console.log(
-        "🧪 No REPLICATE_API_TOKEN found, initializing mock provider for testing"
-      );
       const mockProvider = new MockProvider();
       this.providers.set("replicate", mockProvider);
     }
@@ -70,13 +59,9 @@ export class AIService {
       try {
         const geminiProvider = GeminiProvider.create();
         this.providers.set("gemini", geminiProvider);
-        console.log("✅ Gemini provider initialized");
+
       } catch (error) {
-        console.error("❌ Failed to initialize Gemini provider:", error);
       }
-    } else {
-      console.log("🧪 No GEMINI_API_KEY found, Gemini provider not available");
-    }
   }
 
   /**
@@ -86,63 +71,26 @@ export class AIService {
     messages: AIMessage[],
     options: AIGenerationOptions & { provider?: AIProviderName } = {}
   ): Promise<AIResponse> {
-    console.log("🚀 AI SERVICE DEBUG: generateResponse called");
-    console.log(
-      "🚀 AI SERVICE DEBUG: Input options:",
-      JSON.stringify(options, null, 2)
-    );
-    console.log("🚀 AI SERVICE DEBUG: Input messages count:", messages.length);
 
     const providerName = options.provider || this.config.defaultProvider;
-    console.log("🚀 AI SERVICE DEBUG: Selected provider:", providerName);
-    console.log(
-      "🚀 AI SERVICE DEBUG: Available providers:",
-      Array.from(this.providers.keys())
-    );
-
     const provider = this.getProvider(providerName);
-    console.log("🚀 AI SERVICE DEBUG: Provider found:", !!provider);
-    console.log("🚀 AI SERVICE DEBUG: Provider name:", provider?.name);
 
     if (!provider) {
-      console.error("🚀 AI SERVICE DEBUG: Provider not available!");
       throw new Error(`Provider "${providerName}" not available`);
     }
 
     // Set default model for the provider if not specified
     const providerConfig = this.config.providers[providerName];
-    console.log(
-      "🚀 AI SERVICE DEBUG: Provider config:",
-      JSON.stringify(providerConfig, null, 2)
-    );
 
     const finalOptions = {
       ...options,
       model: options.model || providerConfig?.defaultModel,
     };
-    console.log(
-      "🚀 AI SERVICE DEBUG: Final options:",
-      JSON.stringify(finalOptions, null, 2)
-    );
 
-    console.log(
-      "🚀 AI SERVICE DEBUG: About to call provider.generateResponse..."
-    );
     try {
       const result = await provider.generateResponse(messages, finalOptions);
-      console.log(
-        "🚀 AI SERVICE DEBUG: Provider response received successfully"
-      );
-      console.log(
-        "🚀 AI SERVICE DEBUG: Response content length:",
-        result.content?.length || 0
-      );
       return result;
     } catch (error) {
-      console.error(
-        "🚀 AI SERVICE DEBUG: Provider generateResponse failed:",
-        error
-      );
       throw error;
     }
   }
@@ -202,9 +150,6 @@ export class AIService {
 
     // Strict provider routing - always throw error if requested provider is not available
     if (!provider) {
-      console.error(
-        `🚀 AI SERVICE DEBUG: ${providerName} provider not available`
-      );
 
       if (providerName === "gemini") {
         throw new Error(
@@ -267,21 +212,10 @@ let aiServiceInstance: AIService | null = null;
  * Get the global AI service instance
  */
 export function getAIService(): AIService {
-  console.log("🏭 AI SERVICE FACTORY DEBUG: getAIService called");
-  console.log(
-    "🏭 AI SERVICE FACTORY DEBUG: Existing instance:",
-    !!aiServiceInstance
-  );
-
   if (!aiServiceInstance) {
-    console.log(
-      "🏭 AI SERVICE FACTORY DEBUG: Creating new AIService instance..."
-    );
     aiServiceInstance = new AIService();
-    console.log("🏭 AI SERVICE FACTORY DEBUG: AIService instance created");
-  }
 
-  console.log("🏭 AI SERVICE FACTORY DEBUG: Returning AIService instance");
+  }
   return aiServiceInstance;
 }
 

@@ -33,7 +33,6 @@ export function LogoutButton({
       setIsLoading(true);
       await signOut();
     } catch (error) {
-      console.error("Logout error:", error);
       // You might want to show a toast notification here
     } finally {
       setIsLoading(false);

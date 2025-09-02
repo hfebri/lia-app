@@ -98,7 +98,6 @@ export function useAnalytics(): UseAnalyticsReturn {
       }
     } catch (err) {
       setError("Failed to fetch analytics data");
-      console.error("Analytics fetch error:", err);
     }
   }, [dateRange]);
 
@@ -115,7 +114,6 @@ export function useAnalytics(): UseAnalyticsReturn {
       }
     } catch (err) {
       setError("Failed to fetch usage metrics");
-      console.error("Usage metrics fetch error:", err);
     }
   }, []);
 
@@ -132,7 +130,6 @@ export function useAnalytics(): UseAnalyticsReturn {
       }
     } catch (err) {
       setError("Failed to fetch popular topics");
-      console.error("Popular topics fetch error:", err);
     }
   }, []);
 
@@ -208,7 +205,6 @@ export function useRealTimeMetrics() {
           setMetrics(result.data);
         }
       } catch (error) {
-        console.error("Failed to fetch real-time metrics:", error);
       }
     };
 
@@ -246,7 +242,6 @@ export function useAnalyticsAlerts() {
           setAlerts(result.data);
         }
       } catch (error) {
-        console.error("Failed to fetch analytics alerts:", error);
       }
     };
 
@@ -266,7 +261,6 @@ export function useAnalyticsAlerts() {
 
       setAlerts((prev) => prev.filter((alert) => alert.id !== alertId));
     } catch (error) {
-      console.error("Failed to dismiss alert:", error);
     }
   }, []);
 

@@ -35,7 +35,6 @@ export async function GET(request: NextRequest) {
       data: analyticsData,
     });
   } catch (error) {
-    console.error("Analytics API error:", error);
     return NextResponse.json(
       {
         success: false,

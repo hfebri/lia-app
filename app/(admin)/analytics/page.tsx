@@ -40,7 +40,7 @@ export default function AdminAnalyticsPage() {
 
   const handleExport = () => {
     // Implementation for exporting analytics data
-    console.log("Exporting analytics data...");
+
   };
 
   if (isLoading) {

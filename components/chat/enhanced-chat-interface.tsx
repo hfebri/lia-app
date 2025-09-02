@@ -140,7 +140,7 @@ export function EnhancedChatInterface({
 
         if (response.status === 404) {
           // Conversation not found - clean up URL and reset state
-          console.log("Conversation not found, cleaning up URL");
+
           setCurrentConversationId(null);
           setConversationTitle("AI Assistant");
 
@@ -201,7 +201,6 @@ export function EnhancedChatInterface({
           setTimeout(scrollToBottom, 100);
         }
       } catch (error) {
-        console.error("Error loading conversation:", error);
         setConversationTitle("AI Assistant");
       } finally {
         setIsLoadingConversation(false);
@@ -249,13 +248,11 @@ export function EnhancedChatInterface({
         setIsEditingTitle(false);
         setTempTitle("");
       } else {
-        console.error("Failed to rename conversation");
         // Reset to original title on error
         setIsEditingTitle(false);
         setTempTitle("");
       }
     } catch (error) {
-      console.error("Error renaming conversation:", error);
       setIsEditingTitle(false);
       setTempTitle("");
     }
@@ -299,11 +296,6 @@ export function EnhancedChatInterface({
 
         if (!response.ok) {
           const errorText = await response.text();
-          console.error(
-            "Failed to add message to conversation:",
-            response.status,
-            errorText
-          );
         }
       } else {
         // Create a new conversation
@@ -319,7 +311,6 @@ export function EnhancedChatInterface({
 
         if (!response.ok) {
           const errorText = await response.text();
-          console.error(
             "Failed to create conversation in database:",
             response.status,
             errorText
@@ -340,7 +331,6 @@ export function EnhancedChatInterface({
         }
       }
     } catch (error) {
-      console.error("Error saving conversation:", error);
     }
   };
 
@@ -369,7 +359,6 @@ export function EnhancedChatInterface({
             // Validate file before processing
             const validation = validateFileForAI(file);
             if (!validation.isValid) {
-              console.error(`File validation failed: ${validation.error}`);
               // You could show a toast/error message here
               continue;
             }
@@ -400,7 +389,6 @@ export function EnhancedChatInterface({
           // Clear selected files after processing
           setSelectedFiles([]);
         } catch (error) {
-          console.error("File processing failed:", error);
           return;
         }
       } else {
@@ -436,7 +424,6 @@ export function EnhancedChatInterface({
 
           setSelectedFiles([]);
         } catch (error) {
-          console.error("File upload failed:", error);
           return; // Don't send message if file upload fails
         }
       }
@@ -591,7 +578,6 @@ export function EnhancedChatInterface({
 
   // Handle file errors
   if (fileError) {
-    console.error("File error:", fileError);
     // In a real app, you might want to show a toast notification here
   }
 

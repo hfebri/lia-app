@@ -29,7 +29,6 @@ export async function getUsersAction(): Promise<ActionState<User[]>> {
       data: usersList,
     };
   } catch (error) {
-    console.error("Error getting users:", error);
     return { isSuccess: false, message: "Failed to get users" };
   }
 }
@@ -76,7 +75,6 @@ export async function updateUserRoleAction(
       data: updatedUser,
     };
   } catch (error) {
-    console.error("Error updating user role:", error);
     return { isSuccess: false, message: "Failed to update user role" };
   }
 }
@@ -121,7 +119,6 @@ export async function deleteUserAction(
       data: undefined,
     };
   } catch (error) {
-    console.error("Error deleting user:", error);
     return { isSuccess: false, message: "Failed to delete user" };
   }
 }
@@ -206,7 +203,6 @@ export async function getUserStatsAction(): Promise<
       data: stats,
     };
   } catch (error) {
-    console.error("Error getting user stats:", error);
     return { isSuccess: false, message: "Failed to get user stats" };
   }
 }

@@ -27,7 +27,6 @@ export async function GET(request: NextRequest) {
       data: usageMetrics,
     });
   } catch (error) {
-    console.error("Usage metrics API error:", error);
     return NextResponse.json(
       {
         success: false,

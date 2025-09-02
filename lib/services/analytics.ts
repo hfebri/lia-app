@@ -181,7 +181,6 @@ export async function getAnalyticsData(
       responseTime,
     };
   } catch (error) {
-    console.error("Error fetching analytics data:", error);
     // Return mock data on error
     return getMockAnalyticsData();
   }
@@ -325,7 +324,6 @@ export async function getUsageMetrics(): Promise<UsageMetrics> {
       },
     };
   } catch (error) {
-    console.error("Error fetching usage metrics:", error);
     return getMockUsageMetrics();
   }
 }
@@ -470,7 +468,6 @@ export async function updateDailyMetrics(
         },
       });
   } catch (error) {
-    console.error("Error updating daily metrics:", error);
     throw error;
   }
 }

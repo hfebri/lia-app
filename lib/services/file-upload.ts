@@ -19,7 +19,7 @@ if (supabaseUrl && supabaseServiceKey) {
   supabase = createClient(supabaseUrl, supabaseServiceKey);
 }
 
-const STORAGE_BUCKET = process.env.SUPABASE_STORAGE_BUCKET || "user-files";
+const STORAGE_BUCKET = process.env.SUPABASE_STORAGE_BUCKET || "files";
 
 export interface FileUploadOptions {
   userId: string;
@@ -87,7 +87,6 @@ export async function uploadFile(
       });
 
     if (uploadError) {
-      console.error("Storage upload error:", uploadError);
       return {
         success: false,
         error: `Upload failed: ${uploadError.message}`,
@@ -154,7 +153,6 @@ export async function uploadFile(
       },
     };
   } catch (error) {
-    console.error("File upload error:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown upload error",
@@ -210,7 +208,6 @@ export async function getFileDownloadUrl(
 
     return data.publicUrl;
   } catch (error) {
-    console.error("Error getting download URL:", error);
     return null;
   }
 }
@@ -242,7 +239,6 @@ export async function deleteFile(
       .remove([fileRecord.path]);
 
     if (storageError) {
-      console.error("Storage deletion error:", storageError);
       // Continue with database deletion even if storage deletion fails
     }
 
@@ -257,7 +253,6 @@ export async function deleteFile(
 
     return true;
   } catch (error) {
-    console.error("File deletion error:", error);
     return false;
   }
 }
@@ -286,7 +281,6 @@ export async function getFileById(fileId: string, userId: string) {
       url: downloadUrl,
     };
   } catch (error) {
-    console.error("Error getting file:", error);
     return null;
   }
 }
@@ -349,7 +343,6 @@ export async function getUserFiles(
 
     return filesWithUrls;
   } catch (error) {
-    console.error("Error getting user files:", error);
     return [];
   }
 }

@@ -4,8 +4,6 @@ import { eq } from "drizzle-orm";
 import type { NewDailyMetrics } from "../../../db/types";
 
 export async function seedAnalytics() {
-  console.log("🌱 Seeding initial analytics data...");
-
   try {
     // Get current date in YYYY-MM-DD format
     const today = new Date().toISOString().split("T")[0];
@@ -32,9 +30,9 @@ export async function seedAnalytics() {
       };
 
       await db.insert(dailyMetrics).values(initialMetrics);
-      console.log(`✅ Created initial daily metrics for ${today}`);
+
     } else {
-      console.log(`⏭️  Daily metrics already exist for ${today}`);
+
     }
 
     // Create a few historical daily metrics entries for demo purposes
@@ -76,13 +74,10 @@ export async function seedAnalytics() {
         };
 
         await db.insert(dailyMetrics).values(sampleMetrics);
-        console.log(`✅ Created sample metrics for ${dateString}`);
+
       }
     }
-
-    console.log("✅ Analytics data seeded successfully!");
   } catch (error) {
-    console.error("❌ Error seeding analytics:", error);
     throw error;
   }
 }

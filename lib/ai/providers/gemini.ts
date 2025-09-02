@@ -62,7 +62,6 @@ export class GeminiProvider implements AIProvider {
         usage: this.extractUsage(response as any),
       };
     } catch (error) {
-      console.error("Gemini generateResponse error:", error);
       throw this.handleError(error as Error, options.model);
     }
   }
@@ -116,7 +115,6 @@ export class GeminiProvider implements AIProvider {
         isComplete: true,
       };
     } catch (error) {
-      console.error("Gemini generateStream error:", error);
       throw this.handleError(error as Error, options.model);
     }
   }
@@ -222,7 +220,6 @@ export class GeminiProvider implements AIProvider {
       }
       return undefined;
     } catch (error) {
-      console.warn("Failed to extract usage from Gemini response:", error);
       return undefined;
     }
   }

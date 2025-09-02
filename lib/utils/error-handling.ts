@@ -261,13 +261,6 @@ function generateErrorId(): string {
 export function logError(error: AppError, context?: Record<string, any>): void {
   const report = createErrorReport(error, context);
 
-  console.group(`🚨 ${report.severity.toUpperCase()} ERROR - ${report.id}`);
-  console.error("Message:", report.message);
-  if (report.code) console.error("Code:", report.code);
-  console.error("Timestamp:", report.timestamp.toISOString());
-  if (report.context) console.error("Context:", report.context);
-  if (report.stack) console.error("Stack:", report.stack);
-  console.groupEnd();
 }
 
 /**

@@ -93,10 +93,7 @@ export async function GET(request: NextRequest) {
           dailyActivity[dateKey].conversations += 1;
         }
       } catch (error) {
-        console.error(
-          `Error fetching messages for conversation ${conversation.id}:`,
-          error
-        );
+        // Skip conversations with errors
       }
     }
 
@@ -165,7 +162,6 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Error fetching user analytics:", error);
 
     // Handle authentication errors
     if (error instanceof Error && error.message === "Authentication required") {
@@ -191,7 +187,6 @@ async function getPopularTopicsForUser(userId?: string) {
     const topicAnalysis = await analyzeConversationTopics(userId);
     return topicAnalysis.topics;
   } catch (error) {
-    console.error("Error analyzing topics for user:", error);
     // Return fallback data if analysis fails
     return [
       {
@@ -268,7 +263,6 @@ Return only valid JSON:
 
     throw new Error("No valid JSON found in AI insights response");
   } catch (error) {
-    console.error("AI insights generation failed:", error);
 
     // Fallback to calculated trends
     const previousPeriodMessages = Math.floor(totalMessages * 0.8);

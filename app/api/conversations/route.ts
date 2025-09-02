@@ -42,7 +42,6 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Error fetching conversations:", error);
 
     // Handle authentication errors
     if (error instanceof Error && error.message === "Authentication required") {
@@ -81,7 +80,6 @@ export async function POST(request: NextRequest) {
       data: ConversationService.formatConversationForResponse(conversation),
     });
   } catch (error) {
-    console.error("Error creating conversation:", error);
 
     // Handle authentication errors
     if (error instanceof Error && error.message === "Authentication required") {

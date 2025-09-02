@@ -130,7 +130,6 @@ export async function POST(request: NextRequest) {
               }
             }
           } catch (error) {
-            console.error("Streaming error:", error);
 
             // Send error as a complete message with typing animation
             const errorMessage =
@@ -178,7 +177,6 @@ export async function POST(request: NextRequest) {
       });
     }
   } catch (error) {
-    console.error("Chat API error:", error);
     return NextResponse.json(
       {
         success: false,

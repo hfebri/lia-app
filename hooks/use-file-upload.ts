@@ -79,7 +79,6 @@ export function useFileUpload(): UseFileUploadReturn {
       }
     } catch (err) {
       setError("Failed to load files");
-      console.error("Error loading files:", err);
     }
   }, []);
 
@@ -126,7 +125,6 @@ export function useFileUpload(): UseFileUploadReturn {
         }
       } catch (err) {
         setError("Upload failed");
-        console.error("Upload error:", err);
       } finally {
         setIsUploading(false);
       }
@@ -197,7 +195,6 @@ export function useFileUpload(): UseFileUploadReturn {
             : file
         )
       );
-      console.error("Analysis error:", err);
     }
   }, []);
 
@@ -219,7 +216,6 @@ export function useFileUpload(): UseFileUploadReturn {
       }
     } catch (err) {
       setError("Delete failed");
-      console.error("Delete error:", err);
     }
   }, []);
 

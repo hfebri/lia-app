@@ -126,7 +126,7 @@ export default function AdminUsersPage() {
   }, []);
 
   const handleUserAction = (userId: string, action: string) => {
-    console.log(`Action ${action} on user ${userId}`);
+
     // Handle view details or other actions here
   };
 

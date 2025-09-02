@@ -174,7 +174,6 @@ export async function GET() {
       },
     });
   } catch (error) {
-    console.error("Models API error:", error);
     return NextResponse.json(
       {
         success: false,

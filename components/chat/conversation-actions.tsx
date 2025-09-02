@@ -59,7 +59,6 @@ export function ConversationActions({
       await onRename(conversation.id, newTitle.trim());
       setShowRenameDialog(false);
     } catch (error) {
-      console.error("Failed to rename conversation:", error);
     } finally {
       setIsLoading(false);
     }
@@ -73,7 +72,6 @@ export function ConversationActions({
       await onDelete(conversation.id);
       setShowDeleteDialog(false);
     } catch (error) {
-      console.error("Failed to delete conversation:", error);
     } finally {
       setIsLoading(false);
     }
@@ -86,7 +84,6 @@ export function ConversationActions({
     try {
       await onDuplicate(conversation.id);
     } catch (error) {
-      console.error("Failed to duplicate conversation:", error);
     } finally {
       setIsLoading(false);
     }
@@ -99,7 +96,6 @@ export function ConversationActions({
     try {
       await onExport(conversation.id);
     } catch (error) {
-      console.error("Failed to export conversation:", error);
     } finally {
       setIsLoading(false);
     }

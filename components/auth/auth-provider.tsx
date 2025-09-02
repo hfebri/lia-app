@@ -24,7 +24,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchUserProfile = useCallback(
     async (email: string) => {
-      console.log("🔍 Fetching user profile for email:", email);
+
       try {
         const response = await fetch("/api/auth/user", {
           method: "POST",
@@ -34,25 +34,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           body: JSON.stringify({ email }),
         });
 
-        console.log("📡 User profile API response status:", response.status);
-
         if (response.ok) {
           const userData = await response.json();
-          console.log("✅ User profile fetched successfully:", userData);
+
           setUser(userData);
         } else {
-          console.error("❌ Failed to fetch user profile", response.status);
           const errorText = await response.text();
-          console.error("❌ Error response:", errorText);
           setUser(null);
           // If user not found in DB, sign them out from Supabase too
           if (response.status === 404) {
-            console.log("🔄 User not found in DB, signing out from Supabase");
+
             await supabase.auth.signOut();
           }
         }
       } catch (error) {
-        console.error("💥 Error fetching user profile:", error);
         setUser(null);
       }
     },
@@ -63,41 +58,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Get initial session
     const getInitialSession = async () => {
       try {
-        console.log("🚀 Getting initial session...");
+
         const {
           data: { session },
           error,
         } = await supabase.auth.getSession();
-
-        console.log("📱 Initial session result:", {
-          session: !!session,
-          error,
-          userEmail: session?.user?.email,
-        });
-
         if (error) {
-          console.error("❌ Error getting session:", error);
           setSession(null);
           setUser(null);
         } else {
-          console.log("✅ Setting session state");
+
           setSession(session);
           if (session?.user) {
-            console.log(
-              "👤 Session has user, fetching profile for:",
-              session.user.email
-            );
             await fetchUserProfile(session.user.email!);
           } else {
-            console.log("❌ No user in initial session");
+
           }
         }
       } catch (error) {
-        console.error("💥 Error in getInitialSession:", error);
         setSession(null);
         setUser(null);
       } finally {
-        console.log("🏁 Initial session loading complete");
+
         setIsLoading(false);
       }
     };
@@ -108,20 +90,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("🔄 Auth state change event:", event);
-      console.log("📱 Session object:", session);
-      console.log("👤 Session user:", session?.user);
-
       setSession(session);
 
       if (session?.user) {
-        console.log(
-          "✅ User found in session, fetching profile for:",
-          session.user.email
-        );
         await fetchUserProfile(session.user.email!);
       } else {
-        console.log("❌ No user in session, clearing user state");
+
         setUser(null);
       }
 
@@ -145,11 +119,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (error) {
-        console.error("Error signing in with Google:", error);
         throw error;
       }
     } catch (error) {
-      console.error("Sign in error:", error);
       throw error;
     }
   }, [supabase]);
@@ -158,7 +130,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const { error } = await supabase.auth.signOut();
       if (error) {
-        console.error("Error signing out:", error);
         throw error;
       }
       setUser(null);
@@ -166,21 +137,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Redirect to sign-in page after logout
       window.location.href = "/signin";
     } catch (error) {
-      console.error("Sign out error:", error);
       throw error;
     }
   }, [supabase]);
 
   // Force logout if user is not authenticated
   const forceLogout = useCallback(async () => {
-    console.log("Forcing logout - user not authenticated");
+
     try {
       await supabase.auth.signOut();
       setUser(null);
       setSession(null);
       window.location.href = "/signin";
     } catch (error) {
-      console.error("Error during force logout:", error);
     }
   }, [supabase]);
 
@@ -192,7 +161,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } = await supabase.auth.refreshSession();
 
       if (error) {
-        console.error("Error refreshing session:", error);
         return;
       }
 
@@ -201,14 +169,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await fetchUserProfile(session.user.email!);
       }
     } catch (error) {
-      console.error("Error refreshing session:", error);
     }
   }, [supabase, fetchUserProfile]);
 
   // Check for authentication issues and auto-logout
   useEffect(() => {
     if (!isLoading && session && !user) {
-      console.log("Session exists but no user profile - forcing logout");
+
       forceLogout();
     }
   }, [isLoading, session, user, forceLogout]);

@@ -166,8 +166,6 @@ export async function analyzeConversationTopics(
   userId?: string
 ): Promise<TopicAnalysisResult> {
   try {
-    console.log("🔍 Starting topic analysis for user:", userId || "all users");
-
     // Get all conversations for the user
     let userConversations;
     if (userId) {
@@ -179,8 +177,6 @@ export async function analyzeConversationTopics(
       // For demo/testing, get all conversations
       userConversations = await db.select().from(conversations);
     }
-
-    console.log("📊 Found conversations:", userConversations.length);
 
     if (userConversations.length === 0) {
       return {
@@ -202,14 +198,8 @@ export async function analyzeConversationTopics(
       conversationIds.includes(msg.conversationId)
     );
 
-    console.log("💬 Found user messages:", filteredMessages.length);
-    console.log(
-      "📋 Sample messages:",
-      filteredMessages.slice(0, 3).map((m) => m.content.substring(0, 50))
-    );
-
     if (filteredMessages.length === 0) {
-      console.log("⚠️ No messages found for topic analysis");
+
       return {
         topics: [],
         totalConversations: userConversations.length,
@@ -218,20 +208,17 @@ export async function analyzeConversationTopics(
     }
 
     // Use AI to analyze conversation topics
-    console.log("🤖 Starting AI analysis...");
+
     const aiAnalysis = await analyzeTopicsWithAI(
       filteredMessages,
       userConversations
     );
-    console.log("✅ AI analysis complete, found topics:", aiAnalysis.length);
-
     return {
       topics: aiAnalysis,
       totalConversations: userConversations.length,
       analyzedMessages: filteredMessages.length,
     };
   } catch (error) {
-    console.error("Error analyzing conversation topics:", error);
 
     // Fallback to keyword-based analysis if AI fails
     return await fallbackKeywordAnalysis(userId);
@@ -246,7 +233,7 @@ async function analyzeTopicsWithAI(
   conversations: any[]
 ): Promise<PopularTopic[]> {
   try {
-    console.log("🔧 Initializing AI service...");
+
     const aiService = getAIService();
 
     // Sample messages for analysis (take a representative sample)
@@ -254,8 +241,6 @@ async function analyzeTopicsWithAI(
       .sort(() => 0.5 - Math.random()) // Shuffle
       .slice(0, Math.min(50, messages.length)) // Take up to 50 messages
       .map((msg) => msg.content.substring(0, 200)); // Limit length
-
-    console.log("📝 Sample messages for analysis:", sampleMessages.length);
 
     const analysisPrompt = `
 Analyze the following user conversation messages and identify the most popular topics/themes. 
@@ -292,35 +277,21 @@ Return only valid JSON in this format:
     "keywords": ["keyword1", "keyword2", "keyword3"]
   }
 ]`;
-
-    console.log("🚀 Calling AI service for topic analysis...");
-    console.log("🤖 DEBUG: About to analyze topics with AI", {
-      messagesCount: messages.length,
-      conversationsCount: conversations.length,
-    });
     const response = await aiService.chat(analysisPrompt, {
       systemPrompt:
         "You are an expert data analyst specializing in conversation topic analysis. Return only valid JSON responses.",
       model: "openai/gpt-5",
       provider: "replicate",
     });
-
-    console.log("📥 AI response received, length:", response.length);
-    console.log("🔍 AI response preview:", response.substring(0, 200));
-
     // Parse AI response
     const cleanResponse = response.trim();
     const jsonMatch = cleanResponse.match(/\[[\s\S]*\]/);
 
     if (!jsonMatch) {
-      console.log("❌ No valid JSON found in AI response");
+
       throw new Error("No valid JSON found in AI response");
     }
-
-    console.log("✅ Found JSON in response:", jsonMatch[0].substring(0, 100));
     const aiTopics = JSON.parse(jsonMatch[0]) as PopularTopic[];
-    console.log("📊 Parsed topics:", aiTopics.length);
-
     // Validate and adjust counts based on actual data
     const totalConversations = conversations.length;
     const adjustedTopics = aiTopics.map((topic) => ({
@@ -328,11 +299,8 @@ Return only valid JSON in this format:
       count: Math.min(topic.count, totalConversations),
       percentage: Math.min(topic.percentage, 100),
     }));
-
-    console.log("🎯 Final adjusted topics:", adjustedTopics.length);
     return adjustedTopics.slice(0, 8);
   } catch (error) {
-    console.error("AI topic analysis failed:", error);
     throw error;
   }
 }
@@ -436,7 +404,6 @@ async function fallbackKeywordAnalysis(
       analyzedMessages: filteredMessages.length,
     };
   } catch (error) {
-    console.error("Fallback keyword analysis failed:", error);
 
     // Final fallback
     return {
@@ -495,7 +462,6 @@ export async function getTopicTrends(
       ["Business & Strategy", "down"],
     ]);
   } catch (error) {
-    console.error("Error calculating topic trends:", error);
     return new Map();
   }
 }

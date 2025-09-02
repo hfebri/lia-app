@@ -73,7 +73,6 @@ export async function POST(request: NextRequest) {
       });
     }
   } catch (error) {
-    console.error("File analysis API error:", error);
     return NextResponse.json(
       {
         success: false,
@@ -133,7 +132,6 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Get analysis API error:", error);
     return NextResponse.json(
       { success: false, error: "Failed to get analysis" },
       { status: 500 }

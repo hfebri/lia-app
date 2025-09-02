@@ -49,7 +49,6 @@ export function MessageItem({
         hour12: true,
       }).format(date);
     } catch (error) {
-      console.error("Time formatting error in message-item:", error, timestamp);
       return "Unknown";
     }
   };

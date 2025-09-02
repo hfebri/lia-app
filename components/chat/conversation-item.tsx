@@ -52,7 +52,6 @@ export function ConversationItem({
         }).format(targetDate);
       }
     } catch (error) {
-      console.error("Date formatting error in conversation-item:", error, date);
       return "Unknown";
     }
   };

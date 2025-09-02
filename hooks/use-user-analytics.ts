@@ -79,7 +79,6 @@ export function useUserAnalytics(period: string = "30"): UseUserAnalyticsReturn 
 
       setData(result.data);
     } catch (err) {
-      console.error("Error fetching user analytics:", err);
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
       setIsLoading(false);

@@ -98,7 +98,6 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(new URL("/", request.url));
       }
     } catch (error) {
-      console.error("Error checking user role in middleware:", error);
       return NextResponse.redirect(new URL("/", request.url));
     }
   }

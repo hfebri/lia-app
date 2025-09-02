@@ -33,7 +33,6 @@ export function LoginButton({
       setIsLoading(true);
       await signInWithGoogle();
     } catch (error) {
-      console.error("Login error:", error);
       // You might want to show a toast notification here
     } finally {
       setIsLoading(false);

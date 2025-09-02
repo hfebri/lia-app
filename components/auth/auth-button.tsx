@@ -42,7 +42,6 @@ export function AuthButton({
         await signInWithGoogle();
       }
     } catch (error) {
-      console.error("Auth error:", error);
     } finally {
       setIsLoading(false);
     }

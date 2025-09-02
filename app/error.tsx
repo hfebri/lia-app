@@ -24,19 +24,11 @@ interface ErrorPageProps {
 export default function ErrorPage({ error, reset }: ErrorPageProps) {
   useEffect(() => {
     // Log the error to console for debugging
-    console.error("Global error:", error);
 
     // In production, this would be sent to an error monitoring service
     if (process.env.NODE_ENV === "production") {
       // TODO: Send to error tracking service
-      console.error("Production error:", {
-        message: error.message,
-        digest: error.digest,
-        stack: error.stack,
-        url: window.location.href,
-        userAgent: navigator.userAgent,
-        timestamp: new Date().toISOString(),
-      });
+      // Production error reporting would go here
     }
   }, [error]);
 

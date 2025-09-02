@@ -118,7 +118,6 @@ export function FileUpload({
     const validFiles = files.filter((file) => {
       // Check file size
       if (file.size > maxFileSize * 1024 * 1024) {
-        console.warn(`File ${file.name} exceeds ${maxFileSize}MB limit`);
         return false;
       }
       return true;

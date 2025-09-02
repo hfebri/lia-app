@@ -28,7 +28,6 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
 
     return dbUser;
   } catch (error) {
-    console.error("Error getting current user:", error);
     return null;
   }
 }
@@ -48,7 +47,6 @@ export async function getCurrentSession() {
 
     return session;
   } catch (error) {
-    console.error("Error getting current session:", error);
     return null;
   }
 }
@@ -93,7 +91,6 @@ export async function getUserFromDatabase(
       updatedAt: user.updatedAt,
     };
   } catch (error) {
-    console.error("Error getting user from database:", error);
     return null;
   }
 }
@@ -108,7 +105,6 @@ export async function getUserById(id: string): Promise<User | null> {
 
     return result[0] || null;
   } catch (error) {
-    console.error("Error getting user by ID:", error);
     return null;
   }
 }
@@ -130,7 +126,6 @@ export async function updateUserProfile(
 
     return result[0] || null;
   } catch (error) {
-    console.error("Error updating user profile:", error);
     return null;
   }
 }
@@ -151,7 +146,6 @@ export async function updateUserRole(
 
     return result[0] || null;
   } catch (error) {
-    console.error("Error updating user role:", error);
     return null;
   }
 }
@@ -169,7 +163,6 @@ export async function deactivateUser(userId: string): Promise<User | null> {
 
     return result[0] || null;
   } catch (error) {
-    console.error("Error deactivating user:", error);
     return null;
   }
 }
@@ -187,7 +180,6 @@ export async function reactivateUser(userId: string): Promise<User | null> {
 
     return result[0] || null;
   } catch (error) {
-    console.error("Error reactivating user:", error);
     return null;
   }
 }
@@ -198,7 +190,6 @@ export async function validateUserSession(userId: string): Promise<boolean> {
     const user = await getUserById(userId);
     return user?.isActive || false;
   } catch (error) {
-    console.error("Error validating user session:", error);
     return false;
   }
 }
@@ -214,7 +205,6 @@ export async function userExists(email: string): Promise<boolean> {
 
     return result.length > 0;
   } catch (error) {
-    console.error("Error checking if user exists:", error);
     return false;
   }
 }
@@ -300,7 +290,6 @@ export async function createOrUpdateUser(supabaseUser: {
       };
     }
   } catch (error) {
-    console.error("Error creating/updating user:", error);
     return null;
   }
 }

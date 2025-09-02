@@ -77,7 +77,6 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Get files API error:", error);
     return NextResponse.json(
       { success: false, error: "Failed to get files" },
       { status: 500 }

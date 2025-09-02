@@ -139,7 +139,6 @@ function SidebarComponent({ className }: SidebarProps) {
         stableRouterPush(`/chat?conversation=${newConversation.id}`);
       }
     } catch (error) {
-      console.error("Failed to create new conversation:", error);
     }
   }, [stableCreateConversation, stableRouterPush]);
 
@@ -148,7 +147,6 @@ function SidebarComponent({ className }: SidebarProps) {
     async (id: string) => {
       const success = await stableDeleteConversation(id);
       if (!success) {
-        console.error("Failed to delete conversation");
       }
       // The hook automatically updates the conversations list in state
     },

@@ -214,7 +214,6 @@ export class ChatService {
                 return;
               }
             } catch (parseError) {
-              console.warn("Failed to parse streaming data:", data);
             }
           }
         }

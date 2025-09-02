@@ -89,11 +89,6 @@ export async function analyzeDocument(
     });
 
     // Get AI service and analyze
-    console.log("📄 DEBUG: About to analyze document with AI", {
-      fileId,
-      filename: file.originalName,
-      model,
-    });
     const aiService = getAIService();
     const response = await aiService.generateResponse(
       [
@@ -148,7 +143,6 @@ export async function analyzeDocument(
       },
     };
   } catch (error) {
-    console.error("Document analysis error:", error);
 
     // Update file status to error
     try {
@@ -160,7 +154,6 @@ export async function analyzeDocument(
         })
         .where(eq(files.id, fileId));
     } catch (updateError) {
-      console.error("Failed to update file status:", updateError);
     }
 
     return {
@@ -254,7 +247,6 @@ function parseAnalysisResponse(response: string): {
       };
     }
   } catch (parseError) {
-    console.error("Failed to parse AI response:", parseError);
   }
 
   // Fallback: extract information from plain text response
@@ -322,7 +314,6 @@ export async function getFileAnalysis(fileId: string) {
       updatedAt: file.updatedAt,
     };
   } catch (error) {
-    console.error("Error getting file analysis:", error);
     return null;
   }
 }
