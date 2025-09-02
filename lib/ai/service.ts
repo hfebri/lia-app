@@ -62,6 +62,7 @@ export class AIService {
 
       } catch (error) {
       }
+    }
   }
 
   /**

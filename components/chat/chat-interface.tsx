@@ -145,10 +145,6 @@ export function ChatInterface({ className }: ChatInterfaceProps) {
                         minute: "2-digit",
                       }).format(date);
                     } catch (error) {
-                        "Date formatting error:",
-                        error,
-                        currentConversation.updatedAt
-                      );
                       return "Unknown";
                     }
                   })()}

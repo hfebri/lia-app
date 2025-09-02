@@ -311,10 +311,7 @@ export function EnhancedChatInterface({
 
         if (!response.ok) {
           const errorText = await response.text();
-            "Failed to create conversation in database:",
-            response.status,
-            errorText
-          );
+          // Handle error silently
         } else {
           // Get the new conversation ID and set it
           const result = await response.json();
