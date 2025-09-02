@@ -8,6 +8,7 @@ import { useSearchParams } from "next/navigation";
 import { ModelSelector } from "./model-selector";
 import { StreamingMessage } from "./streaming-message";
 import { MessageItem } from "./message-item";
+import { FileProcessingMessage } from "./file-processing-message";
 import { FileAttachment } from "./file-attachment";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -87,6 +88,7 @@ export function EnhancedChatInterface({
     messages,
     isLoading,
     isStreaming,
+    isProcessingFiles,
     streamingContent,
     error,
     selectedModel,
@@ -330,11 +332,23 @@ export function EnhancedChatInterface({
           }
         }
       }
-    } catch (error) {
-    }
+    } catch (error) {}
   };
 
   const handleSendMessage = async () => {
+    // DEBUG: Check initial state
+    console.log("🎯 SEND MESSAGE DEBUG - Starting:");
+    console.log("- selectedFiles count:", selectedFiles.length);
+    console.log(
+      "- selectedFiles details:",
+      selectedFiles.map((f) => ({ name: f.name, type: f.type, size: f.size }))
+    );
+    console.log("- attachedFiles count:", attachedFiles.length);
+    console.log(
+      "- attachedFiles details:",
+      attachedFiles.map((f) => ({ name: f.originalName, mimeType: f.mimeType }))
+    );
+
     // Prevent sending messages if not authenticated
     if (!isAuthenticated) {
       return;
@@ -397,39 +411,45 @@ export function EnhancedChatInterface({
           return;
         }
       } else {
-        // For non-Gemini models: Upload to Supabase as before
+        // For non-Gemini models: Process files to base64 for AI analysis
         try {
-          await uploadFiles(selectedFiles, {
-            extractText: true,
-            analyzeWithAI: true,
-            conversationId: currentConversationId || undefined,
-          });
+          const processedFiles = [];
 
-          // Refresh files to get the newly uploaded files
-          await refreshFiles();
+          for (const file of selectedFiles) {
+            // Validate file before processing
+            const validation = validateFileForAI(file);
+            if (!validation.isValid) {
+              // You could show a toast/error message here
+              continue;
+            }
 
-          // Get the user's files to find the ones we just uploaded
-          const response = await fetch("/api/files");
-          const result = await response.json();
-
-          if (result.success) {
-            const userFiles = result.data.files;
-            // Get the most recently uploaded files (matching our uploaded files by name)
-            const recentlyUploaded = userFiles
-              .filter((file: FileItem) =>
-                selectedFiles.some(
-                  (selectedFile) => selectedFile.name === file.originalName
-                )
-              )
-              .slice(0, selectedFiles.length); // Only take as many as we uploaded
-
-            // Add these files to the message files
-            messageFiles = [...messageFiles, ...recentlyUploaded];
+            // Convert file to base64 for AI processing
+            const fileData = await processFileForAI(file);
+            processedFiles.push({
+              id: `temp-${Date.now()}-${Math.random()}`, // Temporary ID
+              filename: file.name, // For FileItem compatibility
+              originalName: file.name,
+              mimeType: file.type,
+              size: file.size,
+              url: undefined, // No URL for base64 files
+              uploadStatus: "completed" as const, // For FileItem compatibility
+              analysisStatus: "completed" as const, // For FileItem compatibility
+              uploadedAt: new Date(), // For FileItem compatibility
+              metadata: {
+                data: fileData.data, // Base64 data for AI processing
+                type: file.type, // For compatibility with AI message format
+                isBase64: true, // Flag to indicate this is base64 data
+              },
+            });
           }
 
+          // Add processed files to message
+          messageFiles = [...messageFiles, ...processedFiles];
+
+          // Clear selected files after processing
           setSelectedFiles([]);
         } catch (error) {
-          return; // Don't send message if file upload fails
+          return; // Don't send message if file processing fails
         }
       }
     }
@@ -437,31 +457,15 @@ export function EnhancedChatInterface({
     setInputValue("");
     setAttachedFiles([]);
 
-    // Send message with attached files context
-    let fullContent = messageContent;
+    // For messages with files, let Dolphin analysis handle the file content
+    // Don't add manual file context since Dolphin provides better analysis
+
+    // Send message to AI - pass files for all models
     if (messageFiles.length > 0) {
-      const fileContext = messageFiles
-        .map((file) => {
-          let context = `[File: ${file.originalName}]`;
-          if (file.analysis?.summary) {
-            context += `\nSummary: ${file.analysis.summary}`;
-          }
-          if (file.extractedText) {
-            context += `\nContent: ${file.extractedText.substring(0, 1000)}...`;
-          }
-          return context;
-        })
-        .join("\n\n");
-
-      fullContent = `${messageContent}\n\nAttached files:\n${fileContext}`;
-    }
-
-    // Send message to AI - pass files if using Gemini model
-    if (isGeminiModel && messageFiles.length > 0) {
-      // For Gemini models, pass files with their data directly
+      // For all models, pass files with their data
       const allFiles: File[] = [];
 
-      // Process message files for Gemini
+      // Process message files
       if (messageFiles.length > 0) {
         for (const fileItem of messageFiles) {
           if (fileItem.metadata?.isBase64 && fileItem.metadata?.data) {
@@ -491,13 +495,31 @@ export function EnhancedChatInterface({
         }
       }
 
+      // DEBUG: Log what we're sending
+      console.log("🔥 ENHANCED CHAT DEBUG - Sending with files:");
+      console.log("- Message content:", messageContent);
+      console.log("- All files count:", allFiles.length);
+      console.log(
+        "- All files details:",
+        allFiles.map((f) => ({
+          name: f.name,
+          type: f.type,
+          size: f.size,
+          hasData: !!(f as any).data,
+        }))
+      );
+
       await sendMessage(messageContent, allFiles);
     } else {
-      await sendMessage(fullContent);
+      // DEBUG: Log text-only message
+      console.log("🔥 ENHANCED CHAT DEBUG - Sending text-only:");
+      console.log("- Message content:", messageContent);
+
+      await sendMessage(messageContent);
     }
 
-    // Also save to database for conversation history
-    await saveToDatabase(fullContent);
+    // Save to database after AI response is received
+    // Note: We'll implement this in the useAiChat hook to avoid duplicate AI calls
 
     // Scroll to bottom after sending message
     setTimeout(scrollToBottom, 100);
@@ -761,6 +783,8 @@ export function EnhancedChatInterface({
                     );
                   })}
 
+                  {isProcessingFiles && <FileProcessingMessage />}
+
                   {isStreaming && streamingContent && (
                     <StreamingMessage
                       content={streamingContent}
@@ -957,8 +981,17 @@ export function EnhancedChatInterface({
                     value={inputValue}
                     onChange={(e) => setInputValue(e.target.value)}
                     onKeyDown={handleKeyPress}
-                    placeholder={!isAuthenticated ? "Please sign in to chat..." : "Type your message..."}
-                    disabled={!isAuthenticated || isAuthLoading || isLoading || isStreaming}
+                    placeholder={
+                      !isAuthenticated
+                        ? "Please sign in to chat..."
+                        : "Type your message..."
+                    }
+                    disabled={
+                      !isAuthenticated ||
+                      isAuthLoading ||
+                      isLoading ||
+                      isStreaming
+                    }
                     className="border-0 bg-transparent text-sm placeholder:text-muted-foreground focus-visible:ring-0 shadow-none px-0 min-h-[40px] resize-none overflow-hidden"
                   />
                 </div>
@@ -968,11 +1001,11 @@ export function EnhancedChatInterface({
                   disabled={
                     !isAuthenticated ||
                     (!isStreaming &&
-                    ((!inputValue.trim() &&
-                      attachedFiles.length === 0 &&
-                      selectedFiles.length === 0) ||
-                      !canSend ||
-                      isUploading))
+                      ((!inputValue.trim() &&
+                        attachedFiles.length === 0 &&
+                        selectedFiles.length === 0) ||
+                        !canSend ||
+                        isUploading))
                   }
                   size="icon"
                   className={cn(

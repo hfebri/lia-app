@@ -11,6 +11,7 @@ interface UseAiChatState {
   messages: ChatMessage[];
   isLoading: boolean;
   isStreaming: boolean;
+  isProcessingFiles: boolean; // New state for file processing
   streamingContent: string;
   error: string | null;
   selectedModel: string;
@@ -23,6 +24,29 @@ interface UseAiChatOptions {
   autoScroll?: boolean;
 }
 
+// Helper function to save chat messages to database
+const saveChatToDatabase = async (
+  userMessage: { content: string; metadata?: any },
+  assistantMessage: { content: string; metadata?: any },
+  conversationId?: string
+) => {
+  const response = await fetch("/api/chat/save", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      conversationId,
+      userMessage,
+      assistantMessage,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to save chat to database");
+  }
+
+  return response.json();
+};
+
 export function useAiChat(options: UseAiChatOptions = {}) {
   const {
     initialModel = "openai/gpt-5",
@@ -34,6 +58,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     messages: [],
     isLoading: false,
     isStreaming: false,
+    isProcessingFiles: false,
     streamingContent: "",
     error: null,
     selectedModel: initialModel,
@@ -63,6 +88,23 @@ export function useAiChat(options: UseAiChatOptions = {}) {
   // Send a message with streaming response
   const sendMessage = useCallback(
     async (content: string, files?: File[], stream: boolean = true) => {
+      // DEBUG: Log what we received
+      console.log("💬 USE-AI-CHAT DEBUG - sendMessage called:");
+      console.log("- Content length:", content.length);
+      console.log("- Files param:", files ? files.length : "undefined");
+      console.log("- Stream:", stream);
+      if (files) {
+        console.log(
+          "- Files details:",
+          files.map((f) => ({
+            name: f.name,
+            type: f.type,
+            size: f.size,
+            hasData: !!(f as any).data,
+          }))
+        );
+      }
+
       // Validate message
       const validation = chatService.current.validateMessage(content);
       if (!validation.isValid) {
@@ -73,12 +115,11 @@ export function useAiChat(options: UseAiChatOptions = {}) {
         return;
       }
 
-      // Create user message with files for Gemini models
+      // Create user message with files for all models
       let userMessage = chatService.current.createMessage("user", content);
 
-      // If using Gemini model and files are provided, convert them to base64
-      const isGeminiModel = state.selectedModel.startsWith("gemini");
-      if (isGeminiModel && files && files.length > 0) {
+      // If files are provided, convert them to base64 for all models
+      if (files && files.length > 0) {
         const fileData = await Promise.all(
           files.map(async (file) => {
             // Check if file already has base64 data (from direct processing)
@@ -108,18 +149,22 @@ export function useAiChat(options: UseAiChatOptions = {}) {
           })
         );
 
-        // Add files to the user message for Gemini
+        // Add files to the user message for all models
         userMessage = {
           ...userMessage,
           files: fileData,
         };
       }
 
+      // Check if we have files to process
+      const hasFiles = files && files.length > 0;
+
       setState((prev) => ({
         ...prev,
         messages: [...prev.messages, userMessage].slice(-maxMessages),
-        isLoading: true,
-        isStreaming: stream,
+        isLoading: !hasFiles, // Don't show regular loading if we'll show file processing
+        isProcessingFiles: !!hasFiles, // Show file processing animation if we have files
+        isStreaming: stream && !hasFiles, // Only start streaming if no files to process first
         streamingContent: "",
         error: null,
       }));
@@ -155,6 +200,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
               streamingContent: accumulatedContent,
               isLoading: !chunk.isComplete,
               isStreaming: !chunk.isComplete,
+              isProcessingFiles: false, // Files are done processing once streaming starts
             }));
 
             // Create or update assistant message when complete
@@ -177,6 +223,17 @@ export function useAiChat(options: UseAiChatOptions = {}) {
                 isLoading: false,
                 isStreaming: false,
               }));
+
+              // Save both messages to database after streaming is complete
+              try {
+                await saveChatToDatabase(userMessage, assistantMessage);
+              } catch (error) {
+                console.warn(
+                  "Failed to save streaming chat to database:",
+                  error
+                );
+                // Don't break the chat flow if database save fails
+              }
             }
           }
         } else {
@@ -198,7 +255,16 @@ export function useAiChat(options: UseAiChatOptions = {}) {
             ...prev,
             messages: [...prev.messages, assistantMessage].slice(-maxMessages),
             isLoading: false,
+            isProcessingFiles: false, // Ensure file processing state is cleared
           }));
+
+          // Save both messages to database after AI response is received
+          try {
+            await saveChatToDatabase(userMessage, assistantMessage);
+          } catch (error) {
+            console.warn("Failed to save chat to database:", error);
+            // Don't break the chat flow if database save fails
+          }
         }
       } catch (error) {
         setState((prev) => ({
@@ -207,6 +273,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
             error instanceof Error ? error.message : "Failed to send message",
           isLoading: false,
           isStreaming: false,
+          isProcessingFiles: false, // Clear file processing state on error
           streamingContent: "",
         }));
       }
@@ -306,6 +373,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     messages: state.messages,
     isLoading: state.isLoading,
     isStreaming: state.isStreaming,
+    isProcessingFiles: state.isProcessingFiles,
     streamingContent: state.streamingContent,
     error: state.error,
     selectedModel: state.selectedModel,

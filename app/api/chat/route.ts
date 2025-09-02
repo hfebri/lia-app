@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AIService } from "@/lib/ai/service";
 import { requireAuthenticatedUser } from "@/lib/auth/session";
-import type { AIMessage } from "@/lib/ai/types";
+import type { AIMessage, AIProviderName } from "@/lib/ai/types";
+import {
+  fileAnalysisService,
+  FileAnalysisService,
+} from "@/lib/services/file-analysis-service";
 
 export async function POST(request: NextRequest) {
   try {
@@ -48,17 +52,19 @@ export async function POST(request: NextRequest) {
       const body = await request.json();
       ({ messages, model, stream } = body);
 
-      // Extract files from messages if they contain file data
+      // Extract files from the LATEST USER MESSAGE ONLY (not from entire conversation history)
       if (messages && Array.isArray(messages)) {
         messages.forEach(
           (msg: { files?: unknown[]; [key: string]: unknown }) => {
             if (msg.files && Array.isArray(msg.files)) {
-              files.push(...(msg.files as Array<{
-                name: string;
-                type: string;
-                size: number;
-                data: string;
-              }>));
+              files.push(
+                ...(msg.files as Array<{
+                  name: string;
+                  type: string;
+                  size: number;
+                  data: string;
+                }>)
+              );
             }
           }
         );
@@ -77,9 +83,27 @@ export async function POST(request: NextRequest) {
     const aiService = new AIService();
 
     // Determine provider based on model - NO FALLBACK LOGIC
-    let provider: "replicate" | "gemini" = "replicate";
+    let provider: AIProviderName = "replicate";
     if (model.startsWith("gemini")) {
       provider = "gemini";
+    }
+
+    // Handle file analysis - process files for all non-Gemini models using Replicate
+    let fileAnalysisResults: any[] = [];
+    if (
+      files.length > 0 &&
+      !FileAnalysisService.supportsNativeFileHandling(provider)
+    ) {
+      try {
+        fileAnalysisResults = await fileAnalysisService.analyzeFiles(
+          files,
+          provider,
+          model
+        );
+      } catch (error) {
+        // Continue without file analysis instead of breaking the chat
+        fileAnalysisResults = [];
+      }
     }
 
     // Convert messages to AI format
@@ -93,30 +117,53 @@ export async function POST(request: NextRequest) {
         },
         index: number
       ) => {
-        // If this is the last user message and we have files, include them
+        // If this is the last user message and we have files, handle them based on provider
         const isLastUserMessage =
           index === messages.length - 1 && msg.role === "user";
+
+        if (isLastUserMessage && files.length > 0) {
+          if (FileAnalysisService.supportsNativeFileHandling(provider)) {
+            // For Gemini, pass files directly
+            return {
+              role: msg.role as "user" | "assistant" | "system",
+              content: msg.content,
+              files: files,
+            };
+          } else {
+            // For all other providers (Replicate), enhance the content with file analysis
+            const enhancedContent = fileAnalysisService.createEnhancedPrompt(
+              msg.content,
+              fileAnalysisResults
+            );
+            return {
+              role: msg.role as "user" | "assistant" | "system",
+              content: enhancedContent,
+            };
+          }
+        }
 
         return {
           role: msg.role as "user" | "assistant" | "system",
           content: msg.content,
-          files: isLastUserMessage && files.length > 0 ? files : undefined,
         };
       }
     );
 
     if (stream) {
       // Create streaming response
+      console.log("🌊 Starting streaming response...");
       const encoder = new TextEncoder();
       const readable = new ReadableStream({
         async start(controller) {
           try {
+            console.log("🚀 Generating AI stream...");
             const stream = aiService.generateStream(aiMessages, {
               model,
               provider,
               temperature: 0.7,
               max_tokens: 1000,
             });
+            console.log("✅ AI stream created successfully");
 
             for await (const chunk of stream) {
               const data = JSON.stringify({
@@ -133,7 +180,6 @@ export async function POST(request: NextRequest) {
               }
             }
           } catch (error) {
-
             // Send error as a complete message with typing animation
             const errorMessage =
               error instanceof Error ? error.message : "Streaming failed";
