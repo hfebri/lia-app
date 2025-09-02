@@ -24,7 +24,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchUserProfile = useCallback(
     async (email: string) => {
-
       try {
         const response = await fetch("/api/auth/user", {
           method: "POST",
@@ -43,7 +42,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(null);
           // If user not found in DB, sign them out from Supabase too
           if (response.status === 404) {
-
             await supabase.auth.signOut();
           }
         }
@@ -58,7 +56,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Get initial session
     const getInitialSession = async () => {
       try {
-
         const {
           data: { session },
           error,
@@ -67,19 +64,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setSession(null);
           setUser(null);
         } else {
-
           setSession(session);
           if (session?.user) {
             await fetchUserProfile(session.user.email!);
           } else {
-
           }
         }
       } catch (error) {
         setSession(null);
         setUser(null);
       } finally {
-
         setIsLoading(false);
       }
     };
@@ -95,7 +89,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (session?.user) {
         await fetchUserProfile(session.user.email!);
       } else {
-
         setUser(null);
       }
 
@@ -128,28 +121,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = useCallback(async () => {
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        throw error;
-      }
+      // Clear local state first
       setUser(null);
       setSession(null);
+
+      // Then attempt to sign out from Supabase
+      const { error } = await supabase.auth.signOut({ scope: "local" });
+      if (error) {
+        console.warn("Supabase signOut error (non-critical):", error);
+        // Don't throw error for logout - we've already cleared local state
+      }
+
       // Redirect to sign-in page after logout
       window.location.href = "/signin";
     } catch (error) {
-      throw error;
+      console.error("SignOut error:", error);
+      // Even if logout fails, clear local state and redirect
+      setUser(null);
+      setSession(null);
+      window.location.href = "/signin";
     }
   }, [supabase]);
 
   // Force logout if user is not authenticated
   const forceLogout = useCallback(async () => {
-
     try {
-      await supabase.auth.signOut();
+      // Clear local state first
       setUser(null);
       setSession(null);
+
+      // Attempt local logout (don't use global scope which might cause 403)
+      await supabase.auth.signOut({ scope: "local" });
+
       window.location.href = "/signin";
     } catch (error) {
+      console.warn("Force logout error (non-critical):", error);
+      // Even if logout fails, redirect to signin
+      window.location.href = "/signin";
     }
   }, [supabase]);
 
@@ -168,14 +176,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (session?.user) {
         await fetchUserProfile(session.user.email!);
       }
-    } catch (error) {
-    }
+    } catch (error) {}
   }, [supabase, fetchUserProfile]);
 
   // Check for authentication issues and auto-logout
   useEffect(() => {
     if (!isLoading && session && !user) {
-
       forceLogout();
     }
   }, [isLoading, session, user, forceLogout]);
