@@ -14,6 +14,20 @@
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 
+# API Routes - Ensure they are handled by Next.js functions
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/___netlify-handler"
+  status = 200
+  force = true
+
+# Auth callback redirect
+[[redirects]]
+  from = "/auth/callback"
+  to = "/.netlify/functions/___netlify-handler"
+  status = 200
+  force = true
+
 # Redirects for Next.js Image Optimization
 [[redirects]]
   from = "/_next/image"
@@ -26,3 +40,9 @@
   to = "/.netlify/images?url=:url&w=:width&q=:quality"  
   status = 200
   query = {url = ":url", w = ":width", q = ":quality"}
+
+# Catch-all for Next.js routing
+[[redirects]]
+  from = "/*"
+  to = "/.netlify/functions/___netlify-handler"
+  status = 200
