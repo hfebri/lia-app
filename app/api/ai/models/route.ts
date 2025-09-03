@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 
+// Basic instruction for all models
+export const LIA_SYSTEM_INSTRUCTION = `You are LIA (Leverate Intelligent Assistant), an AI assistant designed to help all Leveratians with their various needs. Your primary goal is to provide helpful, accurate, and relevant assistance to Leverate team members across different tasks and inquiries.`;
+
 // Available AI models and their configurations
 const AVAILABLE_MODELS = [
   {
@@ -174,7 +177,7 @@ export async function GET() {
         totalCount: AVAILABLE_MODELS.length,
       },
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       {
         success: false,
