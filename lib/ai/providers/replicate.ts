@@ -39,6 +39,7 @@ export class ReplicateProvider implements AIProvider {
         extended_thinking = false,
         thinking_budget_tokens = 1024,
         max_image_resolution = 0.5,
+        reasoning_effort = "medium",
       } = options;
 
       // Build input based on model type
@@ -64,8 +65,40 @@ export class ReplicateProvider implements AIProvider {
           input.image = (file as any).url || file.data; // Use URL first, fallback to base64
           input.max_image_resolution = max_image_resolution;
         }
+      } else if (this.isOpenAIModel(model)) {
+        // For OpenAI models, check if there are images
+        const userMessage = messages[messages.length - 1];
+        const hasImage = userMessage?.files && userMessage.files.length > 0;
+
+        if (hasImage) {
+          // Use OpenAI image schema
+          const imageUrls =
+            userMessage.files?.map((file) => (file as any).url || file.data) ||
+            [];
+
+          input = {
+            prompt: userMessage?.content || "",
+            messages: [],
+            verbosity: "medium",
+            image_input: imageUrls,
+            reasoning_effort,
+          };
+        } else {
+          // Use regular OpenAI message format for text-only
+          const formattedMessages = this.formatMessages(
+            messages,
+            system_prompt
+          );
+          input = {
+            messages: formattedMessages,
+            temperature,
+            max_tokens,
+            top_p,
+            reasoning_effort,
+          };
+        }
       } else {
-        // For other models (GPT-5, etc.), use the original format
+        // For other models, use the original format
         const formattedMessages = this.formatMessages(messages, system_prompt);
         input = {
           messages: formattedMessages,
@@ -109,6 +142,7 @@ export class ReplicateProvider implements AIProvider {
         extended_thinking = false,
         thinking_budget_tokens = 1024,
         max_image_resolution = 0.5,
+        reasoning_effort = "medium",
       } = options;
 
       // Build input based on model type
@@ -134,8 +168,40 @@ export class ReplicateProvider implements AIProvider {
           input.image = (file as any).url || file.data; // Use URL first, fallback to base64
           input.max_image_resolution = max_image_resolution;
         }
+      } else if (this.isOpenAIModel(model)) {
+        // For OpenAI models, check if there are images
+        const userMessage = messages[messages.length - 1];
+        const hasImage = userMessage?.files && userMessage.files.length > 0;
+
+        if (hasImage) {
+          // Use OpenAI image schema
+          const imageUrls =
+            userMessage.files?.map((file) => (file as any).url || file.data) ||
+            [];
+
+          input = {
+            prompt: userMessage?.content || "",
+            messages: [],
+            verbosity: "medium",
+            image_input: imageUrls,
+            reasoning_effort,
+          };
+        } else {
+          // Use regular OpenAI message format for text-only
+          const formattedMessages = this.formatMessages(
+            messages,
+            system_prompt
+          );
+          input = {
+            messages: formattedMessages,
+            temperature,
+            max_tokens,
+            top_p,
+            reasoning_effort,
+          };
+        }
       } else {
-        // For other models (GPT-5, etc.), use the original format
+        // For other models, use the original format
         const formattedMessages = this.formatMessages(messages, system_prompt);
         input = {
           messages: formattedMessages,
@@ -191,6 +257,10 @@ export class ReplicateProvider implements AIProvider {
 
   private isClaudeModel(model: string): boolean {
     return model.includes("claude");
+  }
+
+  private isOpenAIModel(model: string): boolean {
+    return model.includes("openai");
   }
 
   private formatMessages(messages: AIMessage[], systemPrompt?: string) {

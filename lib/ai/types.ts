@@ -58,6 +58,7 @@ export interface AIGenerationOptions {
   extended_thinking?: boolean;
   thinking_budget_tokens?: number;
   max_image_resolution?: number;
+  reasoning_effort?: "minimal" | "low" | "medium" | "high";
 }
 
 export interface AIServiceConfig {

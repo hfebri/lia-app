@@ -6,6 +6,7 @@ import {
   type ChatMessage,
   type StreamingChatResponse,
 } from "@/lib/ai/chat-service";
+import type { ReasoningEffort } from "@/components/chat/reasoning-effort-selector";
 
 interface UseAiChatState {
   messages: ChatMessage[];
@@ -17,6 +18,7 @@ interface UseAiChatState {
   selectedModel: string;
   availableModels: any[];
   extendedThinking: boolean;
+  reasoningEffort: ReasoningEffort;
 }
 
 interface UseAiChatOptions {
@@ -65,6 +67,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     selectedModel: initialModel,
     availableModels: [],
     extendedThinking: false,
+    reasoningEffort: "medium",
   });
 
   const chatService = useRef(ChatService.getInstance());
@@ -190,6 +193,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
             {
               model: state.selectedModel,
               extended_thinking: state.extendedThinking,
+              reasoning_effort: state.reasoningEffort,
             }
           );
 
@@ -246,6 +250,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
           const response = await chatService.current.sendMessage(allMessages, {
             model: state.selectedModel,
             extended_thinking: state.extendedThinking,
+            reasoning_effort: state.reasoningEffort,
           });
 
           const assistantMessage = chatService.current.createMessage(
@@ -309,6 +314,8 @@ export function useAiChat(options: UseAiChatOptions = {}) {
       selectedModel: modelId,
       // Reset extended thinking when switching models
       extendedThinking: false,
+      // Reset reasoning effort when switching models
+      reasoningEffort: "medium",
     }));
   }, []);
 
@@ -317,6 +324,14 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     setState((prev) => ({
       ...prev,
       extendedThinking: enabled,
+    }));
+  }, []);
+
+  // Set reasoning effort
+  const setReasoningEffort = useCallback((effort: ReasoningEffort) => {
+    setState((prev) => ({
+      ...prev,
+      reasoningEffort: effort,
     }));
   }, []);
 
@@ -395,6 +410,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     selectedModel: state.selectedModel,
     availableModels: state.availableModels,
     extendedThinking: state.extendedThinking,
+    reasoningEffort: state.reasoningEffort,
 
     // Actions
     sendMessage,
@@ -407,6 +423,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     loadModels,
     setMessages,
     toggleExtendedThinking,
+    setReasoningEffort,
 
     // Computed
     hasMessages: state.messages.length > 0,
@@ -415,5 +432,6 @@ export function useAiChat(options: UseAiChatOptions = {}) {
       (m) => m.id === state.selectedModel
     ),
     isClaudeModel: state.selectedModel === "anthropic/claude-4-sonnet",
+    isOpenAIModel: state.selectedModel.startsWith("openai/"),
   };
 }

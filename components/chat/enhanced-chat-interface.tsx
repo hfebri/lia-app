@@ -11,6 +11,7 @@ import { MessageItem } from "./message-item";
 import { FileProcessingMessage } from "./file-processing-message";
 import { FileAttachment } from "./file-attachment";
 import { ExtendedThinkingToggle } from "./extended-thinking-toggle";
+import { ReasoningEffortSelector } from "./reasoning-effort-selector";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -100,6 +101,8 @@ export function EnhancedChatInterface({
     changeModel,
     extendedThinking,
     toggleExtendedThinking,
+    reasoningEffort,
+    setReasoningEffort,
     clearError,
     loadModels,
     setMessages,
@@ -107,6 +110,7 @@ export function EnhancedChatInterface({
     canSend,
     currentModel,
     isClaudeModel,
+    isOpenAIModel,
   } = useAiChat();
 
   // We'll just save conversations to database, not display them
@@ -816,6 +820,15 @@ export function EnhancedChatInterface({
                     Thinking: {extendedThinking ? "ON" : "OFF"}
                   </div>
                 </>
+              )}
+
+              {/* Reasoning Effort Selector - Show only for OpenAI models */}
+              {isOpenAIModel && (
+                <ReasoningEffortSelector
+                  value={reasoningEffort}
+                  onValueChange={setReasoningEffort}
+                  disabled={isLoading || isStreaming}
+                />
               )}
 
               <ModelSelector

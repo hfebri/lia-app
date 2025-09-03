@@ -17,6 +17,7 @@ export async function POST(request: NextRequest) {
       extended_thinking = false,
       thinking_budget_tokens = 1024,
       max_image_resolution = 0.5,
+      reasoning_effort: "minimal" | "low" | "medium" | "high" = "medium",
       files: Array<{
         name: string;
         type: string;
@@ -65,6 +66,7 @@ export async function POST(request: NextRequest) {
         extended_thinking,
         thinking_budget_tokens,
         max_image_resolution,
+        reasoning_effort,
       } = body);
 
       // Extract files from the LATEST USER MESSAGE ONLY (not from entire conversation history)
@@ -180,6 +182,7 @@ export async function POST(request: NextRequest) {
               extended_thinking,
               thinking_budget_tokens,
               max_image_resolution,
+              reasoning_effort,
             });
             console.log("✅ AI stream created successfully");
 
@@ -234,6 +237,7 @@ export async function POST(request: NextRequest) {
         extended_thinking,
         thinking_budget_tokens,
         max_image_resolution,
+        reasoning_effort,
       });
 
       return NextResponse.json({

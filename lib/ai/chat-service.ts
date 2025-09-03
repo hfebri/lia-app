@@ -39,6 +39,7 @@ export interface ChatServiceOptions {
   extended_thinking?: boolean;
   thinking_budget_tokens?: number;
   max_image_resolution?: number;
+  reasoning_effort?: "minimal" | "low" | "medium" | "high";
 }
 
 export class ChatService {
@@ -72,6 +73,7 @@ export class ChatService {
       extended_thinking = false,
       thinking_budget_tokens = 1024,
       max_image_resolution = 0.5,
+      reasoning_effort = "medium",
     } = options;
     // Convert messages to AI format
     const aiMessages: AIMessage[] = messages.map((msg) => ({
@@ -122,6 +124,7 @@ export class ChatService {
         extended_thinking,
         thinking_budget_tokens,
         max_image_resolution,
+        reasoning_effort,
       }),
     });
 
@@ -155,6 +158,7 @@ export class ChatService {
       extended_thinking = false,
       thinking_budget_tokens = 1024,
       max_image_resolution = 0.5,
+      reasoning_effort = "medium",
     } = options;
 
     // Convert messages to AI format
@@ -206,6 +210,7 @@ export class ChatService {
         extended_thinking,
         thinking_budget_tokens,
         max_image_resolution,
+        reasoning_effort,
       }),
     });
 

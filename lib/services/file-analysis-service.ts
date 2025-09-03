@@ -70,6 +70,13 @@ export class FileAnalysisService {
             markdownContent: `Image file: ${file.name} (${file.type})\nSize: ${file.size} bytes\n\n[Image will be processed natively by Claude - skipping Dolphin analysis]`,
             success: true,
           };
+        } else if (model.includes("openai") && this.isImageFile(file)) {
+          // For OpenAI models with image files: Skip Dolphin analysis, let OpenAI handle natively
+          result = {
+            extractedText: "",
+            markdownContent: `Image file: ${file.name} (${file.type})\nSize: ${file.size} bytes\n\n[Image will be processed natively by OpenAI - skipping Dolphin analysis]`,
+            success: true,
+          };
         } else {
           // Use selected model to extract content for all non-Gemini, non-Claude-image files
           if (FileAnalysisService.ACTIVE_MODEL === "marker") {
