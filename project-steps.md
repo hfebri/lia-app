@@ -360,3 +360,7 @@ seberapa improve
 AGENTS UNTUK SOCIAL MEDIA
 
 GD dan art untuk video
+
+report a bug button
+gemini 2.5 pro rusak
+chat history should be per conversation not per message
