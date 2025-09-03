@@ -36,6 +36,9 @@ export interface ChatServiceOptions {
   stream?: boolean;
   temperature?: number;
   maxTokens?: number;
+  extended_thinking?: boolean;
+  thinking_budget_tokens?: number;
+  max_image_resolution?: number;
 }
 
 export class ChatService {
@@ -65,7 +68,10 @@ export class ChatService {
     const {
       model = "openai/gpt-5",
       temperature = 0.7,
-      maxTokens = 1000,
+      maxTokens = 8192,
+      extended_thinking = false,
+      thinking_budget_tokens = 1024,
+      max_image_resolution = 0.5,
     } = options;
     // Convert messages to AI format
     const aiMessages: AIMessage[] = messages.map((msg) => ({
@@ -113,6 +119,9 @@ export class ChatService {
         stream: false,
         temperature,
         maxTokens,
+        extended_thinking,
+        thinking_budget_tokens,
+        max_image_resolution,
       }),
     });
 
@@ -142,7 +151,10 @@ export class ChatService {
     const {
       model = "openai/gpt-5",
       temperature = 0.7,
-      maxTokens = 1000,
+      maxTokens = 8192,
+      extended_thinking = false,
+      thinking_budget_tokens = 1024,
+      max_image_resolution = 0.5,
     } = options;
 
     // Convert messages to AI format
@@ -191,6 +203,9 @@ export class ChatService {
         stream: true,
         temperature,
         maxTokens,
+        extended_thinking,
+        thinking_budget_tokens,
+        max_image_resolution,
       }),
     });
 

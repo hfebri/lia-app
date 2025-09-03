@@ -10,7 +10,13 @@ import type {
 
 export class ReplicateProvider implements AIProvider {
   public readonly name = "replicate";
-  public readonly models = ["openai/gpt-5"];
+  public readonly models = [
+    "openai/gpt-5",
+    "openai/gpt-5-mini",
+    "openai/gpt-5-nano",
+    "anthropic/claude-4-sonnet",
+    "deepseek-ai/deepseek-r1",
+  ];
   private client: Replicate;
 
   constructor(apiToken: string) {
@@ -30,17 +36,44 @@ export class ReplicateProvider implements AIProvider {
         max_tokens = 1000,
         top_p = 1,
         system_prompt,
+        extended_thinking = false,
+        thinking_budget_tokens = 1024,
+        max_image_resolution = 0.5,
       } = options;
 
-      // Convert messages to the format expected by GPT-5
-      const formattedMessages = this.formatMessages(messages, system_prompt);
+      // Build input based on model type
+      let input: any;
 
-      const input = {
-        messages: formattedMessages,
-        temperature,
-        max_tokens,
-        top_p,
-      };
+      if (this.isClaudeModel(model)) {
+        // For Claude models, use the format from the user's example
+        const userMessage = messages[messages.length - 1];
+        const hasImage = userMessage?.files && userMessage.files.length > 0;
+
+        input = {
+          prompt: userMessage?.content || "",
+          max_tokens,
+          system_prompt: system_prompt || "You are a helpful assistant",
+          extended_thinking,
+          thinking_budget_tokens,
+        };
+
+        // Add image if present
+        if (hasImage && userMessage.files?.[0]) {
+          const file = userMessage.files[0];
+          // For Claude, check if file has URL (uploaded to Supabase) or base64 data
+          input.image = (file as any).url || file.data; // Use URL first, fallback to base64
+          input.max_image_resolution = max_image_resolution;
+        }
+      } else {
+        // For other models (GPT-5, etc.), use the original format
+        const formattedMessages = this.formatMessages(messages, system_prompt);
+        input = {
+          messages: formattedMessages,
+          temperature,
+          max_tokens,
+          top_p,
+        };
+      }
 
       const output = await this.client.run(model as any, { input });
 
@@ -73,17 +106,44 @@ export class ReplicateProvider implements AIProvider {
         max_tokens = 1000,
         top_p = 1,
         system_prompt,
+        extended_thinking = false,
+        thinking_budget_tokens = 1024,
+        max_image_resolution = 0.5,
       } = options;
 
-      // Convert messages to the format expected by GPT-5
-      const formattedMessages = this.formatMessages(messages, system_prompt);
+      // Build input based on model type
+      let input: any;
 
-      const input = {
-        messages: formattedMessages,
-        temperature,
-        max_tokens,
-        top_p,
-      };
+      if (this.isClaudeModel(model)) {
+        // For Claude models, use the format from the user's example
+        const userMessage = messages[messages.length - 1];
+        const hasImage = userMessage?.files && userMessage.files.length > 0;
+
+        input = {
+          prompt: userMessage?.content || "",
+          max_tokens,
+          system_prompt: system_prompt || "You are a helpful assistant",
+          extended_thinking,
+          thinking_budget_tokens,
+        };
+
+        // Add image if present
+        if (hasImage && userMessage.files?.[0]) {
+          const file = userMessage.files[0];
+          // For Claude, check if file has URL (uploaded to Supabase) or base64 data
+          input.image = (file as any).url || file.data; // Use URL first, fallback to base64
+          input.max_image_resolution = max_image_resolution;
+        }
+      } else {
+        // For other models (GPT-5, etc.), use the original format
+        const formattedMessages = this.formatMessages(messages, system_prompt);
+        input = {
+          messages: formattedMessages,
+          temperature,
+          max_tokens,
+          top_p,
+        };
+      }
 
       // For streaming, we use the stream method
       const stream = await this.client.stream(model as any, { input });
@@ -127,6 +187,10 @@ export class ReplicateProvider implements AIProvider {
     } catch (error) {
       throw this.handleError(error, options.model);
     }
+  }
+
+  private isClaudeModel(model: string): boolean {
+    return model.includes("claude");
   }
 
   private formatMessages(messages: AIMessage[], systemPrompt?: string) {

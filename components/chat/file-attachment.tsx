@@ -145,7 +145,24 @@ export function FileAttachment({
       <CardContent className="p-4">
         <div className="flex items-start justify-between">
           <div className="flex items-start space-x-3 min-w-0 flex-1">
-            <Icon className={cn("h-8 w-8 mt-0.5", iconColor)} />
+            {fileType === "image" && file.url ? (
+              <div className="shrink-0">
+                <img
+                  src={file.url}
+                  alt={file.name}
+                  className="h-12 w-12 rounded-md object-cover border border-border/50"
+                  onError={(e) => {
+                    // Fallback to icon if image fails to load
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = "none";
+                    target.nextElementSibling?.classList.remove("hidden");
+                  }}
+                />
+                <Icon className={cn("h-8 w-8 mt-0.5 hidden", iconColor)} />
+              </div>
+            ) : (
+              <Icon className={cn("h-8 w-8 mt-0.5", iconColor)} />
+            )}
             <div className="min-w-0 flex-1">
               <h4 className="text-sm font-medium truncate">{file.name}</h4>
               <div className="flex items-center space-x-2 mt-1">

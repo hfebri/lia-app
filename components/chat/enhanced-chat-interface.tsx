@@ -10,6 +10,7 @@ import { StreamingMessage } from "./streaming-message";
 import { MessageItem } from "./message-item";
 import { FileProcessingMessage } from "./file-processing-message";
 import { FileAttachment } from "./file-attachment";
+import { ExtendedThinkingToggle } from "./extended-thinking-toggle";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,6 +36,7 @@ import {
   Check,
   Plus,
   Library,
+  Image,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -96,12 +98,15 @@ export function EnhancedChatInterface({
     sendMessage,
     stopStreaming,
     changeModel,
+    extendedThinking,
+    toggleExtendedThinking,
     clearError,
     loadModels,
     setMessages,
     hasMessages,
     canSend,
     currentModel,
+    isClaudeModel,
   } = useAiChat();
 
   // We'll just save conversations to database, not display them
@@ -367,9 +372,86 @@ export function EnhancedChatInterface({
 
     // Handle file processing based on model type
     const isGeminiModel = selectedModel.startsWith("gemini");
+    const isClaudeModelForUpload = selectedModel.includes("claude");
 
     if (selectedFiles.length > 0) {
-      if (isGeminiModel) {
+      if (isClaudeModelForUpload) {
+        // For Claude models: Upload images to Supabase and use URLs
+        try {
+          const processedFiles = [];
+
+          for (const file of selectedFiles) {
+            // Validate file before processing
+            const validation = validateFileForAI(file);
+            if (!validation.isValid) {
+              // You could show a toast/error message here
+              continue;
+            }
+
+            // For Claude: Upload image files to Supabase, use base64 for non-images
+            if (file.type.startsWith("image/")) {
+              // Upload image to Supabase using direct API call
+              const formData = new FormData();
+              formData.append("files", file);
+              formData.append("extractText", "false"); // Don't extract text from images
+              formData.append("analyzeWithAI", "false"); // Don't analyze with AI
+
+              const uploadResponse = await fetch("/api/files/upload", {
+                method: "POST",
+                body: formData,
+              });
+
+              const uploadResult = await uploadResponse.json();
+
+              if (uploadResult.success && uploadResult.data.file) {
+                const uploadedFile = uploadResult.data.file;
+                processedFiles.push({
+                  id: uploadedFile.id,
+                  filename: uploadedFile.filename,
+                  originalName: uploadedFile.originalName,
+                  mimeType: uploadedFile.mimeType,
+                  size: uploadedFile.size,
+                  url: uploadedFile.url, // Supabase URL for Claude
+                  uploadStatus: uploadedFile.uploadStatus,
+                  analysisStatus: uploadedFile.analysisStatus,
+                  uploadedAt: new Date(uploadedFile.createdAt),
+                  metadata: {
+                    type: file.type,
+                    isUrl: true, // Flag to indicate this is a URL
+                  },
+                });
+              }
+            } else {
+              // For non-image files, use base64
+              const fileData = await processFileForAI(file);
+              processedFiles.push({
+                id: `temp-${Date.now()}-${Math.random()}`,
+                filename: file.name,
+                originalName: file.name,
+                mimeType: file.type,
+                size: file.size,
+                url: undefined,
+                uploadStatus: "completed" as const,
+                analysisStatus: "completed" as const,
+                uploadedAt: new Date(),
+                metadata: {
+                  data: fileData.data,
+                  type: file.type,
+                  isBase64: true,
+                },
+              });
+            }
+          }
+
+          // Add processed files to message
+          messageFiles = [...messageFiles, ...processedFiles];
+
+          // Clear selected files after processing
+          setSelectedFiles([]);
+        } catch (error) {
+          return;
+        }
+      } else if (isGeminiModel) {
         // For Gemini models: Process files directly to base64 (no Supabase upload)
         try {
           const processedFiles = [];
@@ -411,7 +493,7 @@ export function EnhancedChatInterface({
           return;
         }
       } else {
-        // For non-Gemini models: Process files to base64 for AI analysis
+        // For other non-Gemini, non-Claude models: Process files to base64 for AI analysis
         try {
           const processedFiles = [];
 
@@ -469,7 +551,7 @@ export function EnhancedChatInterface({
       if (messageFiles.length > 0) {
         for (const fileItem of messageFiles) {
           if (fileItem.metadata?.isBase64 && fileItem.metadata?.data) {
-            // File has base64 data (processed directly for Gemini)
+            // File has base64 data (processed directly for Gemini and non-Claude models)
             // Convert base64 back to File object for sendMessage compatibility
             const binaryString = atob(fileItem.metadata.data);
             const bytes = new Uint8Array(binaryString.length);
@@ -483,8 +565,20 @@ export function EnhancedChatInterface({
             // Attach the base64 data to the file for AI processing
             (file as any).data = fileItem.metadata.data;
             allFiles.push(file);
+          } else if (
+            fileItem.metadata?.isUrl &&
+            fileItem.url &&
+            isClaudeModelForUpload
+          ) {
+            // For Claude models: Use URL directly, don't fetch the file
+            const file = new File([], fileItem.originalName, {
+              type: fileItem.mimeType,
+            });
+            // Attach the URL to the file for Claude processing
+            (file as any).url = fileItem.url;
+            allFiles.push(file);
           } else if (fileItem.url) {
-            // File has URL (from Supabase) - fetch and convert to File
+            // File has URL (from Supabase) - fetch and convert to File for non-Claude models
             const response = await fetch(fileItem.url);
             const blob = await response.blob();
             const file = new File([blob], fileItem.originalName, {
@@ -709,6 +803,21 @@ export function EnhancedChatInterface({
             </div>
 
             <div className="flex items-center space-x-2">
+              {/* Extended Thinking Toggle - Show only for Claude models */}
+              {isClaudeModel && (
+                <>
+                  <ExtendedThinkingToggle
+                    enabled={extendedThinking}
+                    onToggle={toggleExtendedThinking}
+                    disabled={isLoading || isStreaming}
+                  />
+                  {/* Debug info */}
+                  <div className="text-xs text-muted-foreground">
+                    Thinking: {extendedThinking ? "ON" : "OFF"}
+                  </div>
+                </>
+              )}
+
               <ModelSelector
                 models={availableModels}
                 selectedModel={selectedModel}
@@ -855,23 +964,43 @@ export function EnhancedChatInterface({
               {/* Selected Files Preview - Will upload when message is sent */}
               {selectedFiles.length > 0 && (
                 <div className="flex flex-wrap gap-2 px-4">
-                  {selectedFiles.map((file, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center gap-2 bg-background border border-border rounded-lg px-3 py-2 text-sm"
-                    >
-                      <FileText className="h-4 w-4 text-muted-foreground" />
-                      <span className="max-w-32 truncate">{file.name}</span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleFileRemove(index)}
-                        className="h-5 w-5 p-0 hover:bg-destructive/10 hover:text-destructive"
+                  {selectedFiles.map((file, index) => {
+                    const isImage = file.type.startsWith("image/");
+                    const imageUrl = isImage ? URL.createObjectURL(file) : null;
+
+                    return (
+                      <div
+                        key={index}
+                        className="flex items-center gap-2 bg-background border border-border rounded-lg px-3 py-2 text-sm"
                       >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  ))}
+                        {isImage && imageUrl ? (
+                          <img
+                            src={imageUrl}
+                            alt={file.name}
+                            className="h-8 w-8 rounded object-cover border border-border/50"
+                            onLoad={() => {
+                              // Clean up object URL after image loads
+                              setTimeout(
+                                () => URL.revokeObjectURL(imageUrl),
+                                1000
+                              );
+                            }}
+                          />
+                        ) : (
+                          <FileText className="h-4 w-4 text-muted-foreground" />
+                        )}
+                        <span className="max-w-32 truncate">{file.name}</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleFileRemove(index)}
+                          className="h-5 w-5 p-0 hover:bg-destructive/10 hover:text-destructive"
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    );
+                  })}
                   <div className="text-xs text-muted-foreground flex items-center gap-1">
                     <Upload className="h-3 w-3" />
                     Will upload when message is sent
@@ -897,7 +1026,7 @@ export function EnhancedChatInterface({
                     }
                   }}
                   multiple
-                  accept=".pdf,.doc,.docx,.txt,.rtf,.xls,.xlsx,.csv"
+                  accept=".pdf,.doc,.docx,.txt,.rtf,.xls,.xlsx,.csv,.jpg,.jpeg,.png,.gif,.bmp,.webp,.svg"
                 />
                 <Button
                   variant="ghost"
@@ -916,7 +1045,7 @@ export function EnhancedChatInterface({
                 </Button>
 
                 {/* Attach existing files button */}
-                <DropdownMenu
+                {/* <DropdownMenu
                   open={showFilePicker}
                   onOpenChange={setShowFilePicker}
                 >
@@ -974,7 +1103,7 @@ export function EnhancedChatInterface({
                       )}
                     </div>
                   </DropdownMenuContent>
-                </DropdownMenu>
+                </DropdownMenu> */}
 
                 <div className="flex-1 min-w-0">
                   <Input

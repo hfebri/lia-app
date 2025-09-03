@@ -7,6 +7,7 @@ import { ModelSelector } from "./model-selector";
 import { StreamingMessage } from "./streaming-message";
 import { AIResponse } from "./ai-response";
 import { MessageItem } from "./message-item";
+import { ExtendedThinkingToggle } from "./extended-thinking-toggle";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -71,12 +72,14 @@ export function AiChatInterface({ className }: AiChatInterfaceProps) {
     sendMessage,
     stopStreaming,
     changeModel,
-
+    extendedThinking,
+    toggleExtendedThinking,
     clearError,
     loadModels,
     hasMessages,
     canSend,
     currentModel,
+    isClaudeModel,
   } = useAiChat();
 
   // Load models on mount
@@ -275,6 +278,15 @@ export function AiChatInterface({ className }: AiChatInterfaceProps) {
               </div>
 
               <div className="flex items-center gap-2">
+                {/* Extended Thinking Toggle - Show only for Claude models */}
+                {isClaudeModel && (
+                  <ExtendedThinkingToggle
+                    enabled={extendedThinking}
+                    onToggle={toggleExtendedThinking}
+                    disabled={isLoading || isStreaming}
+                  />
+                )}
+
                 {/* Model Selector */}
                 <ModelSelector
                   models={availableModels}

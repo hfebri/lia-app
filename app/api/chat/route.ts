@@ -14,6 +14,9 @@ export async function POST(request: NextRequest) {
     let messages,
       model = "openai/gpt-5",
       stream = false,
+      extended_thinking = false,
+      thinking_budget_tokens = 1024,
+      max_image_resolution = 0.5,
       files: Array<{
         name: string;
         type: string;
@@ -30,6 +33,11 @@ export async function POST(request: NextRequest) {
       messages = JSON.parse((formData.get("messages") as string) || "[]");
       model = (formData.get("model") as string) || "openai/gpt-5";
       stream = formData.get("stream") === "true";
+      extended_thinking = formData.get("extended_thinking") === "true";
+      thinking_budget_tokens =
+        parseInt(formData.get("thinking_budget_tokens") as string) || 1024;
+      max_image_resolution =
+        parseFloat(formData.get("max_image_resolution") as string) || 0.5;
 
       // Extract files
       const fileEntries = Array.from(formData.entries()).filter(([key]) =>
@@ -50,7 +58,14 @@ export async function POST(request: NextRequest) {
     } else {
       // Handle JSON for text-only messages or messages with base64 files
       const body = await request.json();
-      ({ messages, model, stream } = body);
+      ({
+        messages,
+        model,
+        stream,
+        extended_thinking,
+        thinking_budget_tokens,
+        max_image_resolution,
+      } = body);
 
       // Extract files from the LATEST USER MESSAGE ONLY (not from entire conversation history)
       if (messages && Array.isArray(messages)) {
@@ -161,7 +176,10 @@ export async function POST(request: NextRequest) {
               model,
               provider,
               temperature: 0.7,
-              max_tokens: 1000,
+              max_tokens: 8192,
+              extended_thinking,
+              thinking_budget_tokens,
+              max_image_resolution,
             });
             console.log("✅ AI stream created successfully");
 
@@ -212,7 +230,10 @@ export async function POST(request: NextRequest) {
         model,
         provider,
         temperature: 0.7,
-        max_tokens: 1000,
+        max_tokens: 8192,
+        extended_thinking,
+        thinking_budget_tokens,
+        max_image_resolution,
       });
 
       return NextResponse.json({

@@ -63,8 +63,15 @@ export class FileAnalysisService {
             markdownContent: `File: ${file.name} (${file.type})\nSize: ${file.size} bytes\n\n[File will be processed natively by Gemini]`,
             success: true,
           };
+        } else if (model.includes("claude") && this.isImageFile(file)) {
+          // For Claude models with image files: Skip Dolphin analysis, let Claude handle natively
+          result = {
+            extractedText: "",
+            markdownContent: `Image file: ${file.name} (${file.type})\nSize: ${file.size} bytes\n\n[Image will be processed natively by Claude - skipping Dolphin analysis]`,
+            success: true,
+          };
         } else {
-          // Use selected model to extract content for all non-Gemini providers
+          // Use selected model to extract content for all non-Gemini, non-Claude-image files
           if (FileAnalysisService.ACTIVE_MODEL === "marker") {
             result = await this.analyzeFileWithMarker(file);
           } else {
@@ -374,6 +381,22 @@ ${content}
    */
   static supportsNativeFileHandling(provider: AIProviderName): boolean {
     return provider === "gemini";
+  }
+
+  /**
+   * Check if file is an image
+   */
+  private isImageFile(file: FileContent): boolean {
+    const imageTypes = [
+      "image/jpeg",
+      "image/jpg",
+      "image/png",
+      "image/gif",
+      "image/webp",
+      "image/bmp",
+      "image/svg+xml",
+    ];
+    return imageTypes.includes(file.type.toLowerCase());
   }
 }
 

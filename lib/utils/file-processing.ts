@@ -53,6 +53,8 @@ export function isSupportedFileType(file: File): boolean {
     "image/png",
     "image/gif",
     "image/webp",
+    "image/bmp",
+    "image/svg+xml",
     // Text files
     "text/plain",
     "text/csv",

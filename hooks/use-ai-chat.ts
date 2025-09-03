@@ -16,6 +16,7 @@ interface UseAiChatState {
   error: string | null;
   selectedModel: string;
   availableModels: any[];
+  extendedThinking: boolean;
 }
 
 interface UseAiChatOptions {
@@ -63,6 +64,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     error: null,
     selectedModel: initialModel,
     availableModels: [],
+    extendedThinking: false,
   });
 
   const chatService = useRef(ChatService.getInstance());
@@ -185,7 +187,10 @@ export function useAiChat(options: UseAiChatOptions = {}) {
 
           const streamGenerator = chatService.current.sendStreamingMessage(
             allMessages,
-            { model: state.selectedModel }
+            {
+              model: state.selectedModel,
+              extended_thinking: state.extendedThinking,
+            }
           );
 
           for await (const chunk of streamGenerator) {
@@ -240,6 +245,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
           // Handle non-streaming response
           const response = await chatService.current.sendMessage(allMessages, {
             model: state.selectedModel,
+            extended_thinking: state.extendedThinking,
           });
 
           const assistantMessage = chatService.current.createMessage(
@@ -301,6 +307,16 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     setState((prev) => ({
       ...prev,
       selectedModel: modelId,
+      // Reset extended thinking when switching models
+      extendedThinking: false,
+    }));
+  }, []);
+
+  // Toggle extended thinking
+  const toggleExtendedThinking = useCallback((enabled: boolean) => {
+    setState((prev) => ({
+      ...prev,
+      extendedThinking: enabled,
     }));
   }, []);
 
@@ -378,6 +394,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     error: state.error,
     selectedModel: state.selectedModel,
     availableModels: state.availableModels,
+    extendedThinking: state.extendedThinking,
 
     // Actions
     sendMessage,
@@ -389,6 +406,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     regenerateResponse,
     loadModels,
     setMessages,
+    toggleExtendedThinking,
 
     // Computed
     hasMessages: state.messages.length > 0,
@@ -396,5 +414,6 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     currentModel: state.availableModels.find(
       (m) => m.id === state.selectedModel
     ),
+    isClaudeModel: state.selectedModel === "anthropic/claude-4-sonnet",
   };
 }

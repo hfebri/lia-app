@@ -55,6 +55,9 @@ export interface AIGenerationOptions {
   presence_penalty?: number;
   stream?: boolean;
   system_prompt?: string;
+  extended_thinking?: boolean;
+  thinking_budget_tokens?: number;
+  max_image_resolution?: number;
 }
 
 export interface AIServiceConfig {
