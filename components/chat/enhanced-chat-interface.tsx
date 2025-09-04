@@ -850,16 +850,6 @@ export function EnhancedChatInterface({
                 disabled={isLoading || isStreaming}
               />
 
-              {hasMessages && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setMessages([])}
-                  disabled={isLoading || isStreaming}
-                >
-                  Clear
-                </Button>
-              )}
             </div>
           </div>
         </div>
