@@ -17,7 +17,8 @@ interface UseAiChatState {
   error: string | null;
   selectedModel: string;
   availableModels: any[];
-  extendedThinking: boolean;
+  extendedThinking: boolean; // Claude-exclusive
+  thinkingMode: boolean; // Gemini-exclusive
   reasoningEffort: ReasoningEffort;
 }
 
@@ -67,6 +68,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     selectedModel: initialModel,
     availableModels: [],
     extendedThinking: false,
+    thinkingMode: false,
     reasoningEffort: "medium",
   });
 
@@ -193,6 +195,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
             {
               model: state.selectedModel,
               extended_thinking: state.extendedThinking,
+              thinking_mode: state.thinkingMode,
               reasoning_effort: state.reasoningEffort,
             }
           );
@@ -250,6 +253,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
           const response = await chatService.current.sendMessage(allMessages, {
             model: state.selectedModel,
             extended_thinking: state.extendedThinking,
+            thinking_mode: state.thinkingMode,
             reasoning_effort: state.reasoningEffort,
           });
 
@@ -314,6 +318,8 @@ export function useAiChat(options: UseAiChatOptions = {}) {
       selectedModel: modelId,
       // Reset extended thinking when switching models
       extendedThinking: false,
+      // Reset thinking mode when switching models
+      thinkingMode: false,
       // Reset reasoning effort when switching models
       reasoningEffort: "medium",
     }));
@@ -324,6 +330,14 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     setState((prev) => ({
       ...prev,
       extendedThinking: enabled,
+    }));
+  }, []);
+
+  // Toggle thinking mode (Gemini)
+  const toggleThinkingMode = useCallback((enabled: boolean) => {
+    setState((prev) => ({
+      ...prev,
+      thinkingMode: enabled,
     }));
   }, []);
 
@@ -410,6 +424,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     selectedModel: state.selectedModel,
     availableModels: state.availableModels,
     extendedThinking: state.extendedThinking,
+    thinkingMode: state.thinkingMode,
     reasoningEffort: state.reasoningEffort,
 
     // Actions
@@ -423,6 +438,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     loadModels,
     setMessages,
     toggleExtendedThinking,
+    toggleThinkingMode,
     setReasoningEffort,
 
     // Computed
@@ -432,6 +448,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
       (m) => m.id === state.selectedModel
     ),
     isClaudeModel: state.selectedModel === "anthropic/claude-4-sonnet",
+    isGeminiModel: state.selectedModel.includes("gemini"),
     isOpenAIModel: state.selectedModel.startsWith("openai/"),
   };
 }

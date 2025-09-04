@@ -55,7 +55,8 @@ export interface AIGenerationOptions {
   presence_penalty?: number;
   stream?: boolean;
   system_prompt?: string;
-  extended_thinking?: boolean;
+  extended_thinking?: boolean; // Claude-exclusive
+  thinking_mode?: boolean; // Gemini-exclusive
   thinking_budget_tokens?: number;
   max_image_resolution?: number;
   reasoning_effort?: "minimal" | "low" | "medium" | "high";

@@ -28,7 +28,7 @@ export class AIService {
         },
         gemini: {
           apiKey: process.env.GEMINI_API_KEY || "",
-          models: ["gemini-2.5-flash", "gemini-2.5-flash-lite"],
+          models: ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.5-flash-lite"],
           defaultModel: "gemini-2.5-flash",
         },
       },

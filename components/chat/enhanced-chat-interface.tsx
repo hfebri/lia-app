@@ -11,6 +11,7 @@ import { MessageItem } from "./message-item";
 import { FileProcessingMessage } from "./file-processing-message";
 import { FileAttachment } from "./file-attachment";
 import { ExtendedThinkingToggle } from "./extended-thinking-toggle";
+import { ThinkingModeToggle } from "./thinking-mode-toggle";
 import { ReasoningEffortSelector } from "./reasoning-effort-selector";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -101,6 +102,8 @@ export function EnhancedChatInterface({
     changeModel,
     extendedThinking,
     toggleExtendedThinking,
+    thinkingMode,
+    toggleThinkingMode,
     reasoningEffort,
     setReasoningEffort,
     clearError,
@@ -110,6 +113,7 @@ export function EnhancedChatInterface({
     canSend,
     currentModel,
     isClaudeModel,
+    isGeminiModel,
     isOpenAIModel,
   } = useAiChat();
 
@@ -821,6 +825,14 @@ export function EnhancedChatInterface({
                   </div>
                 </>
               )}
+              
+              {/* Thinking Mode Toggle - Show only for Gemini models */}
+              <ThinkingModeToggle
+                enabled={thinkingMode}
+                onToggle={toggleThinkingMode}
+                disabled={isLoading || isStreaming}
+                selectedModel={selectedModel}
+              />
 
               {/* Reasoning Effort Selector - Show only for OpenAI models */}
               {isOpenAIModel && (

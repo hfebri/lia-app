@@ -11,6 +11,7 @@ import type {
 export class GeminiProvider implements AIProvider {
   public readonly name = "gemini";
   public readonly models = [
+    "gemini-2.5-pro",
     "gemini-2.5-flash",
     "gemini-2.5-flash-lite",
     "gemini-1.5-pro",
@@ -34,14 +35,18 @@ export class GeminiProvider implements AIProvider {
         // temperature = 0.7, // Currently unused by Gemini API
         // max_tokens = 1000, // Currently unused by Gemini API
         system_prompt,
+        thinking_mode,
       } = options;
 
       // Format messages for Gemini API
       const contents = this.formatMessagesForAPI(messages, system_prompt);
 
+      // Determine thinking config - always on for 2.5 Pro
+      const shouldUseThinking = model === "gemini-2.5-pro" || thinking_mode;
+      
       const config = {
         thinkingConfig: {
-          thinkingBudget: 0,
+          thinkingBudget: shouldUseThinking ? -1 : 0,
         },
       };
 
@@ -76,6 +81,7 @@ export class GeminiProvider implements AIProvider {
         // temperature = 0.7, // Currently unused by Gemini API
         // max_tokens = 1000, // Currently unused by Gemini API
         system_prompt,
+        thinking_mode,
       } = options;
 
       // Format messages for Gemini API
@@ -87,9 +93,12 @@ export class GeminiProvider implements AIProvider {
       //   maxOutputTokens: max_tokens,
       // };
 
+      // Determine thinking config - always on for 2.5 Pro
+      const shouldUseThinking = model === "gemini-2.5-pro" || thinking_mode;
+
       const config = {
         thinkingConfig: {
-          thinkingBudget: 0,
+          thinkingBudget: shouldUseThinking ? -1 : 0,
         },
       };
 
