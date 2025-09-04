@@ -27,6 +27,7 @@ import {
   User,
   LogOut,
   RefreshCw,
+  Bug,
 } from "lucide-react";
 import { SimpleThemeToggle } from "@/components/ui/theme-toggle";
 import {
@@ -396,7 +397,16 @@ function SidebarComponent({ className }: SidebarProps) {
               </div>
 
               {/* Action Buttons */}
-              <div className="flex justify-center mt-2">
+              <div className="space-y-2 mt-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => window.open('https://forms.gle/rUNnrNkaTtvMAfYq9', '_blank')}
+                >
+                  <Bug className="h-4 w-4 mr-2" />
+                  Report Bug
+                </Button>
                 <LogoutButton variant="ghost" size="sm" className="w-full">
                   <LogOut className="h-4 w-4 mr-2" />
                   Sign out
