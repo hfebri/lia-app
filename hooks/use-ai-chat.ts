@@ -20,6 +20,7 @@ interface UseAiChatState {
   extendedThinking: boolean; // Claude-exclusive
   thinkingMode: boolean; // Gemini-exclusive
   reasoningEffort: ReasoningEffort;
+  currentConversationId: string | null; // Track current conversation
 }
 
 interface UseAiChatOptions {
@@ -70,6 +71,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     extendedThinking: false,
     thinkingMode: false,
     reasoningEffort: "medium",
+    currentConversationId: null,
   });
 
   const chatService = useRef(ChatService.getInstance());
@@ -238,7 +240,14 @@ export function useAiChat(options: UseAiChatOptions = {}) {
 
               // Save both messages to database after streaming is complete
               try {
-                await saveChatToDatabase(userMessage, assistantMessage);
+                const result = await saveChatToDatabase(userMessage, assistantMessage, state.currentConversationId);
+                // Update conversation ID if this was the first message
+                if (result.success && !state.currentConversationId) {
+                  setState((prev) => ({
+                    ...prev,
+                    currentConversationId: result.data.conversationId,
+                  }));
+                }
               } catch (error) {
                 console.warn(
                   "Failed to save streaming chat to database:",
@@ -275,7 +284,14 @@ export function useAiChat(options: UseAiChatOptions = {}) {
 
           // Save both messages to database after AI response is received
           try {
-            await saveChatToDatabase(userMessage, assistantMessage);
+            const result = await saveChatToDatabase(userMessage, assistantMessage, state.currentConversationId);
+            // Update conversation ID if this was the first message
+            if (result.success && !state.currentConversationId) {
+              setState((prev) => ({
+                ...prev,
+                currentConversationId: result.data.conversationId,
+              }));
+            }
           } catch (error) {
             console.warn("Failed to save chat to database:", error);
             // Don't break the chat flow if database save fails
@@ -413,6 +429,17 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     [maxMessages]
   );
 
+  // Start new conversation
+  const startNewConversation = useCallback(() => {
+    setState((prev) => ({
+      ...prev,
+      messages: [],
+      currentConversationId: null,
+      error: null,
+      streamingContent: "",
+    }));
+  }, []);
+
   return {
     // State
     messages: state.messages,
@@ -426,6 +453,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     extendedThinking: state.extendedThinking,
     thinkingMode: state.thinkingMode,
     reasoningEffort: state.reasoningEffort,
+    currentConversationId: state.currentConversationId,
 
     // Actions
     sendMessage,
@@ -437,6 +465,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     regenerateResponse,
     loadModels,
     setMessages,
+    startNewConversation,
     toggleExtendedThinking,
     toggleThinkingMode,
     setReasoningEffort,

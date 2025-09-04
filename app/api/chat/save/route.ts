@@ -25,10 +25,7 @@ export async function POST(request: NextRequest) {
       const conversation = await ConversationService.createConversation(
         userId,
         {
-          title:
-            conversationTitle ||
-            userMessage.content.slice(0, 30) +
-              (userMessage.content.length > 30 ? "..." : ""),
+          title: conversationTitle || "New Chat",
         }
       );
       currentConversationId = conversation.id;
@@ -68,6 +65,18 @@ export async function POST(request: NextRequest) {
           metadata: assistantMessage.metadata || null,
         }
       );
+    }
+
+    // Auto-update conversation title if it's still "New Chat" and we have the first user message
+    if (!conversationId && userMessage?.content) {
+      const titleFromMessage = userMessage.content.slice(0, 50).trim();
+      const finalTitle = titleFromMessage.length > 50 
+        ? titleFromMessage.slice(0, 47) + "..." 
+        : titleFromMessage;
+      
+      await ConversationService.updateConversation(currentConversationId, {
+        title: finalTitle,
+      });
     }
 
     return NextResponse.json({
