@@ -6,6 +6,7 @@ import {
   fileAnalysisService,
   FileAnalysisService,
 } from "@/lib/services/file-analysis-service";
+import { LIA_SYSTEM_INSTRUCTION } from "@/app/api/ai/models/route";
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,6 +19,7 @@ export async function POST(request: NextRequest) {
       thinking_budget_tokens = 1024,
       max_image_resolution = 0.5,
       reasoning_effort: "minimal" | "low" | "medium" | "high" = "medium",
+      systemInstruction = "",
       files: Array<{
         name: string;
         type: string;
@@ -39,6 +41,7 @@ export async function POST(request: NextRequest) {
         parseInt(formData.get("thinking_budget_tokens") as string) || 1024;
       max_image_resolution =
         parseFloat(formData.get("max_image_resolution") as string) || 0.5;
+      systemInstruction = (formData.get("systemInstruction") as string) || "";
 
       // Extract files
       const fileEntries = Array.from(formData.entries()).filter(([key]) =>
@@ -67,6 +70,7 @@ export async function POST(request: NextRequest) {
         thinking_budget_tokens,
         max_image_resolution,
         reasoning_effort,
+        systemInstruction,
       } = body);
 
       // Extract files from the LATEST USER MESSAGE ONLY (not from entire conversation history)
@@ -174,11 +178,19 @@ export async function POST(request: NextRequest) {
         async start(controller) {
           try {
             console.log("🚀 Generating AI stream...");
+            
+            // Combine default LIA system instruction with user's custom instruction
+            let combinedSystemPrompt = LIA_SYSTEM_INSTRUCTION;
+            if (systemInstruction && systemInstruction.trim()) {
+              combinedSystemPrompt = `${LIA_SYSTEM_INSTRUCTION}\n\nAdditional Instructions: ${systemInstruction.trim()}`;
+            }
+            
             const stream = aiService.generateStream(aiMessages, {
               model,
               provider,
               temperature: 0.7,
               max_tokens: 8192,
+              system_prompt: combinedSystemPrompt,
               extended_thinking,
               thinking_budget_tokens,
               max_image_resolution,
@@ -229,11 +241,18 @@ export async function POST(request: NextRequest) {
       });
     } else {
       // Generate non-streaming response
+      // Combine default LIA system instruction with user's custom instruction
+      let combinedSystemPrompt = LIA_SYSTEM_INSTRUCTION;
+      if (systemInstruction && systemInstruction.trim()) {
+        combinedSystemPrompt = `${LIA_SYSTEM_INSTRUCTION}\n\nAdditional Instructions: ${systemInstruction.trim()}`;
+      }
+      
       const response = await aiService.generateResponse(aiMessages, {
         model,
         provider,
         temperature: 0.7,
         max_tokens: 8192,
+        system_prompt: combinedSystemPrompt,
         extended_thinking,
         thinking_budget_tokens,
         max_image_resolution,

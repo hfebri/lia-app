@@ -1,5 +1,3 @@
-export interface ActionState<T = void> {
-  isSuccess: boolean;
-  message: string;
-  data?: T;
-}
+export type ActionState<T> =
+  | { isSuccess: true; message: string; data: T }
+  | { isSuccess: false; message: string; data?: never };

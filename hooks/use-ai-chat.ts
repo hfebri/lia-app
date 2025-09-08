@@ -21,6 +21,7 @@ interface UseAiChatState {
   thinkingMode: boolean; // Gemini-exclusive
   reasoningEffort: ReasoningEffort;
   currentConversationId: string | null; // Track current conversation
+  systemInstruction: string; // System instruction for conversation
 }
 
 interface UseAiChatOptions {
@@ -72,6 +73,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     thinkingMode: false,
     reasoningEffort: "medium",
     currentConversationId: null,
+    systemInstruction: "",
   });
 
   const chatService = useRef(ChatService.getInstance());
@@ -97,21 +99,9 @@ export function useAiChat(options: UseAiChatOptions = {}) {
   // Send a message with streaming response
   const sendMessage = useCallback(
     async (content: string, files?: File[], stream: boolean = true) => {
-      // DEBUG: Log what we received
-      console.log("💬 USE-AI-CHAT DEBUG - sendMessage called:");
-      console.log("- Content length:", content.length);
-      console.log("- Files param:", files ? files.length : "undefined");
-      console.log("- Stream:", stream);
-      if (files) {
-        console.log(
-          "- Files details:",
-          files.map((f) => ({
-            name: f.name,
-            type: f.type,
-            size: f.size,
-            hasData: !!(f as any).data,
-          }))
-        );
+      // Log system instruction if present
+      if (state.systemInstruction) {
+        console.log("🎯 Using system instruction:", state.systemInstruction.substring(0, 50) + "...");
       }
 
       // Validate message
@@ -199,6 +189,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
               extended_thinking: state.extendedThinking,
               thinking_mode: state.thinkingMode,
               reasoning_effort: state.reasoningEffort,
+              systemInstruction: state.systemInstruction,
             }
           );
 
@@ -437,6 +428,15 @@ export function useAiChat(options: UseAiChatOptions = {}) {
       currentConversationId: null,
       error: null,
       streamingContent: "",
+      systemInstruction: "", // Clear system instruction on new conversation
+    }));
+  }, []);
+
+  // Set system instruction
+  const setSystemInstruction = useCallback((instruction: string) => {
+    setState((prev) => ({
+      ...prev,
+      systemInstruction: instruction,
     }));
   }, []);
 
@@ -454,6 +454,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     thinkingMode: state.thinkingMode,
     reasoningEffort: state.reasoningEffort,
     currentConversationId: state.currentConversationId,
+    systemInstruction: state.systemInstruction,
 
     // Actions
     sendMessage,
@@ -469,6 +470,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     toggleExtendedThinking,
     toggleThinkingMode,
     setReasoningEffort,
+    setSystemInstruction,
 
     // Computed
     hasMessages: state.messages.length > 0,

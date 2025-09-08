@@ -41,6 +41,7 @@ export interface ChatServiceOptions {
   thinking_budget_tokens?: number;
   max_image_resolution?: number;
   reasoning_effort?: "minimal" | "low" | "medium" | "high";
+  systemInstruction?: string; // Custom system instruction for conversation
 }
 
 export class ChatService {
@@ -160,6 +161,7 @@ export class ChatService {
       thinking_budget_tokens = 1024,
       max_image_resolution = 0.5,
       reasoning_effort = "medium",
+      systemInstruction = "",
     } = options;
 
     // Convert messages to AI format
@@ -169,33 +171,10 @@ export class ChatService {
       files: msg.files, // Include files for multimodal support
     }));
 
-    // DEBUG: Log what we're sending to the API
-    console.log("🚀 FRONTEND DEBUG - Sending to API:");
-    console.log("- Messages count:", aiMessages.length);
-    console.log("- Model:", model);
-
-    // Debug each message separately
-    aiMessages.forEach((msg, index) => {
-      console.log(`Message ${index + 1}:`, {
-        role: msg.role,
-        contentLength: msg.content.length,
-        hasFiles: !!msg.files,
-        filesCount: msg.files?.length || 0,
-      });
-
-      if (msg.files && msg.files.length > 0) {
-        console.log(
-          `  📎 Files in message ${index + 1}:`,
-          msg.files.map((f) => ({
-            name: f.name,
-            type: f.type,
-            size: f.size,
-            hasData: !!f.data,
-            dataLength: f.data?.length || 0,
-          }))
-        );
-      }
-    });
+    // Add system instruction to debug log if present
+    if (systemInstruction) {
+      console.log("🎯 System instruction:", systemInstruction.substring(0, 100) + "...");
+    }
 
     const response = await fetch(`${this.baseUrl}/chat`, {
       method: "POST",
@@ -212,6 +191,7 @@ export class ChatService {
         thinking_budget_tokens,
         max_image_resolution,
         reasoning_effort,
+        systemInstruction: systemInstruction || undefined, // Only include if not empty
       }),
     });
 

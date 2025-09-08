@@ -1,7 +1,6 @@
 "use client";
 
 import { UserTable } from "@/components/admin/user-table";
-import { AdminStats } from "@/components/admin/admin-stats";
 import {
   Card,
   CardContent,
@@ -10,111 +9,67 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import {
-  Users,
-  UserPlus,
-  Shield,
-  Activity,
-  Clock,
-  TrendingUp,
-} from "lucide-react";
+import { Users, UserPlus } from "lucide-react";
 import { useState, useEffect } from "react";
-import { getUsersAction, getUserStatsAction } from "@/actions/db/users-actions";
-import { SelectUser } from "@/db/schema";
+// Remove server action import - using API route instead
+import { User } from "@/db/types";
 import { toast } from "sonner";
 
 // Convert database users to UserTable format
-const convertToUserTableFormat = (dbUsers: SelectUser[]) => {
+const convertToUserTableFormat = (
+  dbUsers: (User & { messageCount: number; fileCount: number })[]
+) => {
   return dbUsers.map((user) => ({
     id: user.id,
     email: user.email,
     fullName: user.name || undefined,
     avatarUrl: user.image || undefined,
     role: user.role as "admin" | "user",
-    status: "active" as const, // You might want to add this to your schema
+    status: user.isActive ? ("active" as const) : ("inactive" as const),
     lastActive: user.updatedAt,
     createdAt: user.createdAt,
-    messageCount: 0, // You'll need to join with messages to get real counts
-    fileCount: 0, // You'll need to join with files to get real counts
+    messageCount: user.messageCount,
+    fileCount: user.fileCount,
   }));
 };
 
 export default function AdminUsersPage() {
-  const [users, setUsers] = useState<SelectUser[]>([]);
-  const [userStats, setUserStats] = useState<Array<{
-    title: string;
-    value: string;
-    change: {
-      value: number;
-      type: 'increase' | 'decrease';
-      period: string;
-    };
-    icon: React.ComponentType;
-  }>>([]);
+  console.log("🔍 [ADMIN USERS PAGE] Component rendered");
+
+  const [users, setUsers] = useState<
+    (User & { messageCount: number; fileCount: number })[]
+  >([]);
   const [loading, setLoading] = useState(true);
 
   const loadData = async () => {
     try {
       setLoading(true);
-      const [usersResult, statsResult] = await Promise.all([
-        getUsersAction(),
-        getUserStatsAction(),
-      ]);
+
+      console.log("🔍 [FRONTEND] Fetching admin users...");
+      const response = await fetch("/api/admin/users", {
+        cache: "no-cache",
+        headers: {
+          "Cache-Control": "no-cache",
+        },
+      });
+      console.log("🔍 [FRONTEND] Response status:", response.status);
+      const usersResult = await response.json();
+      console.log("🔍 [FRONTEND] API response:", usersResult);
 
       if (usersResult.isSuccess && usersResult.data) {
+        console.log(
+          "✅ [FRONTEND] Setting users data:",
+          usersResult.data.length,
+          "users"
+        );
+        console.log("🔍 [FRONTEND] Sample user data:", usersResult.data[0]);
         setUsers(usersResult.data);
       } else {
+        console.log("❌ [FRONTEND] API failed:", usersResult.message);
         toast.error(usersResult.message);
       }
-
-      if (statsResult.isSuccess && statsResult.data) {
-        const stats = statsResult.data;
-        setUserStats([
-          {
-            title: "Total Users",
-            value: stats.totalUsers.toString(),
-            change: {
-              value: 12,
-              type: "increase" as const,
-              period: "last month",
-            },
-            icon: Users,
-          },
-          {
-            title: "Active Today",
-            value: stats.activeUsers.toString(),
-            change: {
-              value: 7,
-              type: "increase" as const,
-              period: "yesterday",
-            },
-            icon: Activity,
-          },
-          {
-            title: "New Registrations",
-            value: stats.newRegistrations.toString(),
-            change: {
-              value: 23,
-              type: "increase" as const,
-              period: "last week",
-            },
-            icon: TrendingUp,
-          },
-          {
-            title: "Admin Users",
-            value: stats.adminUsers.toString(),
-            change: {
-              value: 0,
-              type: "increase" as const,
-              period: "no change",
-            },
-            icon: Shield,
-          },
-        ]);
-      } else {
-        toast.error(statsResult.message);
-      }
     } catch (error) {
+      console.log("❌ [FRONTEND] Fetch error:", error);
       toast.error("Failed to load user data");
     } finally {
       setLoading(false);
@@ -126,7 +81,6 @@ export default function AdminUsersPage() {
   }, []);
 
   const handleUserAction = (userId: string, action: string) => {
-
     // Handle view details or other actions here
   };
 
@@ -149,26 +103,6 @@ export default function AdminUsersPage() {
           Add User
         </Button>
       </div>
-
-      {/* User Statistics */}
-      {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => (
-            <Card key={i}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <div className="h-4 w-20 bg-muted animate-pulse rounded"></div>
-                <div className="h-4 w-4 bg-muted animate-pulse rounded"></div>
-              </CardHeader>
-              <CardContent>
-                <div className="h-8 w-16 bg-muted animate-pulse rounded mb-1"></div>
-                <div className="h-3 w-24 bg-muted animate-pulse rounded"></div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      ) : (
-        <AdminStats stats={userStats} />
-      )}
 
       {/* User Table */}
       <Card>

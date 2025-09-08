@@ -1,11 +1,96 @@
 "use server";
 
 import { db } from "@/db/db";
-import { users } from "@/db/schema";
+import { users, messages, files, conversations } from "@/db/schema";
 import type { User, NewUser } from "@/db/types";
 import { ActionState } from "@/types";
 import { eq, and, or, desc, count, sql } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth/session";
+
+export async function getUsersWithCountsAction(): Promise<
+  ActionState<(User & { messageCount: number; fileCount: number })[]>
+> {
+  try {
+    console.log(
+      "🔍 [getUsersWithCountsAction] Starting users with counts retrieval"
+    );
+
+    const currentUser = await getCurrentUser();
+    console.log(
+      "🔍 [getUsersWithCountsAction] Current user:",
+      currentUser?.id,
+      currentUser?.role
+    );
+
+    if (!currentUser) {
+      console.log("❌ [getUsersWithCountsAction] No current user found");
+      return { isSuccess: false, message: "Unauthorized" };
+    }
+
+    if (currentUser.role !== "admin") {
+      console.log(
+        "❌ [getUsersWithCountsAction] User is not admin:",
+        currentUser.role
+      );
+      return { isSuccess: false, message: "Admin access required" };
+    }
+
+    console.log("✅ [getUsersWithCountsAction] User authorization passed");
+
+    // Get all users first
+    const allUsers = await db
+      .select()
+      .from(users)
+      .orderBy(desc(users.createdAt));
+
+    // Get message counts for each user
+    const messageCounts = await db
+      .select({
+        userId: messages.userId,
+        count: sql<number>`COUNT(${messages.id})`.as("messageCount"),
+      })
+      .from(messages)
+      .groupBy(messages.userId);
+
+    // Get file counts for each user
+    const fileCounts = await db
+      .select({
+        userId: files.userId,
+        count: sql<number>`COUNT(${files.id})`.as("fileCount"),
+      })
+      .from(files)
+      .where(eq(files.isActive, true))
+      .groupBy(files.userId);
+
+    // Combine the data
+    const usersWithCounts = allUsers.map((user) => {
+      const messageCount =
+        messageCounts.find((mc) => mc.userId === user.id)?.count || 0;
+      const fileCount =
+        fileCounts.find((fc) => fc.userId === user.id)?.count || 0;
+
+      return {
+        ...user,
+        messageCount: Number(messageCount),
+        fileCount: Number(fileCount),
+      };
+    });
+
+    return {
+      isSuccess: true,
+      message: "Users with counts retrieved successfully",
+      data: usersWithCounts,
+    };
+  } catch (error) {
+    console.error("❌ [getUsersWithCountsAction] Error occurred:", error);
+    console.error("❌ [getUsersWithCountsAction] Error details:", {
+      message: error instanceof Error ? error.message : "Unknown error",
+      stack: error instanceof Error ? error.stack : undefined,
+      name: error instanceof Error ? error.name : undefined,
+    });
+    return { isSuccess: false, message: "Failed to get users with counts" };
+  }
+}
 
 export async function getUsersAction(): Promise<ActionState<User[]>> {
   try {
@@ -135,67 +220,161 @@ export async function getUserStatsAction(): Promise<
   }>
 > {
   try {
+    console.log("🔍 [getUserStatsAction] Starting user stats retrieval");
+
     const currentUser = await getCurrentUser();
+    console.log(
+      "🔍 [getUserStatsAction] Current user:",
+      currentUser?.id,
+      currentUser?.role
+    );
 
     if (!currentUser) {
-      return { isSuccess: false, message: "Unauthorized" };
+      console.log("❌ [getUserStatsAction] No current user found");
+      return { isSuccess: false, message: "Unauthorized - Please sign in" };
     }
 
     if (currentUser.role !== "admin") {
+      console.log(
+        "❌ [getUserStatsAction] User is not admin:",
+        currentUser.role
+      );
       return { isSuccess: false, message: "Admin access required" };
     }
 
-    // Get user statistics
+    console.log("✅ [getUserStatsAction] User authorization passed");
+
+    // Get user statistics with simplified queries first
+    console.log(
+      "🔍 [getUserStatsAction] About to execute basic user count query"
+    );
+
+    let totalUsersResult;
+    try {
+      totalUsersResult = await db.select({ count: count() }).from(users);
+      console.log(
+        "✅ [getUserStatsAction] Total users query successful:",
+        totalUsersResult[0]?.count
+      );
+    } catch (error) {
+      console.error("❌ [getUserStatsAction] Total users query failed:", error);
+      throw new Error(
+        `Database query failed: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    }
+
+    // Get admin users count
+    let adminUsersResult;
+    try {
+      adminUsersResult = await db
+        .select({ count: count() })
+        .from(users)
+        .where(eq(users.role, "admin"));
+      console.log(
+        "✅ [getUserStatsAction] Admin users query successful:",
+        adminUsersResult[0]?.count
+      );
+    } catch (error) {
+      console.error("❌ [getUserStatsAction] Admin users query failed:", error);
+      adminUsersResult = [{ count: 0 }];
+    }
+
+    // For now, let's use simpler date calculations and provide fallback values
     const now = new Date();
     const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-    const [
-      totalUsersResult,
-      activeUsersResult,
-      newRegistrationsResult,
-      adminUsersResult,
-    ] = await Promise.all([
-      db.select({ count: count() }).from(users),
-      db
-        .select({ count: count() })
-        .from(users)
-        .where(sql`last_active >= ${oneDayAgo}`),
-      db
-        .select({ count: count() })
-        .from(users)
-        .where(sql`created_at >= ${oneWeekAgo}`),
-      db
-        .select({ count: count() })
-        .from(users)
-        .where(eq(users.role, "admin")),
-    ]);
+    let activeUsersResult = [{ count: 0 }];
+    let newRegistrationsResult = [{ count: 0 }];
 
-    // Get conversation and message counts
-    const conversationStats = await db.execute(sql`
-      SELECT 
-        COUNT(DISTINCT c.id) as conversation_count,
-        COUNT(m.id) as message_count
-      FROM conversations c
-      LEFT JOIN messages m ON c.id = m.chat_id
-    `);
+    try {
+      activeUsersResult = await db
+        .select({ count: count() })
+        .from(users)
+        .where(sql`${users.updatedAt} >= ${oneDayAgo.toISOString()}`);
+      console.log(
+        "✅ [getUserStatsAction] Active users query successful:",
+        activeUsersResult[0]?.count
+      );
+    } catch (error) {
+      console.error(
+        "❌ [getUserStatsAction] Active users query failed:",
+        error
+      );
+    }
 
-    // Get file count
-    const fileStats = await db.execute(sql`
-      SELECT COUNT(*) as file_count
-      FROM files
-      WHERE is_active = true
-    `);
+    try {
+      newRegistrationsResult = await db
+        .select({ count: count() })
+        .from(users)
+        .where(sql`${users.createdAt} >= ${oneWeekAgo.toISOString()}`);
+      console.log(
+        "✅ [getUserStatsAction] New registrations query successful:",
+        newRegistrationsResult[0]?.count
+      );
+    } catch (error) {
+      console.error(
+        "❌ [getUserStatsAction] New registrations query failed:",
+        error
+      );
+    }
+
+    // Get conversation, message, and file counts with fallbacks
+    let conversationCountResult = [{ count: 0 }];
+    let messageCountResult = [{ count: 0 }];
+    let fileCountResult = [{ count: 0 }];
+
+    try {
+      conversationCountResult = await db
+        .select({ count: count() })
+        .from(conversations);
+      console.log(
+        "✅ [getUserStatsAction] Conversations query successful:",
+        conversationCountResult[0]?.count
+      );
+    } catch (error) {
+      console.error(
+        "❌ [getUserStatsAction] Conversations query failed:",
+        error
+      );
+    }
+
+    try {
+      messageCountResult = await db.select({ count: count() }).from(messages);
+      console.log(
+        "✅ [getUserStatsAction] Messages query successful:",
+        messageCountResult[0]?.count
+      );
+    } catch (error) {
+      console.error("❌ [getUserStatsAction] Messages query failed:", error);
+    }
+
+    try {
+      fileCountResult = await db
+        .select({ count: count() })
+        .from(files)
+        .where(eq(files.isActive, true));
+      console.log(
+        "✅ [getUserStatsAction] Files query successful:",
+        fileCountResult[0]?.count
+      );
+    } catch (error) {
+      console.error("❌ [getUserStatsAction] Files query failed:", error);
+    }
 
     const stats = {
-      totalUsers: totalUsersResult[0]?.count || 0,
-      activeUsers: activeUsersResult[0]?.count || 0,
-      newRegistrations: newRegistrationsResult[0]?.count || 0,
-      adminUsers: adminUsersResult[0]?.count || 0,
-      totalConversations: Number(conversationStats[0]?.conversation_count) || 0,
-      totalMessages: Number(conversationStats[0]?.message_count) || 0,
-      totalFiles: Number(fileStats[0]?.file_count) || 0,
+      totalUsers: Number(totalUsersResult[0]?.count) || 0,
+      activeUsers: Number(activeUsersResult[0]?.count) || 0,
+      newRegistrations: Number(newRegistrationsResult[0]?.count) || 0,
+      adminUsers: Number(adminUsersResult[0]?.count) || 0,
+      totalConversations: Number(conversationCountResult[0]?.count) || 0,
+      totalMessages: Number(messageCountResult[0]?.count) || 0,
+      totalFiles: Number(fileCountResult[0]?.count) || 0,
     };
+
+    console.log("✅ [getUserStatsAction] Final stats compiled:", stats);
 
     return {
       isSuccess: true,
@@ -203,6 +382,17 @@ export async function getUserStatsAction(): Promise<
       data: stats,
     };
   } catch (error) {
-    return { isSuccess: false, message: "Failed to get user stats" };
+    console.error("❌ [getUserStatsAction] Error occurred:", error);
+    console.error("❌ [getUserStatsAction] Error details:", {
+      message: error instanceof Error ? error.message : "Unknown error",
+      stack: error instanceof Error ? error.stack : undefined,
+      name: error instanceof Error ? error.name : undefined,
+    });
+    return {
+      isSuccess: false,
+      message: `Failed to get user stats: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`,
+    };
   }
 }

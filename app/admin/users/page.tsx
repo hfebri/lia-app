@@ -19,38 +19,45 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { getUsersAction, getUserStatsAction } from "@/actions/db/users-actions";
+import { getUserStatsAction } from "@/actions/db/users-actions";
 import { SelectUser } from "@/db/schema";
 import { toast } from "sonner";
 
 // Convert database users to UserTable format
-const convertToUserTableFormat = (dbUsers: SelectUser[]) => {
+const convertToUserTableFormat = (
+  dbUsers: (SelectUser & { conversationCount: number; messageCount: number })[]
+) => {
   return dbUsers.map((user) => ({
     id: user.id,
     email: user.email,
     fullName: user.name || undefined,
     avatarUrl: user.image || undefined,
     role: user.role as "admin" | "user",
-    status: "active" as const, // You might want to add this to your schema
+    status: user.isActive ? ("active" as const) : ("inactive" as const),
     lastActive: user.updatedAt,
     createdAt: user.createdAt,
-    messageCount: 0, // You'll need to join with messages to get real counts
-    fileCount: 0, // You'll need to join with files to get real counts
+    messageCount: user.conversationCount, // Map conversationCount to messageCount for display
+    fileCount: user.messageCount, // Map messageCount to fileCount for display
   }));
 };
 
 export default function AdminUsersPage() {
-  const [users, setUsers] = useState<SelectUser[]>([]);
+  const [users, setUsers] = useState<
+    (SelectUser & { conversationCount: number; messageCount: number })[]
+  >([]);
   const [userStats, setUserStats] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const loadData = async () => {
     try {
       setLoading(true);
-      const [usersResult, statsResult] = await Promise.all([
-        getUsersAction(),
-        getUserStatsAction(),
-      ]);
+
+      // Fetch users with counts from the API
+      const response = await fetch("/api/admin/users");
+      const usersResult = await response.json();
+
+      // Fetch stats
+      const statsResult = await getUserStatsAction();
 
       if (usersResult.isSuccess && usersResult.data) {
         setUsers(usersResult.data);
@@ -116,7 +123,6 @@ export default function AdminUsersPage() {
   }, []);
 
   const handleUserAction = (userId: string, action: string) => {
-
     // Handle view details or other actions here
   };
 

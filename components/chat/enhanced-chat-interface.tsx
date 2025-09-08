@@ -13,6 +13,7 @@ import { FileAttachment } from "./file-attachment";
 import { ExtendedThinkingToggle } from "./extended-thinking-toggle";
 import { ThinkingModeToggle } from "./thinking-mode-toggle";
 import { ReasoningEffortSelector } from "./reasoning-effort-selector";
+import { SystemInstructionButton } from "./system-instruction-button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -106,6 +107,8 @@ export function EnhancedChatInterface({
     toggleThinkingMode,
     reasoningEffort,
     setReasoningEffort,
+    systemInstruction,
+    setSystemInstruction,
     clearError,
     loadModels,
     setMessages,
@@ -153,14 +156,17 @@ export function EnhancedChatInterface({
       setIsLoadingConversation(true);
 
       try {
-        // Fetch conversation details
-        const response = await fetch(`/api/conversations/${conversationId}`);
+        // Fetch conversation details and messages in parallel
+        const [conversationResponse, messagesResponse] = await Promise.all([
+          fetch(`/api/conversations/${conversationId}`),
+          fetch(`/api/conversations/${conversationId}/messages`)
+        ]);
 
-        if (response.status === 404) {
+        if (conversationResponse.status === 404) {
           // Conversation not found - clean up URL and reset state
-
           setCurrentConversationId(null);
           setConversationTitle("AI Assistant");
+          setMessages([]);
 
           // Remove conversation ID from URL
           const url = new URL(window.location.href);
@@ -170,28 +176,27 @@ export function EnhancedChatInterface({
           return;
         }
 
-        if (!response.ok) throw new Error("Failed to load conversation");
+        if (!conversationResponse.ok) throw new Error("Failed to load conversation");
+        if (!messagesResponse.ok) throw new Error("Failed to load messages");
 
-        const result = await response.json();
-        if (!result.success)
-          throw new Error(result.message || "Failed to load conversation");
+        const [conversationResult, messagesResult] = await Promise.all([
+          conversationResponse.json(),
+          messagesResponse.json()
+        ]);
 
-        const conversation = result.data;
+        if (!conversationResult.success) {
+          throw new Error(conversationResult.message || "Failed to load conversation");
+        }
+        if (!messagesResult.success) {
+          throw new Error(messagesResult.message || "Failed to load messages");
+        }
+
+        const conversation = conversationResult.data;
 
         // Update conversation title
         if (conversation.title) {
           setConversationTitle(conversation.title);
         }
-
-        // Fetch conversation messages
-        const messagesResponse = await fetch(
-          `/api/conversations/${conversationId}/messages`
-        );
-        if (!messagesResponse.ok) throw new Error("Failed to load messages");
-
-        const messagesResult = await messagesResponse.json();
-        if (!messagesResult.success)
-          throw new Error(messagesResult.message || "Failed to load messages");
 
         // Convert database messages to AI chat messages format
         const aiMessages = messagesResult.data.map(
@@ -208,23 +213,22 @@ export function EnhancedChatInterface({
           })
         );
 
-        // Clear current messages and load the conversation messages
-        setMessages([]);
+        // Set the loaded messages directly (no clearing first to prevent flashing)
+        setMessages(aiMessages);
+        
+        // Clear system instruction for loaded conversation (fresh start per conversation)
+        setSystemInstruction("");
 
-        // Set the loaded messages in the chat interface
-        if (aiMessages.length > 0) {
-          setMessages(aiMessages);
-
-          // Scroll to bottom after loading conversation
-          setTimeout(scrollToBottom, 100);
-        }
+        // Scroll to bottom after loading conversation
+        setTimeout(scrollToBottom, 100);
       } catch (error) {
         setConversationTitle("AI Assistant");
+        // Don't clear messages on error to maintain current state
       } finally {
         setIsLoadingConversation(false);
       }
     },
-    [setMessages, scrollToBottom]
+    [setMessages, scrollToBottom, setSystemInstruction]
   );
 
   // Load conversation data when conversation ID changes
@@ -238,8 +242,13 @@ export function EnhancedChatInterface({
       // If no conversation ID in URL but we have one set, clear it
       setCurrentConversationId(null);
       setConversationTitle("AI Assistant");
+      // Only clear messages when intentionally starting a new conversation
+      if (!conversationId) {
+        setMessages([]);
+        setSystemInstruction(""); // Clear system instruction for new conversation
+      }
     }
-  }, [searchParams, currentConversationId, loadConversationData]);
+  }, [searchParams, currentConversationId, loadConversationData, setSystemInstruction]);
 
   // Rename conversation
   const handleRenameConversation = async (newTitle: string) => {
@@ -842,6 +851,12 @@ export function EnhancedChatInterface({
                   disabled={isLoading || isStreaming}
                 />
               )}
+
+              <SystemInstructionButton
+                systemInstruction={systemInstruction}
+                onSystemInstructionChange={setSystemInstruction}
+                disabled={isLoading || isStreaming}
+              />
 
               <ModelSelector
                 models={availableModels}

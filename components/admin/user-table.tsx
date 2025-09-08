@@ -75,8 +75,8 @@ export interface User {
   status: "active" | "inactive" | "suspended";
   lastActive: Date;
   createdAt: Date;
-  messageCount?: number;
-  fileCount?: number;
+  messageCount?: number; // Actually stores conversation count for display
+  fileCount?: number; // Actually stores message count for display
 }
 
 interface UserTableProps {
@@ -92,6 +92,21 @@ export function UserTable({
   onRefresh,
   className,
 }: UserTableProps) {
+  console.log("🔍 [USER TABLE] Received users:", users.length);
+  if (users.length > 0) {
+    console.log("🔍 [USER TABLE] Sample user:", users[0]);
+    const helmiUser = users.find(
+      (u) => u.email === "hfebri@leverategroup.asia"
+    );
+    if (helmiUser) {
+      console.log("🔍 [USER TABLE] Helmi user data:", {
+        email: helmiUser.email,
+        messageCount: helmiUser.messageCount,
+        fileCount: helmiUser.fileCount,
+      });
+    }
+  }
+
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [roleFilter, setRoleFilter] = useState<string>("all");
@@ -115,17 +130,19 @@ export function UserTable({
     return matchesSearch && matchesStatus && matchesRole;
   });
 
-  const formatDate = (date: Date) => {
+  const formatDate = (date: Date | string) => {
+    const dateObj = typeof date === "string" ? new Date(date) : date;
     return new Intl.DateTimeFormat("en-US", {
       year: "numeric",
       month: "short",
       day: "numeric",
-    }).format(date);
+    }).format(dateObj);
   };
 
-  const formatRelativeTime = (date: Date) => {
+  const formatRelativeTime = (date: Date | string) => {
     const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
+    const dateObj = typeof date === "string" ? new Date(date) : date;
+    const diffMs = now.getTime() - dateObj.getTime();
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
     if (diffDays === 0) return "Today";
@@ -317,9 +334,9 @@ export function UserTable({
                 </TableCell>
                 <TableCell>
                   <div className="text-xs space-y-1">
-                    <div>{user.messageCount || 0} messages</div>
+                    <div>{user.messageCount || 0} conversations</div>
                     <div className="text-muted-foreground">
-                      {user.fileCount || 0} files
+                      {user.fileCount || 0} messages
                     </div>
                   </div>
                 </TableCell>
