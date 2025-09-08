@@ -189,21 +189,26 @@ export function ModelSelector({
               </div>
 
               {/* Capabilities */}
-              <div className="flex flex-wrap gap-1 w-full">
-                {model.capabilities.slice(0, 3).map((capability) => (
-                  <Badge
-                    key={capability}
-                    variant="outline"
-                    className="text-xs px-1.5 py-0.5"
-                  >
-                    {capability.replace("-", " ")}
-                  </Badge>
-                ))}
-                {model.capabilities.length > 3 && (
-                  <Badge variant="outline" className="text-xs px-1.5 py-0.5">
-                    +{model.capabilities.length - 3}
-                  </Badge>
-                )}
+              <div className="w-full">
+                <div className="text-xs text-muted-foreground mb-1 font-medium">
+                  Best for:
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {model.capabilities.slice(0, 3).map((capability) => (
+                    <Badge
+                      key={capability}
+                      variant="outline"
+                      className="text-xs px-1.5 py-0.5"
+                    >
+                      {capability.replace("-", " ")}
+                    </Badge>
+                  ))}
+                  {model.capabilities.length > 3 && (
+                    <Badge variant="outline" className="text-xs px-1.5 py-0.5">
+                      +{model.capabilities.length - 3}
+                    </Badge>
+                  )}
+                </div>
               </div>
             </DropdownMenuItem>
           );
