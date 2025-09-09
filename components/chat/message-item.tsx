@@ -4,6 +4,7 @@ import { Message } from "@/lib/types/chat";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Markdown } from "@/components/ui/markdown";
 import { cn } from "@/lib/utils";
 import { User, Bot, Clock, FileText, Image, File } from "lucide-react";
 
@@ -103,7 +104,7 @@ export function MessageItem({
             )}
           />
 
-          <div className="relative text-sm leading-relaxed whitespace-pre-wrap break-words">
+          <div className="relative text-sm leading-relaxed break-words">
             {/* File attachments - show above content for user messages */}
             {isUser && message.files && message.files.length > 0 && (
               <div className="mb-3 space-y-2">
@@ -126,7 +127,11 @@ export function MessageItem({
               </div>
             )}
 
-            {message.content}
+            {isAssistant ? (
+              <Markdown content={message.content} />
+            ) : (
+              <div className="whitespace-pre-wrap">{message.content}</div>
+            )}
 
             {/* File attachments - show below content for assistant messages */}
             {isAssistant && message.files && message.files.length > 0 && (

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Markdown } from "@/components/ui/markdown";
 import { cn } from "@/lib/utils";
 import { Loader2, Square, Bot, Sparkles, Brain, Zap } from "lucide-react";
 
@@ -92,8 +93,8 @@ export function StreamingMessage({
           {/* Message tail */}
           <div className="absolute top-4 -left-1 w-3 h-3 transform rotate-45 bg-background border-l border-b border-border/60" />
 
-          <div className="relative text-sm leading-relaxed whitespace-pre-wrap break-words">
-            {displayedContent}
+          <div className="relative text-sm leading-relaxed break-words">
+            <Markdown content={displayedContent} />
             {isStreaming && (
               <span className="inline-flex items-center ml-2">
                 <span className="w-1 h-1 bg-current rounded-full animate-pulse" />
