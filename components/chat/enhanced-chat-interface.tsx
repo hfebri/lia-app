@@ -17,6 +17,7 @@ import { SystemInstructionButton } from "./system-instruction-button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -1136,7 +1137,7 @@ export function EnhancedChatInterface({
                 </DropdownMenu> */}
 
                 <div className="flex-1 min-w-0">
-                  <Input
+                  <Textarea
                     value={inputValue}
                     onChange={(e) => setInputValue(e.target.value)}
                     onKeyDown={handleKeyPress}
@@ -1151,7 +1152,8 @@ export function EnhancedChatInterface({
                       isLoading ||
                       isStreaming
                     }
-                    className="border-0 bg-transparent text-sm placeholder:text-muted-foreground focus-visible:ring-0 shadow-none px-0 min-h-[40px] resize-none overflow-hidden"
+                    className="border-0 bg-transparent text-sm placeholder:text-muted-foreground focus-visible:ring-0 shadow-none px-0 min-h-[40px] max-h-[150px] resize-none overflow-y-auto"
+                    rows={1}
                   />
                 </div>
 
