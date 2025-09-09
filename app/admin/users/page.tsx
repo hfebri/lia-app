@@ -15,7 +15,6 @@ import {
   UserPlus,
   Shield,
   Activity,
-  Clock,
   TrendingUp,
 } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -111,7 +110,7 @@ export default function AdminUsersPage() {
       } else {
         toast.error(statsResult.message);
       }
-    } catch (error) {
+    } catch {
       toast.error("Failed to load user data");
     } finally {
       setLoading(false);
@@ -122,7 +121,7 @@ export default function AdminUsersPage() {
     loadData();
   }, []);
 
-  const handleUserAction = (userId: string, action: string) => {
+  const handleUserAction = () => {
     // Handle view details or other actions here
   };
 

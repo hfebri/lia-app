@@ -54,7 +54,7 @@ export function RecentConversations({ data, onRename, onDelete }: RecentConversa
       await onRename(id, newTitle.trim());
       setEditingId(null);
       setTempTitle("");
-    } catch (error) {
+    } catch {
       setEditingId(null);
       setTempTitle("");
     }
@@ -83,7 +83,7 @@ export function RecentConversations({ data, onRename, onDelete }: RecentConversa
     
     try {
       await onDelete(id);
-    } catch (error) {
+    } catch {
     }
   };
 

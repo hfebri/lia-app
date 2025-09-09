@@ -3,7 +3,7 @@ import { getCurrentSession } from "@/lib/auth/session";
 import { getPopularTopics } from "@/lib/services/analytics";
 
 // GET /api/admin/analytics/topics - Get popular topics
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const session = await getCurrentSession();
 

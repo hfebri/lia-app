@@ -12,45 +12,12 @@ import {
   MessageSquare,
   FileText,
   BarChart3,
-  TrendingUp,
   Clock,
   Shield,
-  Activity,
-  Database,
-  Zap,
 } from "lucide-react";
 import Link from "next/link";
 
-const stats = [
-  {
-    title: "Total Users",
-    value: "1,234",
-    change: "+12%",
-    changeType: "positive" as const,
-    icon: Users,
-  },
-  {
-    title: "Conversations",
-    value: "5,678",
-    change: "+8%",
-    changeType: "positive" as const,
-    icon: MessageSquare,
-  },
-  {
-    title: "Files Processed",
-    value: "2,345",
-    change: "+15%",
-    changeType: "positive" as const,
-    icon: FileText,
-  },
-  {
-    title: "API Calls",
-    value: "12,456",
-    change: "-3%",
-    changeType: "negative" as const,
-    icon: BarChart3,
-  },
-];
+// removed unused stats variable
 
 const recentActivity = [
   {

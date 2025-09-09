@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db/db";
 import { users, messages, conversations } from "@/db/schema";
-import { desc, sql, eq } from "drizzle-orm";
+import { desc, sql } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth/session";
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     console.log("🔍 [ADMIN USERS] Admin users API called");
     const currentUser = await getCurrentUser();

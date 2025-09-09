@@ -39,7 +39,7 @@ export default function AdminUsersPage() {
   const [users, setUsers] = useState<
     (User & { messageCount: number; fileCount: number })[]
   >([]);
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
 
   const loadData = async () => {
     try {
@@ -80,7 +80,7 @@ export default function AdminUsersPage() {
     loadData();
   }, []);
 
-  const handleUserAction = (userId: string, action: string) => {
+  const handleUserAction = () => {
     // Handle view details or other actions here
   };
 

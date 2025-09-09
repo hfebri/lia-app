@@ -3,7 +3,7 @@ import { getCurrentSession } from "@/lib/auth/session";
 import { getUsageMetrics } from "@/lib/services/analytics";
 
 // GET /api/admin/analytics/usage - Get usage metrics
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const session = await getCurrentSession();
 

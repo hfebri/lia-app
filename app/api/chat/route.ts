@@ -6,7 +6,7 @@ import {
   fileAnalysisService,
   FileAnalysisService,
 } from "@/lib/services/file-analysis-service";
-import { LIA_SYSTEM_INSTRUCTION } from "@/app/api/ai/models/route";
+import { LIA_SYSTEM_INSTRUCTION } from "@/lib/constants/ai-models";
 
 export async function POST(request: NextRequest) {
   try {
@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
           provider,
           model
         );
-      } catch (error) {
+      } catch {
         // Continue without file analysis instead of breaking the chat
         fileAnalysisResults = [];
       }

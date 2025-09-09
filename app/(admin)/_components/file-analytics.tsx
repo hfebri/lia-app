@@ -1,9 +1,8 @@
 "use client";
 
-import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { FileText, Image, Archive, FileSpreadsheet, File } from "lucide-react";
+import { FileText, Archive, File } from "lucide-react";
 
 interface FileAnalyticsProps {
   data?: {

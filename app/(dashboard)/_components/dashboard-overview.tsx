@@ -7,27 +7,22 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   MessageSquare,
   FileText,
-  Users,
   TrendingUp,
   Clock,
   Zap,
   Target,
-  Plus,
-  ArrowRight,
   RefreshCw,
   AlertCircle,
   BarChart3,
 } from "lucide-react";
 import { ActivityChart } from "../../(admin)/_components/activity-chart";
-import { RecentConversations } from "../../(admin)/_components/recent-conversations";
+// removed unused RecentConversations import
 import { FileAnalytics } from "../../(admin)/_components/file-analytics";
 import { PopularTopics } from "../../(admin)/_components/popular-topics";
 import { useUserAnalytics } from "@/hooks/use-user-analytics";
@@ -36,44 +31,9 @@ import { DashboardSkeleton } from "../../(admin)/_components/dashboard-skeleton"
 export function DashboardOverview() {
   const { data: analytics, isLoading, error, refetch } = useUserAnalytics();
 
-  const handleRenameConversation = async (id: string, newTitle: string) => {
-    try {
-      const response = await fetch(`/api/conversations/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: newTitle,
-        }),
-      });
+  // removed unused handleRenameConversation
 
-      if (response.ok) {
-        // Refresh the analytics data to get updated conversation list
-        refetch();
-      } else {
-        throw new Error("Failed to rename conversation");
-      }
-    } catch (error) {
-      throw error;
-    }
-  };
-
-  const handleDeleteConversation = async (id: string) => {
-    try {
-      const response = await fetch(`/api/conversations/${id}`, {
-        method: "DELETE",
-      });
-
-      if (response.ok) {
-        // Refresh only the analytics data to update the conversation list
-        // This avoids a full page reload and just updates the dashboard data
-        refetch();
-      } else {
-        throw new Error("Failed to delete conversation");
-      }
-    } catch (error) {
-      throw error;
-    }
-  };
+  // removed unused handleDeleteConversation
 
   if (isLoading) {
     return <DashboardSkeleton />;

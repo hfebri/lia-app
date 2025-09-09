@@ -45,7 +45,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         updatedAt: file.updatedAt,
       },
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { success: false, error: "Failed to get file" },
       { status: 500 }

@@ -231,7 +231,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
 
               // Save both messages to database after streaming is complete
               try {
-                const result = await saveChatToDatabase(userMessage, assistantMessage, state.currentConversationId);
+                const result = await saveChatToDatabase(userMessage, assistantMessage, state.currentConversationId || undefined);
                 // Update conversation ID if this was the first message
                 if (result.success && !state.currentConversationId) {
                   setState((prev) => ({
@@ -275,7 +275,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
 
           // Save both messages to database after AI response is received
           try {
-            const result = await saveChatToDatabase(userMessage, assistantMessage, state.currentConversationId);
+            const result = await saveChatToDatabase(userMessage, assistantMessage, state.currentConversationId || undefined);
             // Update conversation ID if this was the first message
             if (result.success && !state.currentConversationId) {
               setState((prev) => ({
