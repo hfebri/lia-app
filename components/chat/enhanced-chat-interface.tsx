@@ -77,6 +77,7 @@ export function EnhancedChatInterface({
   // Ref for auto-scrolling to bottom
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Get conversation ID from URL
   const searchParams = useSearchParams();
@@ -557,6 +558,11 @@ export function EnhancedChatInterface({
     setInputValue("");
     setAttachedFiles([]);
 
+    // Reset textarea height
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+    }
+
     // For messages with files, let Dolphin analysis handle the file content
     // Don't add manual file context since Dolphin provides better analysis
 
@@ -641,6 +647,19 @@ export function EnhancedChatInterface({
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
+    }
+  };
+
+  const handleInputChange = (value: string) => {
+    setInputValue(value);
+
+    // Auto-resize textarea
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = `${Math.min(
+        textareaRef.current.scrollHeight,
+        150
+      )}px`;
     }
   };
 
@@ -1138,8 +1157,9 @@ export function EnhancedChatInterface({
 
                 <div className="flex-1 min-w-0">
                   <Textarea
+                    ref={textareaRef}
                     value={inputValue}
-                    onChange={(e) => setInputValue(e.target.value)}
+                    onChange={(e) => handleInputChange(e.target.value)}
                     onKeyDown={handleKeyPress}
                     placeholder={
                       !isAuthenticated
@@ -1190,6 +1210,13 @@ export function EnhancedChatInterface({
                   )}
                 </Button>
               </div>
+
+              {inputValue.length > 0 && (
+                <div className="flex justify-between items-center mt-2 text-xs text-muted-foreground px-4">
+                  <span>Press Enter to send, Shift+Enter for new line</span>
+                  <span>{inputValue.length} characters</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
