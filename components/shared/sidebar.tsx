@@ -129,20 +129,6 @@ function SidebarComponent({ className }: SidebarProps) {
     [router]
   );
 
-  // Create new conversation - memoized to prevent re-renders
-  const handleNewChat = useCallback(async () => {
-    try {
-      const newConversation = await stableCreateConversation({
-        title: "New Chat",
-      });
-      if (newConversation) {
-        // Navigate to the new conversation using Next.js router (client-side navigation)
-        stableRouterPush(`/chat?conversation=${newConversation.id}`);
-      }
-    } catch (error) {
-    }
-  }, [stableCreateConversation, stableRouterPush]);
-
   // Delete conversation using the hook - memoized to prevent re-renders
   const handleDeleteConversation = useCallback(
     async (id: string) => {
@@ -209,16 +195,6 @@ function SidebarComponent({ className }: SidebarProps) {
               <h2 className="text-lg font-semibold tracking-tight">
                 Chat History
               </h2>
-              <Button
-                onClick={handleNewChat}
-                size="sm"
-                variant="outline"
-                className="h-6 w-6 p-0"
-                disabled={isLoading}
-                title="Start new chat"
-              >
-                <Plus className="h-3 w-3" />
-              </Button>
             </div>
 
             <ScrollArea className="h-48">
@@ -229,16 +205,6 @@ function SidebarComponent({ className }: SidebarProps) {
                     <p className="text-sm text-muted-foreground">
                       No conversations yet
                     </p>
-                    <Button
-                      onClick={handleNewChat}
-                      size="sm"
-                      variant="outline"
-                      className="mt-2"
-                      disabled={isLoading}
-                    >
-                      <Plus className="h-3 w-3 mr-1" />
-                      Start Chat
-                    </Button>
                   </div>
                 ) : (
                   recentConversations.map((conversation) => (
@@ -402,7 +368,9 @@ function SidebarComponent({ className }: SidebarProps) {
                   variant="ghost"
                   size="sm"
                   className="w-full"
-                  onClick={() => window.open('https://forms.gle/rUNnrNkaTtvMAfYq9', '_blank')}
+                  onClick={() =>
+                    window.open("https://forms.gle/rUNnrNkaTtvMAfYq9", "_blank")
+                  }
                 >
                   <Bug className="h-4 w-4 mr-2" />
                   Report Bug
