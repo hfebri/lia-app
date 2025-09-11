@@ -51,7 +51,7 @@ export class ConversationService {
     userId: string,
     params: CreateConversationParams = {}
   ): Promise<Conversation> {
-    const { title, initialMessage } = params;
+    const { title, initialMessage, aiModel } = params;
 
     const conversationData: NewConversation = {
       userId,
@@ -60,7 +60,7 @@ export class ConversationService {
         (initialMessage
           ? generateConversationTitle(initialMessage)
           : "New Conversation"),
-      aiModel: "gpt-3.5-turbo", // Default model
+      aiModel: aiModel || "openai/gpt-5", // Use provided model or default
       metadata: null,
     };
 
@@ -235,6 +235,7 @@ export class ConversationService {
     return {
       id: conversation.id,
       title: conversation.title,
+      aiModel: conversation.aiModel,
       createdAt: conversation.createdAt,
       updatedAt: conversation.updatedAt,
       userId: conversation.userId,

@@ -56,6 +56,23 @@ interface SidebarProps {
   className?: string;
 }
 
+// Helper function to get friendly model names
+const getModelDisplayName = (modelId: string): string => {
+  if (modelId.includes("gpt-5")) return "GPT-5";
+  if (modelId.includes("gpt-4")) return "GPT-4";
+  if (modelId.includes("gemini")) return "Gemini";
+  if (modelId.includes("claude")) return "Claude";
+  return modelId.split("/").pop()?.toUpperCase() || "AI";
+};
+
+// Helper function to get model color
+const getModelColor = (modelId: string): string => {
+  if (modelId.includes("gpt")) return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100";
+  if (modelId.includes("claude")) return "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-100";
+  if (modelId.includes("gemini")) return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100";
+  return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-100";
+};
+
 interface NavItem {
   title: string;
   href: string;
@@ -224,11 +241,21 @@ function SidebarComponent({ className }: SidebarProps) {
                               <p className="text-sm font-medium truncate">
                                 {conversation.title || "Untitled Chat"}
                               </p>
-                              <p className="text-xs text-muted-foreground">
-                                {new Date(
-                                  conversation.createdAt
-                                ).toLocaleDateString()}
-                              </p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <p className="text-xs text-muted-foreground">
+                                  {new Date(
+                                    conversation.createdAt
+                                  ).toLocaleDateString()}
+                                </p>
+                                {conversation.aiModel && (
+                                  <span className={cn(
+                                    "inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium",
+                                    getModelColor(conversation.aiModel)
+                                  )}>
+                                    {getModelDisplayName(conversation.aiModel)}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </Link>

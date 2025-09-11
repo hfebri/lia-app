@@ -68,11 +68,12 @@ export async function POST(request: NextRequest) {
     const { userId } = await requireAuthenticatedUser();
 
     const body = await request.json();
-    const { title, initialMessage } = body;
+    const { title, initialMessage, aiModel } = body;
 
     const conversation = await ConversationService.createConversation(userId, {
       title,
       initialMessage,
+      aiModel,
     });
 
     return NextResponse.json({

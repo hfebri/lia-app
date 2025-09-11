@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useAiChat } from "@/hooks/use-ai-chat";
+import { useConversations } from "@/hooks/use-conversations";
 import { useFileUpload, type FileItem } from "@/hooks/use-file-upload";
 import { useSearchParams } from "next/navigation";
 import { ModelSelector } from "./model-selector";
@@ -73,6 +74,7 @@ export function EnhancedChatInterface({
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [tempTitle, setTempTitle] = useState("");
   const [showFilePicker, setShowFilePicker] = useState(false);
+  const [preventModelOverride, setPreventModelOverride] = useState(false);
 
   // Ref for auto-scrolling to bottom
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -120,7 +122,20 @@ export function EnhancedChatInterface({
     isClaudeModel,
     isGeminiModel,
     isOpenAIModel,
-  } = useAiChat();
+    setConversationModel,
+  } = useAiChat({
+    onConversationCreated: (conversationId: string) => {
+      // Update URL when a new conversation is created during message sending
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.set("conversation", conversationId);
+      window.history.pushState({}, "", newUrl);
+
+      // Update local state
+      setCurrentConversationId(conversationId);
+    },
+  });
+
+  const { createConversation } = useConversations();
 
   // We'll just save conversations to database, not display them
 
@@ -161,7 +176,7 @@ export function EnhancedChatInterface({
         // Fetch conversation details and messages in parallel
         const [conversationResponse, messagesResponse] = await Promise.all([
           fetch(`/api/conversations/${conversationId}`),
-          fetch(`/api/conversations/${conversationId}/messages`)
+          fetch(`/api/conversations/${conversationId}/messages`),
         ]);
 
         if (conversationResponse.status === 404) {
@@ -178,16 +193,19 @@ export function EnhancedChatInterface({
           return;
         }
 
-        if (!conversationResponse.ok) throw new Error("Failed to load conversation");
+        if (!conversationResponse.ok)
+          throw new Error("Failed to load conversation");
         if (!messagesResponse.ok) throw new Error("Failed to load messages");
 
         const [conversationResult, messagesResult] = await Promise.all([
           conversationResponse.json(),
-          messagesResponse.json()
+          messagesResponse.json(),
         ]);
 
         if (!conversationResult.success) {
-          throw new Error(conversationResult.message || "Failed to load conversation");
+          throw new Error(
+            conversationResult.message || "Failed to load conversation"
+          );
         }
         if (!messagesResult.success) {
           throw new Error(messagesResult.message || "Failed to load messages");
@@ -196,8 +214,15 @@ export function EnhancedChatInterface({
         const conversation = conversationResult.data;
 
         // Update conversation title
-        if (conversation.title) {
+        // But only if we're not in the middle of a manual model change
+        if (conversation.title && !preventModelOverride) {
           setConversationTitle(conversation.title);
+        }
+
+        // Update selected model to match the conversation's model
+        // But only if we're not in the middle of a manual model change
+        if (conversation.aiModel && !preventModelOverride) {
+          setConversationModel(conversation.aiModel);
         }
 
         // Convert database messages to AI chat messages format
@@ -216,8 +241,11 @@ export function EnhancedChatInterface({
         );
 
         // Set the loaded messages directly (no clearing first to prevent flashing)
-        setMessages(aiMessages);
-        
+        // But only if we're not in the middle of a manual model change
+        if (!preventModelOverride) {
+          setMessages(aiMessages);
+        }
+
         // Clear system instruction for loaded conversation (fresh start per conversation)
         setSystemInstruction("");
 
@@ -230,7 +258,13 @@ export function EnhancedChatInterface({
         setIsLoadingConversation(false);
       }
     },
-    [setMessages, scrollToBottom, setSystemInstruction]
+    [
+      setMessages,
+      scrollToBottom,
+      setSystemInstruction,
+      setConversationModel,
+      preventModelOverride,
+    ]
   );
 
   // Load conversation data when conversation ID changes
@@ -238,19 +272,23 @@ export function EnhancedChatInterface({
     const conversationId = searchParams.get("conversation");
 
     if (conversationId && conversationId !== currentConversationId) {
+      // Loading a different conversation
       setCurrentConversationId(conversationId);
       loadConversationData(conversationId);
     } else if (!conversationId && currentConversationId) {
-      // If no conversation ID in URL but we have one set, clear it
+      // No conversation ID in URL but we have one set - clear it
       setCurrentConversationId(null);
       setConversationTitle("AI Assistant");
-      // Only clear messages when intentionally starting a new conversation
-      if (!conversationId) {
-        setMessages([]);
-        setSystemInstruction(""); // Clear system instruction for new conversation
-      }
+      // Don't call setMessages([]) here - let changeModel handle message clearing
+      // to avoid conflicts with the useAiChat state management
+      setSystemInstruction(""); // Clear system instruction for new conversation
     }
-  }, [searchParams, currentConversationId, loadConversationData, setSystemInstruction]);
+  }, [
+    searchParams,
+    currentConversationId,
+    loadConversationData,
+    setSystemInstruction,
+  ]);
 
   // Rename conversation
   const handleRenameConversation = async (newTitle: string) => {
@@ -335,6 +373,7 @@ export function EnhancedChatInterface({
           body: JSON.stringify({
             title: content.slice(0, 30) + (content.length > 30 ? "..." : ""),
             initialMessage: content,
+            aiModel: selectedModel, // Pass the current selected model
           }),
         });
 
@@ -854,7 +893,7 @@ export function EnhancedChatInterface({
                   </div>
                 </>
               )}
-              
+
               {/* Thinking Mode Toggle - Show only for Gemini models */}
               <ThinkingModeToggle
                 enabled={thinkingMode}
@@ -881,10 +920,33 @@ export function EnhancedChatInterface({
               <ModelSelector
                 models={availableModels}
                 selectedModel={selectedModel}
-                onModelChange={changeModel}
+                onModelChange={async (modelId: string) => {
+                  // Only start a new conversation if the model is different
+                  if (modelId !== selectedModel) {
+                    // Prevent conversation loading from overriding the model change
+                    setPreventModelOverride(true);
+
+                    // Clear current conversation and URL - new conversation will be created when user sends first message
+                    const url = new URL(window.location.href);
+                    url.searchParams.delete("conversation");
+                    window.history.pushState({}, "", url);
+
+                    // Update local state immediately
+                    setCurrentConversationId(null);
+                    setConversationTitle("AI Assistant");
+
+                    // Clear messages immediately to prevent any loaded conversation data from showing
+                    setMessages([]);
+
+                    // Change model and clear messages
+                    changeModel(modelId);
+
+                    // Reset the flag after a brief delay to allow the model change to take effect
+                    setTimeout(() => setPreventModelOverride(false), 100);
+                  }
+                }}
                 disabled={isLoading || isStreaming}
               />
-
             </div>
           </div>
         </div>

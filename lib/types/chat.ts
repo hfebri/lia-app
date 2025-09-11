@@ -20,6 +20,7 @@ export interface Message {
 export interface Conversation {
   id: string;
   title: string;
+  aiModel: string;
   createdAt: Date;
   updatedAt: Date;
   userId: string;
@@ -50,6 +51,7 @@ export interface CreateConversationParams {
   title?: string;
   templateId?: string;
   initialMessage?: string;
+  aiModel?: string;
 }
 
 export type MessageRole = "user" | "assistant";

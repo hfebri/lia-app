@@ -73,7 +73,7 @@ export function MessageItem({
         >
           {isUser ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
         </AvatarFallback>
-        {isUser && <AvatarImage src="/placeholder-user.jpg" alt="User" />}
+        {/* AvatarImage removed - let fallback handle display */}
       </Avatar>
 
       {/* Message Content */}

@@ -13,20 +13,28 @@ interface MarkdownProps {
 
 export function Markdown({ content, className }: MarkdownProps) {
   return (
-    <div className={cn("prose prose-sm dark:prose-invert max-w-none", className)}>
+    <div
+      className={cn("prose prose-sm dark:prose-invert max-w-none", className)}
+    >
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeHighlight]}
         components={{
           // Custom components for better styling
           h1: ({ children }) => (
-            <h1 className="text-xl font-bold mb-4 mt-6 first:mt-0">{children}</h1>
+            <h1 className="text-xl font-bold mb-4 mt-6 first:mt-0">
+              {children}
+            </h1>
           ),
           h2: ({ children }) => (
-            <h2 className="text-lg font-semibold mb-3 mt-5 first:mt-0">{children}</h2>
+            <h2 className="text-lg font-semibold mb-3 mt-5 first:mt-0">
+              {children}
+            </h2>
           ),
           h3: ({ children }) => (
-            <h3 className="text-base font-semibold mb-2 mt-4 first:mt-0">{children}</h3>
+            <h3 className="text-base font-semibold mb-2 mt-4 first:mt-0">
+              {children}
+            </h3>
           ),
           p: ({ children }) => (
             <p className="mb-4 last:mb-0 leading-relaxed">{children}</p>
@@ -35,17 +43,18 @@ export function Markdown({ content, className }: MarkdownProps) {
             <ul className="list-disc list-inside mb-4 space-y-1">{children}</ul>
           ),
           ol: ({ children }) => (
-            <ol className="list-decimal list-inside mb-4 space-y-1">{children}</ol>
+            <ol className="list-decimal list-inside mb-4 space-y-1">
+              {children}
+            </ol>
           ),
-          li: ({ children }) => (
-            <li className="leading-relaxed">{children}</li>
-          ),
+          li: ({ children }) => <li className="leading-relaxed">{children}</li>,
           blockquote: ({ children }) => (
             <blockquote className="border-l-4 border-border pl-4 my-4 italic text-muted-foreground">
               {children}
             </blockquote>
           ),
-          code: ({ inline, children }) => {
+          code: ({ children, ...props }) => {
+            const inline = (props as any)?.inline;
             if (inline) {
               return (
                 <code className="bg-muted px-1.5 py-0.5 rounded text-sm font-mono">
@@ -67,9 +76,7 @@ export function Markdown({ content, className }: MarkdownProps) {
           strong: ({ children }) => (
             <strong className="font-semibold">{children}</strong>
           ),
-          em: ({ children }) => (
-            <em className="italic">{children}</em>
-          ),
+          em: ({ children }) => <em className="italic">{children}</em>,
           table: ({ children }) => (
             <div className="overflow-x-auto mb-4">
               <table className="w-full border-collapse border border-border">

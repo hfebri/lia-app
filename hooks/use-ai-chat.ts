@@ -21,6 +21,7 @@ interface UseAiChatState {
   thinkingMode: boolean; // Gemini-exclusive
   reasoningEffort: ReasoningEffort;
   currentConversationId: string | null; // Track current conversation
+  currentConversationModel: string | null; // Track model used in current conversation
   systemInstruction: string; // System instruction for conversation
 }
 
@@ -28,6 +29,7 @@ interface UseAiChatOptions {
   initialModel?: string;
   maxMessages?: number;
   autoScroll?: boolean;
+  onConversationCreated?: (conversationId: string) => void;
 }
 
 // Helper function to save chat messages to database
@@ -58,6 +60,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     initialModel = "openai/gpt-5",
     maxMessages = 100,
     autoScroll = true,
+    onConversationCreated,
   } = options;
 
   const [state, setState] = useState<UseAiChatState>({
@@ -73,6 +76,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     thinkingMode: false,
     reasoningEffort: "medium",
     currentConversationId: null,
+    currentConversationModel: null,
     systemInstruction: "",
   });
 
@@ -101,7 +105,10 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     async (content: string, files?: File[], stream: boolean = true) => {
       // Log system instruction if present
       if (state.systemInstruction) {
-        console.log("🎯 Using system instruction:", state.systemInstruction.substring(0, 50) + "...");
+        console.log(
+          "🎯 Using system instruction:",
+          state.systemInstruction.substring(0, 50) + "..."
+        );
       }
 
       // Validate message
@@ -161,6 +168,8 @@ export function useAiChat(options: UseAiChatOptions = {}) {
       setState((prev) => ({
         ...prev,
         messages: [...prev.messages, userMessage].slice(-maxMessages),
+        currentConversationModel:
+          prev.currentConversationModel || prev.selectedModel, // Set conversation model on first message
         isLoading: !hasFiles, // Don't show regular loading if we'll show file processing
         isProcessingFiles: !!hasFiles, // Show file processing animation if we have files
         isStreaming: stream && !hasFiles, // Only start streaming if no files to process first
@@ -231,13 +240,23 @@ export function useAiChat(options: UseAiChatOptions = {}) {
 
               // Save both messages to database after streaming is complete
               try {
-                const result = await saveChatToDatabase(userMessage, assistantMessage, state.currentConversationId || undefined);
+                const result = await saveChatToDatabase(
+                  userMessage,
+                  assistantMessage,
+                  state.currentConversationId || undefined
+                );
                 // Update conversation ID if this was the first message
                 if (result.success && !state.currentConversationId) {
+                  const newConversationId = result.data.conversationId;
                   setState((prev) => ({
                     ...prev,
-                    currentConversationId: result.data.conversationId,
+                    currentConversationId: newConversationId,
                   }));
+
+                  // Notify parent component that a conversation was created
+                  if (onConversationCreated) {
+                    onConversationCreated(newConversationId);
+                  }
                 }
               } catch (error) {
                 console.warn(
@@ -275,13 +294,23 @@ export function useAiChat(options: UseAiChatOptions = {}) {
 
           // Save both messages to database after AI response is received
           try {
-            const result = await saveChatToDatabase(userMessage, assistantMessage, state.currentConversationId || undefined);
+            const result = await saveChatToDatabase(
+              userMessage,
+              assistantMessage,
+              state.currentConversationId || undefined
+            );
             // Update conversation ID if this was the first message
             if (result.success && !state.currentConversationId) {
+              const newConversationId = result.data.conversationId;
               setState((prev) => ({
                 ...prev,
-                currentConversationId: result.data.conversationId,
+                currentConversationId: newConversationId,
               }));
+
+              // Notify parent component that a conversation was created
+              if (onConversationCreated) {
+                onConversationCreated(newConversationId);
+              }
             }
           } catch (error) {
             console.warn("Failed to save chat to database:", error);
@@ -300,7 +329,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
         }));
       }
     },
-    [state.messages, state.selectedModel, maxMessages]
+    [state.messages, state.selectedModel, maxMessages, onConversationCreated]
   );
 
   // Stop streaming
@@ -319,18 +348,48 @@ export function useAiChat(options: UseAiChatOptions = {}) {
   }, []);
 
   // Change selected model
-  const changeModel = useCallback((modelId: string) => {
-    setState((prev) => ({
-      ...prev,
-      selectedModel: modelId,
-      // Reset extended thinking when switching models
-      extendedThinking: false,
-      // Reset thinking mode when switching models
-      thinkingMode: false,
-      // Reset reasoning effort when switching models
-      reasoningEffort: "medium",
-    }));
-  }, []);
+  const changeModel = useCallback(
+    (modelId: string, onConversationCleared?: () => void) => {
+      // If changing to a different model, always start new conversation
+      const isDifferentModel = state.selectedModel !== modelId;
+
+      if (isDifferentModel) {
+        // First, call the callback to notify that conversation will be cleared
+        // This ensures URL changes happen before state updates
+        if (onConversationCleared) {
+          onConversationCleared();
+        }
+
+        // Then update the state to clear conversation and set new model
+        setState((prev) => ({
+          ...prev,
+          selectedModel: modelId,
+          messages: [],
+          currentConversationId: null, // Always clear conversation ID on model change
+          currentConversationModel: modelId, // Set the new conversation model
+          error: null,
+          streamingContent: "",
+          systemInstruction: "", // Clear system instruction on model change
+          // Reset model-specific settings when switching models
+          extendedThinking: false,
+          thinkingMode: false,
+          reasoningEffort: "medium",
+        }));
+      } else {
+        // If same model, just update the model-specific settings
+        setState((prev) => ({
+          ...prev,
+          selectedModel: modelId,
+          currentConversationModel: prev.currentConversationModel || modelId, // Set if not set
+          // Reset model-specific settings when switching models
+          extendedThinking: false,
+          thinkingMode: false,
+          reasoningEffort: "medium",
+        }));
+      }
+    },
+    [state.selectedModel]
+  );
 
   // Toggle extended thinking
   const toggleExtendedThinking = useCallback((enabled: boolean) => {
@@ -426,6 +485,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
       ...prev,
       messages: [],
       currentConversationId: null,
+      currentConversationModel: null, // Reset conversation model
       error: null,
       streamingContent: "",
       systemInstruction: "", // Clear system instruction on new conversation
@@ -437,6 +497,20 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     setState((prev) => ({
       ...prev,
       systemInstruction: instruction,
+    }));
+  }, []);
+
+  // Set model for an existing conversation without clearing messages
+  // This is specifically for loading existing conversations
+  const setConversationModel = useCallback((modelId: string) => {
+    setState((prev) => ({
+      ...prev,
+      selectedModel: modelId,
+      currentConversationModel: modelId,
+      // Reset model-specific settings when switching models
+      extendedThinking: false,
+      thinkingMode: false,
+      reasoningEffort: "medium",
     }));
   }, []);
 
@@ -454,6 +528,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     thinkingMode: state.thinkingMode,
     reasoningEffort: state.reasoningEffort,
     currentConversationId: state.currentConversationId,
+    currentConversationModel: state.currentConversationModel,
     systemInstruction: state.systemInstruction,
 
     // Actions
@@ -471,6 +546,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     toggleThinkingMode,
     setReasoningEffort,
     setSystemInstruction,
+    setConversationModel,
 
     // Computed
     hasMessages: state.messages.length > 0,

@@ -96,6 +96,7 @@ export function useConversations() {
       params: {
         title?: string;
         initialMessage?: string;
+        aiModel?: string;
       } = {}
     ) => {
       if (!user) return null;
