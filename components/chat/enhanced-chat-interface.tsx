@@ -1234,7 +1234,7 @@ export function EnhancedChatInterface({
                       isLoading ||
                       isStreaming
                     }
-                    className="border-0 bg-transparent text-sm placeholder:text-muted-foreground focus-visible:ring-0 shadow-none px-0 min-h-[40px] max-h-[150px] resize-none overflow-y-auto"
+                    className="border-0 bg-transparent text-sm placeholder:text-muted-foreground focus-visible:ring-0 shadow-none px-3 min-h-[40px] max-h-[150px] resize-none overflow-y-auto"
                     rows={1}
                   />
                 </div>
