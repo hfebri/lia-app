@@ -167,27 +167,6 @@ export function ModelSelector({
                 {model.description}
               </p>
 
-              {/* Model Stats */}
-              <div className="flex items-center space-x-4 w-full text-xs text-muted-foreground">
-                <div className="flex items-center space-x-1">
-                  <Clock className="h-3 w-3" />
-                  <span className={getSpeedColor(modelSpeed)}>
-                    {modelSpeed}
-                  </span>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <DollarSign className="h-3 w-3" />
-                  <span>
-                    ${model.pricing.input.toFixed(3)}/{model.pricing.unit}
-                  </span>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <span>
-                    {(model.contextWindow / 1000).toFixed(0)}K context
-                  </span>
-                </div>
-              </div>
-
               {/* Capabilities */}
               <div className="w-full">
                 <div className="text-xs text-muted-foreground mb-1 font-medium">
