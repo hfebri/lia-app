@@ -1,16 +1,23 @@
 "use client";
 
 import { Card, CardContent } from "@/components/ui/card";
-import { FileText, Cpu, Sparkles } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { FileText, Cpu, Sparkles, Eye, Scan } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { FileProcessingProgress } from "@/lib/services/client-file-processor";
 
 interface FileProcessingMessageProps {
   className?: string;
+  progress?: Record<string, FileProcessingProgress>;
 }
 
 export function FileProcessingMessage({
   className,
+  progress = {},
 }: FileProcessingMessageProps) {
+  const fileNames = Object.keys(progress);
+  const hasProgress = fileNames.length > 0;
+
   return (
     <div className={cn("flex gap-3 p-4", className)}>
       {/* AI Avatar */}
@@ -19,24 +26,30 @@ export function FileProcessingMessage({
       </div>
 
       {/* Processing Message */}
-      <Card className="bg-muted/50 border-border max-w-md">
+      <Card className="bg-muted/50 border-border max-w-lg">
         <CardContent className="p-4">
           <div className="flex items-center gap-3">
             {/* File Icon with Animation */}
             <div className="relative">
               <FileText className="h-5 w-5 text-blue-600" />
               <div className="absolute -top-1 -right-1">
-                <Cpu className="h-3 w-3 text-orange-500 animate-pulse" />
+                {hasProgress ? (
+                  <Scan className="h-3 w-3 text-orange-500 animate-pulse" />
+                ) : (
+                  <Cpu className="h-3 w-3 text-orange-500 animate-pulse" />
+                )}
               </div>
             </div>
 
             {/* Processing Text and Animation */}
             <div className="flex-1">
               <div className="text-sm font-medium text-foreground mb-1">
-                Analyzing files...
+                {hasProgress
+                  ? "Processing..."
+                  : "Preparing files for analysis..."}
               </div>
               <div className="text-xs text-muted-foreground mb-2">
-                Extracting content with AI
+                {hasProgress ? "Extracting text" : "Getting ready to process"}
               </div>
 
               {/* Animated Dots */}
@@ -54,21 +67,52 @@ export function FileProcessingMessage({
             </div>
           </div>
 
-          {/* Processing Steps */}
-          <div className="mt-3 space-y-1">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
-              <span>Reading document structure</span>
+          {/* File-specific Progress */}
+          {hasProgress && (
+            <div className="mt-3 space-y-3">
+              {fileNames.map((fileName) => {
+                const fileProgress = progress[fileName];
+                return (
+                  <div key={fileName} className="space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-medium text-foreground truncate max-w-[200px]">
+                        {fileName}
+                      </span>
+                      <span className="text-muted-foreground ml-2">
+                        {fileProgress.progress}%
+                      </span>
+                    </div>
+                    <Progress value={fileProgress.progress} className="h-1.5" />
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Eye className="h-3 w-3" />
+                      <span>{fileProgress.stage}</span>
+                      <span className="ml-auto">
+                        {Math.round(fileProgress.timeElapsed / 1000)}s
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse [animation-delay:0.5s]"></div>
-              <span>Extracting text content</span>
+          )}
+
+          {/* Processing Steps - only show when no specific progress */}
+          {!hasProgress && (
+            <div className="mt-3 space-y-1">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
+                <span>Reading document structure</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse [animation-delay:0.5s]"></div>
+                <span>Extracting text content</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <div className="w-1.5 h-1.5 bg-purple-500 rounded-full animate-pulse [animation-delay:1s]"></div>
+                <span>Preparing for AI analysis</span>
+              </div>
             </div>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <div className="w-1.5 h-1.5 bg-purple-500 rounded-full animate-pulse [animation-delay:1s]"></div>
-              <span>Preparing for AI analysis</span>
-            </div>
-          </div>
+          )}
         </CardContent>
       </Card>
     </div>

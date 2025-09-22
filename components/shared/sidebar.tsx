@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Bot,
   MessageSquare,
@@ -216,7 +217,19 @@ function SidebarComponent({ className }: SidebarProps) {
 
             <ScrollArea className="h-48">
               <div className="space-y-1">
-                {conversations.length === 0 ? (
+                {isLoading ? (
+                  <div className="space-y-2 px-4 py-2">
+                    {Array.from({ length: 3 }).map((_, i) => (
+                      <div key={i} className="flex items-center gap-2 p-2">
+                        <Skeleton className="h-3 w-3 rounded-full" />
+                        <div className="flex-1 space-y-1">
+                          <Skeleton className="h-3 w-3/4" />
+                          <Skeleton className="h-2 w-1/2" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : conversations.length === 0 ? (
                   <div className="px-4 py-8 text-center">
                     <MessageSquare className="h-8 w-8 mx-auto mb-2 text-muted-foreground/40" />
                     <p className="text-sm text-muted-foreground">

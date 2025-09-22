@@ -1,5 +1,6 @@
 import type { AIProviderName } from "../ai/types";
 import Replicate from "replicate";
+import Tesseract from "tesseract.js";
 
 export interface FileAnalysisResult {
   extractedText: string;
@@ -23,13 +24,11 @@ export class FileAnalysisService {
   private replicateClient?: Replicate;
 
   // Available models for file analysis
-  private static readonly DOLPHIN_MODEL =
-    "bytedance/dolphin:19f1ad93970c2bf21442a842d01d97fb04a94a69d2b36dee43531a9cbae07e85";
   private static readonly MARKER_MODEL =
     "cuuupid/marker:4eb62a42c3e5b8695a796936e69afa2c004839aef15410f01492d59783baf752";
 
-  // Current active model (switch between 'dolphin' and 'marker')
-  private static readonly ACTIVE_MODEL: "dolphin" | "marker" = "dolphin";
+  // Current active model (switch between 'tesseract' and 'marker')
+  private static readonly ACTIVE_MODEL: "tesseract" | "marker" = "tesseract";
 
   constructor() {
     // Initialize Replicate client for file analysis
@@ -50,39 +49,59 @@ export class FileAnalysisService {
     provider: AIProviderName,
     model: string
   ): Promise<FileAnalysisResult[]> {
+    console.log(`🔍 FILE ANALYSIS DEBUG - Analyzing ${files.length} files:`);
+    console.log(`- Provider: ${provider}`);
+    console.log(`- Model: ${model}`);
+    console.log(
+      `- Files:`,
+      files.map((f) => `${f.name} (${f.type})`)
+    );
+
     const results: FileAnalysisResult[] = [];
 
     for (const file of files) {
+      console.log(`\n📁 Processing file: ${file.name} (${file.type})`);
       try {
         let result: FileAnalysisResult;
-
         if (provider === "gemini") {
-          // Gemini handles files natively - no preprocessing needed
+          console.log(`✅ Gemini provider - handling all files natively`);
+          // Gemini handles all files natively - no preprocessing needed
           result = {
             extractedText: "",
             markdownContent: `File: ${file.name} (${file.type})\nSize: ${file.size} bytes\n\n[File will be processed natively by Gemini]`,
             success: true,
           };
-        } else if (model.includes("claude") && this.isImageFile(file)) {
-          // For Claude models with image files: Skip Dolphin analysis, let Claude handle natively
+        } else if (this.isImageFile(file)) {
+          console.log(
+            `✅ ${provider.toUpperCase()} + Image - handling natively`
+          );
+          // All providers handle image files natively
           result = {
             extractedText: "",
-            markdownContent: `Image file: ${file.name} (${file.type})\nSize: ${file.size} bytes\n\n[Image will be processed natively by Claude - skipping Dolphin analysis]`,
-            success: true,
-          };
-        } else if (model.includes("openai") && this.isImageFile(file)) {
-          // For OpenAI models with image files: Skip Dolphin analysis, let OpenAI handle natively
-          result = {
-            extractedText: "",
-            markdownContent: `Image file: ${file.name} (${file.type})\nSize: ${file.size} bytes\n\n[Image will be processed natively by OpenAI - skipping Dolphin analysis]`,
+            markdownContent: `Image file: ${file.name} (${file.type})\nSize: ${
+              file.size
+            } bytes\n\n[Image will be processed natively by ${provider.toUpperCase()}]`,
             success: true,
           };
         } else {
-          // Use selected model to extract content for all non-Gemini, non-Claude-image files
+          // Use selected model to extract content for all non-Gemini, non-image files
+          console.log(
+            `🔧 Using ${FileAnalysisService.ACTIVE_MODEL} for processing document`
+          );
+          console.log(`📊 File analysis details:`);
+          console.log(`  - File name: ${file.name}`);
+          console.log(`  - File type: ${file.type}`);
+          console.log(`  - File size: ${file.size} bytes`);
+          console.log(`  - Is image file: ${this.isImageFile(file)}`);
+          console.log(`  - Is document file: ${this.isDocumentFile(file)}`);
+          console.log(`  - Active model: ${FileAnalysisService.ACTIVE_MODEL}`);
+
           if (FileAnalysisService.ACTIVE_MODEL === "marker") {
+            console.log(`🚀 Starting Marker model processing...`);
             result = await this.analyzeFileWithMarker(file);
           } else {
-            result = await this.analyzeFileWithDolphin(file);
+            console.log(`🚀 Starting Tesseract OCR processing...`);
+            result = await this.analyzeFileWithTesseract(file);
           }
         }
 
@@ -102,44 +121,123 @@ export class FileAnalysisService {
   }
 
   /**
-   * Use Bytedance Dolphin model to analyze file and extract content in markdown format
+   * Use Tesseract OCR to analyze document files and extract text content
    */
-  private async analyzeFileWithDolphin(
+  private async analyzeFileWithTesseract(
     file: FileContent
   ): Promise<FileAnalysisResult> {
-    if (!this.replicateClient) {
-      return {
-        extractedText: "",
-        markdownContent: "",
-        success: false,
-        error: "Replicate client not initialized",
-      };
-    }
+    console.log(
+      `\n🚀 [TESSERACT START] Beginning OCR analysis for: ${file.name}`
+    );
+    console.log(
+      `📝 [TESSERACT] File details: ${file.type}, ${file.size} bytes`
+    );
 
     try {
-      // Create a data URL for the file
-      const dataUrl = `data:${file.type};base64,${file.data}`;
+      // Check if file is a document type that Tesseract can handle
+      console.log(`🔍 [TESSERACT] Checking file type compatibility...`);
+      if (!this.isDocumentFile(file)) {
+        console.log(
+          `❌ [TESSERACT] File type ${file.type} not supported by Tesseract OCR`
+        );
+        return {
+          extractedText: "",
+          markdownContent: "",
+          success: false,
+          error:
+            "File type not supported by Tesseract OCR. Only document files (PDF, DOCX, PPTX) are supported.",
+        };
+      }
 
-      // Prepare input for Dolphin model (it expects a 'file' parameter with URL)
-      const input = {
-        file: dataUrl,
-      };
+      console.log(`✅ [TESSERACT] File type ${file.type} is supported`);
+      console.log(`🔍 [TESSERACT] Starting OCR processing for: ${file.name}`);
+      const startTime = Date.now();
 
-      // Run Dolphin model for file analysis
-      const output = (await this.replicateClient.run(
-        FileAnalysisService.DOLPHIN_MODEL,
-        { input }
-      )) as string | string[];
+      // Convert base64 to buffer for Tesseract (Node.js compatible)
+      console.log(
+        `📦 [TESSERACT] Converting base64 to buffer for file: ${file.name}`
+      );
+      console.log(
+        `📦 [TESSERACT] Base64 data length: ${file.data.length} characters`
+      );
 
-      // Handle the response
-      const content = Array.isArray(output) ? output.join("") : String(output);
-      const cleanContent = content.trim();
+      const buffer = Buffer.from(file.data, "base64");
+      console.log(`📦 [TESSERACT] Buffer created successfully`);
+      console.log(
+        `📊 [TESSERACT] Buffer details: size=${buffer.length} bytes, type=${file.type}`
+      );
 
-      // Extract markdown content and text
-      const markdownContent = this.formatAsMarkdown(
+      // Use Tesseract to extract text
+      console.log(
+        `🚀 [TESSERACT] Starting Tesseract.recognize() for: ${file.name}`
+      );
+      console.log(`🔧 [TESSERACT] Language: eng, Options: logger enabled`);
+
+      const recognitionStart = Date.now();
+      const {
+        data: { text },
+      } = await Tesseract.recognize(buffer, "eng", {
+        logger: (m) => {
+          const progressText = m.progress
+            ? `(${Math.round(m.progress * 100)}%)`
+            : "";
+          const elapsed = Date.now() - recognitionStart;
+          console.log(
+            `🔧 [TESSERACT PROGRESS] [${file.name}] ${m.status} ${progressText} - ${elapsed}ms elapsed`
+          );
+        },
+      });
+
+      const recognitionEnd = Date.now();
+      const recognitionTime = recognitionEnd - recognitionStart;
+      console.log(`✅ [TESSERACT] OCR recognition completed for: ${file.name}`);
+      console.log(`⏱️  [TESSERACT] Recognition time: ${recognitionTime}ms`);
+
+      const endTime = Date.now();
+      const processingTime = endTime - startTime;
+      console.log(`⏱️  [TESSERACT] Total processing time: ${processingTime}ms`);
+
+      const cleanContent = text.trim();
+      console.log(
+        `📝 [TESSERACT] Extracted text length: ${text.length} characters`
+      );
+      console.log(
+        `📝 [TESSERACT] Clean content length: ${cleanContent.length} characters`
+      );
+
+      if (!cleanContent) {
+        console.log(
+          `❌ [TESSERACT] No text content extracted from document: ${file.name}`
+        );
+        return {
+          extractedText: "",
+          markdownContent: "",
+          success: false,
+          error: "No text content extracted from document",
+        };
+      }
+
+      console.log(
+        `📄 [TESSERACT] Text preview (first 100 chars): "${cleanContent.substring(
+          0,
+          100
+        )}..."`
+      );
+
+      // Format as markdown with analysis details
+      console.log(`📝 [TESSERACT] Formatting content as markdown...`);
+      const markdownContent = this.formatAsMarkdownForTesseract(
         file.name,
         file.type,
-        cleanContent
+        cleanContent,
+        processingTime
+      );
+
+      console.log(
+        `✅ [TESSERACT COMPLETE] Successfully processed: ${file.name}`
+      );
+      console.log(
+        `📊 [TESSERACT SUMMARY] ${cleanContent.length} chars extracted in ${processingTime}ms`
       );
 
       return {
@@ -148,12 +246,29 @@ export class FileAnalysisService {
         success: true,
       };
     } catch (error) {
+      console.log(
+        `❌ [TESSERACT ERROR] Failed to process ${file.name}:`,
+        error
+      );
+      console.log(
+        `💥 [TESSERACT ERROR] Error type: ${
+          error instanceof Error ? error.constructor.name : typeof error
+        }`
+      );
+      console.log(
+        `💥 [TESSERACT ERROR] Error message: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+
       return {
         extractedText: "",
         markdownContent: "",
         success: false,
         error:
-          error instanceof Error ? error.message : "Dolphin analysis failed",
+          error instanceof Error
+            ? error.message
+            : "Tesseract OCR analysis failed",
       };
     }
   }
@@ -245,66 +360,32 @@ export class FileAnalysisService {
   }
 
   /**
-   * Create a prompt for file analysis using Dolphin model
+   * Format the extracted content as markdown for Tesseract OCR
    */
-  private createFileAnalysisPrompt(fileName: string, fileType: string): string {
-    const basePrompt = `Analyze this ${fileType} file named "${fileName}" and extract its content in a structured markdown format.
-
-Please provide:
-1. A clear description of what you see
-2. Extract all visible text content
-3. Describe any images, diagrams, or visual elements
-4. Identify key sections, headings, or structure
-5. Format the output in clean markdown
-
-Focus on being comprehensive and accurate. If it's a document, extract all text. If it's an image, describe it thoroughly.`;
-
-    // Customize prompt based on file type
-    if (fileType.includes("pdf")) {
-      return (
-        basePrompt +
-        "\n\nThis is a PDF document. Extract all text content and maintain the document structure."
-      );
-    } else if (fileType.includes("image")) {
-      return (
-        basePrompt +
-        "\n\nThis is an image file. Describe what you see in detail and extract any text visible in the image."
-      );
-    } else if (fileType.includes("document") || fileType.includes("word")) {
-      return (
-        basePrompt +
-        "\n\nThis is a document file. Extract all text content and preserve formatting structure."
-      );
-    }
-
-    return basePrompt;
-  }
-
-  /**
-   * Format the extracted content as markdown
-   */
-  private formatAsMarkdown(
+  private formatAsMarkdownForTesseract(
     fileName: string,
     fileType: string,
-    content: string
+    content: string,
+    processingTime: number
   ): string {
     const timestamp = new Date().toISOString();
 
-    return `# File Analysis: ${fileName}
+    return `# Document Analysis: ${fileName}
 
 **File Type:** ${fileType}
 **Analyzed:** ${timestamp}
-**Analysis Method:** Bytedance Dolphin Model
+**Analysis Method:** Tesseract OCR
+**Processing Time:** ${processingTime}ms
 
 ---
 
-## Extracted Content
+## Extracted Text Content
 
 ${content}
 
 ---
 
-*File analysis completed using ByteDance Dolphin AI vision model for non-Gemini provider compatibility.*
+*Document text extraction completed using Tesseract.js OCR for local, fast document processing.*
 `;
   }
 
@@ -387,6 +468,8 @@ ${content}
    * Check if provider supports native file handling
    */
   static supportsNativeFileHandling(provider: AIProviderName): boolean {
+    // Only Gemini supports all file types natively
+    // Claude and OpenAI support images natively, but documents need OCR
     return provider === "gemini";
   }
 
@@ -404,6 +487,36 @@ ${content}
       "image/svg+xml",
     ];
     return imageTypes.includes(file.type.toLowerCase());
+  }
+
+  /**
+   * Check if file is a document that Tesseract can process
+   */
+  private isDocumentFile(file: FileContent): boolean {
+    const documentTypes = [
+      "application/pdf",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
+      "application/msword", // .doc
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation", // .pptx
+      "application/vnd.ms-powerpoint", // .ppt
+    ];
+    const isDocument = documentTypes.includes(file.type.toLowerCase());
+
+    console.log(
+      `🔍 [FILE TYPE CHECK] Checking if ${file.name} (${file.type}) is a document...`
+    );
+    console.log(
+      `📋 [FILE TYPE CHECK] Supported document types: ${documentTypes.join(
+        ", "
+      )}`
+    );
+    console.log(
+      `✅ [FILE TYPE CHECK] Result: ${
+        isDocument ? "DOCUMENT" : "NOT A DOCUMENT"
+      }`
+    );
+
+    return isDocument;
   }
 }
 

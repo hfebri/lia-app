@@ -7,12 +7,14 @@ import {
   type StreamingChatResponse,
 } from "@/lib/ai/chat-service";
 import type { ReasoningEffort } from "@/components/chat/reasoning-effort-selector";
+import type { ProcessedFile, FileProcessingProgress } from "@/lib/services/client-file-processor";
 
 interface UseAiChatState {
   messages: ChatMessage[];
   isLoading: boolean;
   isStreaming: boolean;
   isProcessingFiles: boolean; // New state for file processing
+  fileProcessingProgress: Record<string, FileProcessingProgress>; // Track OCR progress per file
   streamingContent: string;
   error: string | null;
   selectedModel: string;
@@ -36,7 +38,8 @@ interface UseAiChatOptions {
 const saveChatToDatabase = async (
   userMessage: { content: string; metadata?: any },
   assistantMessage: { content: string; metadata?: any },
-  conversationId?: string
+  conversationId?: string,
+  aiModel?: string
 ) => {
   const response = await fetch("/api/chat/save", {
     method: "POST",
@@ -45,6 +48,7 @@ const saveChatToDatabase = async (
       conversationId,
       userMessage,
       assistantMessage,
+      aiModel, // Include AI model in the request
     }),
   });
 
@@ -63,14 +67,23 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     onConversationCreated,
   } = options;
 
+  // Get saved model from localStorage or use initial model
+  const getSavedModel = () => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("lia-selectedModel") || initialModel;
+    }
+    return initialModel;
+  };
+
   const [state, setState] = useState<UseAiChatState>({
     messages: [],
     isLoading: false,
     isStreaming: false,
     isProcessingFiles: false,
+    fileProcessingProgress: {},
     streamingContent: "",
     error: null,
-    selectedModel: initialModel,
+    selectedModel: getSavedModel(),
     availableModels: [],
     extendedThinking: false,
     thinkingMode: false,
@@ -103,6 +116,12 @@ export function useAiChat(options: UseAiChatOptions = {}) {
   // Send a message with streaming response
   const sendMessage = useCallback(
     async (content: string, files?: File[], stream: boolean = true) => {
+      console.log("🚀 USE-AI-CHAT - sendMessage called with:", {
+        content,
+        filesCount: files?.length || 0,
+        stream,
+      });
+
       // Log system instruction if present
       if (state.systemInstruction) {
         console.log(
@@ -121,58 +140,109 @@ export function useAiChat(options: UseAiChatOptions = {}) {
         return;
       }
 
-      // Create user message with files for all models
-      let userMessage = chatService.current.createMessage("user", content);
+      // Process files client-side FIRST before creating message
+      let finalContent = content;
+      let processedFiles: ProcessedFile[] = [];
 
-      // If files are provided, convert them to base64 for all models
       if (files && files.length > 0) {
-        const fileData = await Promise.all(
-          files.map(async (file) => {
-            // Check if file already has base64 data (from direct processing)
-            if ((file as any).data) {
-              return {
-                name: file.name,
-                type: (file as any).type || file.type,
-                size: file.size,
-                data: (file as any).data,
-              };
+        console.log("📁 [CLIENT] Starting client-side file processing...");
+        
+        // Initialize progress for all files immediately
+        const initialProgress: Record<string, any> = {};
+        files.forEach(file => {
+          initialProgress[file.name] = {
+            stage: "Initializing...",
+            progress: 0,
+            timeElapsed: 0,
+          };
+        });
+        
+        setState((prev) => ({
+          ...prev,
+          isProcessingFiles: true,
+          fileProcessingProgress: initialProgress,
+          error: null,
+        }));
+
+        // Clear any local processing state from the UI component
+        console.log("🔧 [DEBUG] useAiChat taking over - clearing local processing");
+
+        try {
+          // Dynamically import ClientFileProcessor to avoid SSR issues
+          const { ClientFileProcessor } = await import("@/lib/services/client-file-processor");
+          
+          // Process files with progress tracking
+          processedFiles = await ClientFileProcessor.processFiles(
+            files,
+            (fileName, progress) => {
+              setState((prev) => ({
+                ...prev,
+                fileProcessingProgress: {
+                  ...prev.fileProcessingProgress,
+                  [fileName]: progress,
+                },
+              }));
             }
+          );
 
-            // Otherwise, convert file to base64
-            const arrayBuffer = await file.arrayBuffer();
-            const base64Data = btoa(
-              new Uint8Array(arrayBuffer).reduce(
-                (data, byte) => data + String.fromCharCode(byte),
-                ""
-              )
-            );
-            return {
+          // Create enhanced prompt with extracted text (for AI)
+          finalContent = ClientFileProcessor.createEnhancedPrompt(
+            content,
+            processedFiles
+          );
+
+          // Create display content (for user message in chat)
+          const displayContent = ClientFileProcessor.createDisplayContent(processedFiles);
+          if (displayContent) {
+            // Store the display content separately so we can show it in the user message
+            (processedFiles as any).displayForMessage = `${content}\n\n${displayContent}`;
+          }
+
+          console.log("✅ [CLIENT] File processing completed");
+          console.log("📝 [CLIENT] Enhanced prompt length:", finalContent.length);
+          console.log("🔍 [CLIENT] Display content:", displayContent);
+          console.log("🔍 [CLIENT] Enhanced prompt preview:", finalContent.substring(0, 500) + "...");
+          console.log("🔍 [CLIENT] Processed files count:", processedFiles.length);
+          processedFiles.forEach((file, idx) => {
+            console.log(`🔍 [CLIENT] File ${idx + 1}:`, {
               name: file.name,
-              type: file.type,
-              size: file.size,
-              data: base64Data,
-            };
-          })
-        );
-
-        // Add files to the user message for all models
-        userMessage = {
-          ...userMessage,
-          files: fileData,
-        };
+              hasExtractedText: !!file.extractedText,
+              extractedTextLength: file.extractedText?.length || 0,
+              displayContent: file.displayContent?.substring(0, 100),
+              promptContent: file.promptContent?.substring(0, 100)
+            });
+          });
+        } catch (error) {
+          console.error("❌ [CLIENT] File processing failed:", error);
+          setState((prev) => ({
+            ...prev,
+            error: error instanceof Error ? error.message : "File processing failed",
+            isProcessingFiles: false,
+            fileProcessingProgress: {},
+          }));
+          return;
+        }
       }
 
-      // Check if we have files to process
-      const hasFiles = files && files.length > 0;
+      // Create user message - use display content for UI
+      const userMessageContent = (processedFiles as any).displayForMessage || content;
+      const userMessage = chatService.current.createMessage("user", userMessageContent);
+
+      // For AI processing, we need to use the enhanced content with extracted text
+      const messagesForAI = [
+        ...state.messages,
+        chatService.current.createMessage("user", finalContent) // Use enhanced prompt for AI
+      ].slice(-maxMessages);
 
       setState((prev) => ({
         ...prev,
-        messages: [...prev.messages, userMessage].slice(-maxMessages),
+        messages: [...prev.messages, userMessage].slice(-maxMessages), // Display content in UI
         currentConversationModel:
           prev.currentConversationModel || prev.selectedModel, // Set conversation model on first message
-        isLoading: !hasFiles, // Don't show regular loading if we'll show file processing
-        isProcessingFiles: !!hasFiles, // Show file processing animation if we have files
-        isStreaming: stream && !hasFiles, // Only start streaming if no files to process first
+        isLoading: true,
+        isProcessingFiles: false, // File processing is done
+        fileProcessingProgress: {}, // Clear progress
+        isStreaming: stream,
         streamingContent: "",
         error: null,
       }));
@@ -184,12 +254,12 @@ export function useAiChat(options: UseAiChatOptions = {}) {
       abortController.current = new AbortController();
 
       try {
-        const allMessages = [...state.messages, userMessage];
+        // Use messagesForAI which contains the enhanced prompt with extracted text
+        const allMessages = messagesForAI;
 
         if (stream) {
           // Handle streaming response
           let accumulatedContent = "";
-          let assistantMessageId = "";
 
           const streamGenerator = chatService.current.sendStreamingMessage(
             allMessages,
@@ -243,7 +313,8 @@ export function useAiChat(options: UseAiChatOptions = {}) {
                 const result = await saveChatToDatabase(
                   userMessage,
                   assistantMessage,
-                  state.currentConversationId || undefined
+                  state.currentConversationId || undefined,
+                  state.selectedModel // Pass the selected AI model
                 );
                 // Update conversation ID if this was the first message
                 if (result.success && !state.currentConversationId) {
@@ -297,7 +368,8 @@ export function useAiChat(options: UseAiChatOptions = {}) {
             const result = await saveChatToDatabase(
               userMessage,
               assistantMessage,
-              state.currentConversationId || undefined
+              state.currentConversationId || undefined,
+              state.selectedModel // Pass the selected AI model
             );
             // Update conversation ID if this was the first message
             if (result.success && !state.currentConversationId) {
@@ -329,7 +401,17 @@ export function useAiChat(options: UseAiChatOptions = {}) {
         }));
       }
     },
-    [state.messages, state.selectedModel, maxMessages, onConversationCreated]
+    [
+      state.messages, 
+      state.selectedModel, 
+      state.systemInstruction,
+      state.extendedThinking,
+      state.thinkingMode,
+      state.reasoningEffort,
+      state.currentConversationId,
+      maxMessages, 
+      onConversationCreated
+    ]
   );
 
   // Stop streaming
@@ -354,6 +436,11 @@ export function useAiChat(options: UseAiChatOptions = {}) {
       const isDifferentModel = state.selectedModel !== modelId;
 
       if (isDifferentModel) {
+        // Save selected model to localStorage
+        if (typeof window !== "undefined") {
+          localStorage.setItem("lia-selectedModel", modelId);
+        }
+
         // First, call the callback to notify that conversation will be cleared
         // This ensures URL changes happen before state updates
         if (onConversationCleared) {
@@ -520,6 +607,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     isLoading: state.isLoading,
     isStreaming: state.isStreaming,
     isProcessingFiles: state.isProcessingFiles,
+    fileProcessingProgress: state.fileProcessingProgress,
     streamingContent: state.streamingContent,
     error: state.error,
     selectedModel: state.selectedModel,

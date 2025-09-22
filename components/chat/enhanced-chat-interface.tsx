@@ -75,6 +75,7 @@ export function EnhancedChatInterface({
   const [tempTitle, setTempTitle] = useState("");
   const [showFilePicker, setShowFilePicker] = useState(false);
   const [preventModelOverride, setPreventModelOverride] = useState(false);
+  const [isLocalProcessing, setIsLocalProcessing] = useState(false);
 
   // Ref for auto-scrolling to bottom
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -98,6 +99,7 @@ export function EnhancedChatInterface({
     isLoading,
     isStreaming,
     isProcessingFiles,
+    fileProcessingProgress,
     streamingContent,
     error,
     selectedModel,
@@ -166,6 +168,14 @@ export function EnhancedChatInterface({
       scrollToBottom();
     }
   }, [streamingContent, isStreaming, scrollToBottom]);
+
+  // Clear local processing state when useAiChat takes over
+  useEffect(() => {
+    if (isProcessingFiles) {
+      console.log("🔧 [DEBUG] useAiChat processing started - clearing local processing");
+      setIsLocalProcessing(false);
+    }
+  }, [isProcessingFiles]);
 
   // Function to load conversation data from the database
   const loadConversationData = useCallback(
@@ -399,8 +409,13 @@ export function EnhancedChatInterface({
   };
 
   const handleSendMessage = async () => {
+    // Show processing indicator immediately when send button is clicked
+    console.log("🔧 [DEBUG] Setting isLocalProcessing to true");
+    setIsLocalProcessing(true);
+    
     // DEBUG: Check initial state
     console.log("🎯 SEND MESSAGE DEBUG - Starting:");
+    console.log("🔧 [DEBUG] isLocalProcessing state after set:", isLocalProcessing);
     console.log("- selectedFiles count:", selectedFiles.length);
     console.log(
       "- selectedFiles details:",
@@ -414,6 +429,8 @@ export function EnhancedChatInterface({
 
     // Prevent sending messages if not authenticated
     if (!isAuthenticated) {
+      console.log("🔧 [DEBUG] Not authenticated - clearing isLocalProcessing");
+      setIsLocalProcessing(false);
       return;
     }
 
@@ -421,12 +438,30 @@ export function EnhancedChatInterface({
       !inputValue.trim() &&
       attachedFiles.length === 0 &&
       selectedFiles.length === 0
-    )
+    ) {
+      console.log("🔧 [DEBUG] No content to send - clearing isLocalProcessing");
+      setIsLocalProcessing(false);
       return;
-    if (!canSend) return;
+    }
+    
+    if (!canSend) {
+      console.log("🔧 [DEBUG] Cannot send - clearing isLocalProcessing");
+      setIsLocalProcessing(false);
+      return;
+    }
 
     const messageContent = inputValue.trim();
     let messageFiles = [...attachedFiles];
+
+    // Clear input immediately to show user the message was received
+    setInputValue("");
+    setAttachedFiles([]);
+    setSelectedFiles([]); // Also clear selected files
+    
+    // Reset textarea height
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+    }
 
     // Handle file processing based on model type
     const isGeminiModel = selectedModel.startsWith("gemini");
@@ -504,8 +539,6 @@ export function EnhancedChatInterface({
           // Add processed files to message
           messageFiles = [...messageFiles, ...processedFiles];
 
-          // Clear selected files after processing
-          setSelectedFiles([]);
         } catch (error) {
           return;
         }
@@ -544,9 +577,6 @@ export function EnhancedChatInterface({
 
           // Add processed files to message
           messageFiles = [...messageFiles, ...processedFiles];
-
-          // Clear selected files after processing
-          setSelectedFiles([]);
         } catch (error) {
           return;
         }
@@ -585,21 +615,10 @@ export function EnhancedChatInterface({
 
           // Add processed files to message
           messageFiles = [...messageFiles, ...processedFiles];
-
-          // Clear selected files after processing
-          setSelectedFiles([]);
         } catch (error) {
           return; // Don't send message if file processing fails
         }
       }
-    }
-
-    setInputValue("");
-    setAttachedFiles([]);
-
-    // Reset textarea height
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
     }
 
     // For messages with files, let Dolphin analysis handle the file content
@@ -674,6 +693,10 @@ export function EnhancedChatInterface({
 
       await sendMessage(messageContent);
     }
+
+    // Keep local processing state until useAiChat takes over
+    // Don't clear it here - let it be cleared when actual processing starts
+    console.log("🔧 [DEBUG] Keeping isLocalProcessing active - useAiChat will take over");
 
     // Save to database after AI response is received
     // Note: We'll implement this in the useAiChat hook to avoid duplicate AI calls
@@ -1004,7 +1027,10 @@ export function EnhancedChatInterface({
                     );
                   })}
 
-                  {isProcessingFiles && <FileProcessingMessage />}
+                  {(isProcessingFiles || isLocalProcessing) && (
+                    console.log("🔧 [DEBUG] Rendering FileProcessingMessage - isProcessingFiles:", isProcessingFiles, "isLocalProcessing:", isLocalProcessing),
+                    <FileProcessingMessage progress={fileProcessingProgress} />
+                  )}
 
                   {isStreaming && streamingContent && (
                     <StreamingMessage
@@ -1078,6 +1104,7 @@ export function EnhancedChatInterface({
                 <div className="flex flex-wrap gap-2 px-4">
                   {selectedFiles.map((file, index) => {
                     const isImage = file.type.startsWith("image/");
+                    const isPDF = file.type === "application/pdf";
                     const imageUrl = isImage ? URL.createObjectURL(file) : null;
 
                     return (
@@ -1098,10 +1125,19 @@ export function EnhancedChatInterface({
                               );
                             }}
                           />
+                        ) : isPDF ? (
+                          <div className="h-8 w-8 rounded border border-border/50 bg-red-50 dark:bg-red-950/20 flex items-center justify-center">
+                            <FileText className="h-4 w-4 text-red-500" />
+                          </div>
                         ) : (
                           <FileText className="h-4 w-4 text-muted-foreground" />
                         )}
                         <span className="max-w-32 truncate">{file.name}</span>
+                        {isPDF && (
+                          <Badge variant="secondary" className="text-xs px-1 py-0">
+                            OCR
+                          </Badge>
+                        )}
                         <Button
                           variant="ghost"
                           size="sm"

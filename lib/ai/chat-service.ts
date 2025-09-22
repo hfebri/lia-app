@@ -173,8 +173,16 @@ export class ChatService {
 
     // Add system instruction to debug log if present
     if (systemInstruction) {
-      console.log("🎯 System instruction:", systemInstruction.substring(0, 100) + "...");
+      console.log(
+        "🎯 System instruction:",
+        systemInstruction.substring(0, 100) + "..."
+      );
     }
+
+    console.log("🚀 CHAT-SERVICE - About to make streaming fetch request");
+    console.log("- URL:", `${this.baseUrl}/chat`);
+    console.log("- Messages count:", aiMessages.length);
+    console.log("- Model:", model);
 
     const response = await fetch(`${this.baseUrl}/chat`, {
       method: "POST",
@@ -195,6 +203,12 @@ export class ChatService {
       }),
     });
 
+    console.log(
+      "✅ CHAT-SERVICE - Fetch response received:",
+      response.status,
+      response.statusText
+    );
+
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(`HTTP ${response.status}: ${errorText}`);
@@ -204,6 +218,8 @@ export class ChatService {
     if (!reader) {
       throw new Error("No response body available");
     }
+
+    console.log("🔄 CHAT-SERVICE - Starting streaming loop...");
 
     const decoder = new TextDecoder();
     let buffer = "";

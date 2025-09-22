@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Markdown } from "@/components/ui/markdown";
 import { cn } from "@/lib/utils";
-import { User, Bot, Clock, FileText, Image, File } from "lucide-react";
+import { User, Bot, Clock, FileText, Image, File, FileSpreadsheet, FileImage, FileCode } from "lucide-react";
 
 interface MessageItemProps {
   message: Message;
@@ -20,14 +20,39 @@ export function MessageItem({
   const isUser = message.role === "user";
   const isAssistant = message.role === "assistant";
 
-  const getFileIcon = (fileType: string) => {
+  const getFileIcon = (fileType: string, fileName?: string) => {
+    // Image files
     if (fileType.startsWith("image/")) {
-      return <Image className="h-3 w-3" />;
+      return <FileImage className="h-4 w-4 text-blue-500" />;
     }
+    
+    // PDF files
     if (fileType === "application/pdf") {
-      return <FileText className="h-3 w-3" />;
+      return <FileText className="h-4 w-4 text-red-500" />;
     }
-    return <File className="h-3 w-3" />;
+    
+    // Microsoft Office files
+    if (fileType.includes("spreadsheet") || fileType.includes("excel") || fileName?.endsWith('.xlsx') || fileName?.endsWith('.xls')) {
+      return <FileSpreadsheet className="h-4 w-4 text-green-500" />;
+    }
+    
+    // Word documents
+    if (fileType.includes("wordprocessing") || fileType.includes("msword") || fileName?.endsWith('.docx') || fileName?.endsWith('.doc')) {
+      return <FileText className="h-4 w-4 text-blue-600" />;
+    }
+    
+    // PowerPoint presentations
+    if (fileType.includes("presentation") || fileType.includes("powerpoint") || fileName?.endsWith('.pptx') || fileName?.endsWith('.ppt')) {
+      return <FileText className="h-4 w-4 text-orange-500" />;
+    }
+    
+    // Code files
+    if (fileName?.match(/\.(js|jsx|ts|tsx|py|html|css|json|xml|yml|yaml)$/)) {
+      return <FileCode className="h-4 w-4 text-purple-500" />;
+    }
+    
+    // Default file icon
+    return <File className="h-4 w-4 text-gray-500" />;
   };
 
   const formatFileSize = (bytes: number) => {
@@ -113,7 +138,7 @@ export function MessageItem({
                     key={index}
                     className="flex items-center gap-2 p-2 rounded-lg bg-white/10 backdrop-blur-sm border border-white/20"
                   >
-                    {getFileIcon(file.type)}
+                    {getFileIcon(file.type, file.name)}
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-xs truncate">
                         {file.name}
@@ -141,7 +166,7 @@ export function MessageItem({
                     key={index}
                     className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 border border-border/40"
                   >
-                    {getFileIcon(file.type)}
+                    {getFileIcon(file.type, file.name)}
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-xs truncate">
                         {file.name}

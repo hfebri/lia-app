@@ -8,6 +8,7 @@ import { StreamingMessage } from "./streaming-message";
 import { AIResponse } from "./ai-response";
 import { MessageItem } from "./message-item";
 import { ExtendedThinkingToggle } from "./extended-thinking-toggle";
+import { ChatHistorySkeleton } from "./message-skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -65,6 +66,7 @@ export function AiChatInterface({ className }: AiChatInterfaceProps) {
     messages,
     isLoading,
     isStreaming,
+    isProcessingFiles,
     streamingContent,
     error,
     selectedModel,
@@ -292,7 +294,7 @@ export function AiChatInterface({ className }: AiChatInterfaceProps) {
                   models={availableModels}
                   selectedModel={selectedModel}
                   onModelChange={changeModel}
-                  disabled={isLoading || isStreaming}
+                  disabled={isLoading || isStreaming || isProcessingFiles || !hasMessages && availableModels.length === 0}
                 />
               </div>
             </div>
@@ -313,7 +315,7 @@ export function AiChatInterface({ className }: AiChatInterfaceProps) {
       {/* Scrollable Messages Area */}
       <div ref={messagesContainerRef} className="flex-1 overflow-auto">
         <div className="p-4">
-          {!hasMessages && !isStreaming ? (
+          {!hasMessages && !isStreaming && !isLoading ? (
             /* Welcome State */
             <div className="flex items-center justify-center h-96">
               <div className="text-center max-w-md">
@@ -331,6 +333,11 @@ export function AiChatInterface({ className }: AiChatInterfaceProps) {
                   </p>
                 )}
               </div>
+            </div>
+          ) : isLoading && !hasMessages ? (
+            /* Loading State - Show skeleton when loading initial conversation */
+            <div className="p-4">
+              <ChatHistorySkeleton messageCount={2} />
             </div>
           ) : (
             /* Messages List */
@@ -454,11 +461,11 @@ export function AiChatInterface({ className }: AiChatInterfaceProps) {
                       ? "Ask me anything..."
                       : "Continue the conversation..."
                   }
-                  disabled={isLoading || isStreaming}
+                  disabled={isLoading || isStreaming || isProcessingFiles}
                   className="pr-12"
                 />
 
-                {isLoading && !isStreaming && (
+                {(isLoading || isProcessingFiles) && !isStreaming && (
                   <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
                     <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                   </div>
@@ -480,12 +487,13 @@ export function AiChatInterface({ className }: AiChatInterfaceProps) {
                   disabled={
                     (!inputValue.trim() && attachedFiles.length === 0) ||
                     !canSend ||
-                    isUploadingFiles
+                    isUploadingFiles ||
+                    isProcessingFiles
                   }
                   size="icon"
                   className="shrink-0"
                 >
-                  {isUploadingFiles ? (
+                  {isUploadingFiles || isProcessingFiles ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <Send className="h-4 w-4" />

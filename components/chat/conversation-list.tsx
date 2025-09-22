@@ -79,7 +79,7 @@ export function ConversationList({
       </CardHeader>
 
       <CardContent className="p-0">
-        {conversations.length === 0 ? (
+        {conversations.length === 0 && !isLoading ? (
           <div className="p-6 text-center">
             <MessageCircle className="h-12 w-12 mx-auto mb-4 text-muted-foreground/40" />
             <h3 className="text-sm font-medium mb-2">No conversations yet</h3>
@@ -93,7 +93,7 @@ export function ConversationList({
               </Button>
             )}
           </div>
-        ) : (
+        ) : conversations.length > 0 ? (
           <ScrollArea className="h-[400px]">
             <div className="space-y-1 p-3">
               {sortedConversations.map((conversation) => (
@@ -111,6 +111,19 @@ export function ConversationList({
               ))}
             </div>
           </ScrollArea>
+        ) : (
+          /* Show skeleton when loading with no conversations */
+          <div className="space-y-2 p-3">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3 p-3">
+                <Skeleton className="h-8 w-8 rounded-full" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-3 w-1/2" />
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </CardContent>
     </Card>

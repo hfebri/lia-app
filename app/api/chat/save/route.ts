@@ -7,8 +7,10 @@ export async function POST(request: NextRequest) {
   try {
     const { userId } = await requireAuthenticatedUser();
     const body = await request.json();
-    const { conversationId, userMessage, assistantMessage, conversationTitle } =
+    const { conversationId, userMessage, assistantMessage, conversationTitle, aiModel } =
       body;
+
+    console.log("💾 [CHAT SAVE] Saving conversation with model:", aiModel);
 
     // Validate required fields
     if (!userMessage?.content) {
@@ -26,6 +28,7 @@ export async function POST(request: NextRequest) {
         userId,
         {
           title: conversationTitle || "New Chat",
+          aiModel: aiModel || "openai/gpt-5", // Use provided model or default
         }
       );
       currentConversationId = conversation.id;

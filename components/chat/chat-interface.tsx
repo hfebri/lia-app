@@ -74,7 +74,7 @@ export function ChatInterface({ className }: ChatInterfaceProps) {
           <ConversationList
             conversations={conversations}
             currentConversationId={currentConversation?.id}
-            isLoading={isLoading && conversations.length === 0}
+            isLoading={isLoading}
             onSelectConversation={selectConversation}
             onDeleteConversation={handleDeleteConversation}
             onCreateNew={handleNewConversation}

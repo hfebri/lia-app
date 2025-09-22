@@ -2,16 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { AIService } from "@/lib/ai/service";
 import { requireAuthenticatedUser } from "@/lib/auth/session";
 import type { AIMessage, AIProviderName } from "@/lib/ai/types";
-import {
-  fileAnalysisService,
-  FileAnalysisService,
-} from "@/lib/services/file-analysis-service";
 import { LIA_SYSTEM_INSTRUCTION } from "@/lib/constants/ai-models";
 
 export async function POST(request: NextRequest) {
+  console.log("🚀 API ROUTE /api/chat - POST request received");
+  console.log("🔍 API ROUTE - Request headers:", Object.fromEntries(request.headers.entries()));
+  
   try {
+    console.log("🔐 API ROUTE - Checking authentication...");
     // Require authentication for all chat requests
     await requireAuthenticatedUser();
+    console.log("✅ API ROUTE - Authentication passed");
     let messages,
       model = "openai/gpt-5",
       stream = false,
@@ -28,8 +29,10 @@ export async function POST(request: NextRequest) {
       }> = [];
 
     const contentType = request.headers.get("content-type") || "";
-
+    console.log("📦 API ROUTE - Content-Type:", contentType);
+    
     if (contentType.includes("multipart/form-data")) {
+      console.log("📁 API ROUTE - Processing multipart/form-data...");
       // Handle FormData for file uploads
       const formData = await request.formData();
 
@@ -60,8 +63,10 @@ export async function POST(request: NextRequest) {
         })
       );
     } else {
+      console.log("📄 API ROUTE - Processing JSON request...");
       // Handle JSON for text-only messages or messages with base64 files
       const body = await request.json();
+      console.log("📊 API ROUTE - Parsed JSON body keys:", Object.keys(body));
       ({
         messages,
         model,
@@ -103,71 +108,28 @@ export async function POST(request: NextRequest) {
     // Initialize AI service
     const aiService = new AIService();
 
-    // Determine provider based on model - NO FALLBACK LOGIC
+    // Determine provider based on model
     let provider: AIProviderName = "replicate";
     if (model.startsWith("gemini")) {
       provider = "gemini";
+    } else if (model.startsWith("anthropic/") || model.startsWith("openai/") || model.startsWith("deepseek-ai/")) {
+      // Anthropic, OpenAI, and DeepSeek models are served through Replicate
+      provider = "replicate";
     }
 
-    // Handle file analysis - process files for all non-Gemini models using Replicate
-    let fileAnalysisResults: any[] = [];
-    if (
-      files.length > 0 &&
-      !FileAnalysisService.supportsNativeFileHandling(provider)
-    ) {
-      try {
-        fileAnalysisResults = await fileAnalysisService.analyzeFiles(
-          files,
-          provider,
-          model
-        );
-      } catch {
-        // Continue without file analysis instead of breaking the chat
-        fileAnalysisResults = [];
-      }
-    }
+    console.log(`🔍 API ROUTE DEBUG - Provider: ${provider}, Model: ${model}, Files: ${files.length}`);
+    console.log(`📝 API ROUTE - File processing now handled client-side, API receives processed text`);
 
-    // Convert messages to AI format
+    // Convert messages to AI format - files already processed client-side
     const aiMessages: AIMessage[] = messages.map(
-      (
-        msg: {
-          role: string;
-          content: string;
-          files?: unknown[];
-          [key: string]: unknown;
-        },
-        index: number
-      ) => {
-        // If this is the last user message and we have files, handle them based on provider
-        const isLastUserMessage =
-          index === messages.length - 1 && msg.role === "user";
-
-        if (isLastUserMessage && files.length > 0) {
-          if (FileAnalysisService.supportsNativeFileHandling(provider)) {
-            // For Gemini, pass files directly
-            return {
-              role: msg.role as "user" | "assistant" | "system",
-              content: msg.content,
-              files: files,
-            };
-          } else {
-            // For all other providers (Replicate), enhance the content with file analysis
-            const enhancedContent = fileAnalysisService.createEnhancedPrompt(
-              msg.content,
-              fileAnalysisResults
-            );
-            return {
-              role: msg.role as "user" | "assistant" | "system",
-              content: enhancedContent,
-            };
-          }
-        }
-
-        return {
-          role: msg.role as "user" | "assistant" | "system",
-          content: msg.content,
-        };
-      }
+      (msg: {
+        role: string;
+        content: string;
+        [key: string]: unknown;
+      }) => ({
+        role: msg.role as "user" | "assistant" | "system",
+        content: msg.content,
+      })
     );
 
     if (stream) {
@@ -178,13 +140,13 @@ export async function POST(request: NextRequest) {
         async start(controller) {
           try {
             console.log("🚀 Generating AI stream...");
-            
+
             // Combine default LIA system instruction with user's custom instruction
             let combinedSystemPrompt = LIA_SYSTEM_INSTRUCTION;
             if (systemInstruction && systemInstruction.trim()) {
               combinedSystemPrompt = `${LIA_SYSTEM_INSTRUCTION}\n\nAdditional Instructions: ${systemInstruction.trim()}`;
             }
-            
+
             const stream = aiService.generateStream(aiMessages, {
               model,
               provider,
@@ -246,7 +208,7 @@ export async function POST(request: NextRequest) {
       if (systemInstruction && systemInstruction.trim()) {
         combinedSystemPrompt = `${LIA_SYSTEM_INSTRUCTION}\n\nAdditional Instructions: ${systemInstruction.trim()}`;
       }
-      
+
       const response = await aiService.generateResponse(aiMessages, {
         model,
         provider,
