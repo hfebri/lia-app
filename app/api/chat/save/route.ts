@@ -10,7 +10,6 @@ export async function POST(request: NextRequest) {
     const { conversationId, userMessage, assistantMessage, conversationTitle, aiModel } =
       body;
 
-    console.log("💾 [CHAT SAVE] Saving conversation with model:", aiModel);
 
     // Validate required fields
     if (!userMessage?.content) {

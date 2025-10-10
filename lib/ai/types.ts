@@ -59,7 +59,9 @@ export interface AIGenerationOptions {
   thinking_mode?: boolean; // Gemini-exclusive
   thinking_budget_tokens?: number;
   max_image_resolution?: number;
-  reasoning_effort?: "minimal" | "low" | "medium" | "high";
+  reasoning_effort?: "minimal" | "low" | "medium" | "high"; // OpenAI
+  enable_web_search?: boolean; // OpenAI - enable web search capabilities
+  verbosity?: "low" | "medium" | "high"; // OpenAI - control response detail level
 }
 
 export interface AIServiceConfig {

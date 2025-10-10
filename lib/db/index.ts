@@ -5,7 +5,6 @@ export * from "../../db/types";
 // Export all query functions
 export * as userQueries from "./queries/users";
 export * as conversationQueries from "./queries/conversations";
-export * as messageQueries from "./queries/messages";
 export * as fileQueries from "./queries/files";
 export * as analyticsQueries from "./queries/analytics";
 
@@ -27,16 +26,9 @@ export {
   updateConversation,
   deleteConversation,
   getConversationsByUserId,
+  getConversationMessages,
+  addMessageToConversation,
 } from "./queries/conversations";
-
-export {
-  // Message operations
-  getMessageById,
-  getMessagesByConversationId,
-  createMessage,
-  updateMessage,
-  deleteMessage,
-} from "./queries/messages";
 
 export {
   // File operations

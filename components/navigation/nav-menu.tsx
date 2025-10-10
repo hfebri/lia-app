@@ -1,7 +1,8 @@
 "use client";
 
+import type { MouseEvent } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,6 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { ChevronDown, ExternalLink } from "lucide-react";
+import { useNavigationLoader } from "@/components/providers/navigation-loader-provider";
 
 interface NavMenuItem {
   title: string;
@@ -34,6 +36,33 @@ interface NavMenuProps {
 
 export function NavMenu({ sections, className }: NavMenuProps) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const { startNavigation } = useNavigationLoader();
+  const currentSearch = searchParams.toString();
+  const currentLocation = currentSearch ? `${pathname}?${currentSearch}` : pathname;
+
+  const handleLinkClick = (
+    event: MouseEvent<HTMLAnchorElement>,
+    href: string,
+    isExternal: boolean
+  ) => {
+    if (
+      isExternal ||
+      event.defaultPrevented ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.button !== 0
+    ) {
+      return;
+    }
+
+    if (href === currentLocation) {
+      return;
+    }
+
+    startNavigation();
+  };
 
   return (
     <nav className={cn("flex items-center space-x-6", className)}>
@@ -57,6 +86,9 @@ export function NavMenu({ sections, className }: NavMenuProps) {
                       href={item.href}
                       target={isExternal ? "_blank" : undefined}
                       rel={isExternal ? "noopener noreferrer" : undefined}
+                      onClick={(event) =>
+                        handleLinkClick(event, item.href, isExternal)
+                      }
                       className={cn(
                         "flex items-center justify-between w-full",
                         isActive && "bg-accent"

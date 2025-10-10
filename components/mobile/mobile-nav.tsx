@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SimpleThemeToggle } from "@/components/ui/theme-toggle";
+import { useNavigationLoader } from "@/components/providers/navigation-loader-provider";
 
 interface NavItem {
   title: string;
@@ -76,13 +77,23 @@ interface MobileNavProps {
 export function MobileNav({ className, isAdmin = false }: MobileNavProps) {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const { startNavigation } = useNavigationLoader();
+  const currentSearch = searchParams.toString();
+  const currentLocation = currentSearch ? `${pathname}?${currentSearch}` : pathname;
 
   const filteredItems = navigationItems.filter(
     (item) => !item.adminOnly || isAdmin
   );
 
-  const handleItemClick = () => {
+  const handleItemClick = (href: string) => {
     setIsOpen(false);
+
+    if (href === currentLocation) {
+      return;
+    }
+
+    startNavigation();
   };
 
   return (
@@ -125,7 +136,7 @@ export function MobileNav({ className, isAdmin = false }: MobileNavProps) {
                     <Link
                       key={item.href}
                       href={item.href}
-                      onClick={handleItemClick}
+                      onClick={() => handleItemClick(item.href)}
                       className={cn(
                         "flex items-center space-x-3 rounded-lg px-3 py-3 text-sm font-medium transition-all hover:bg-accent hover:text-accent-foreground",
                         isActive

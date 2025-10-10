@@ -1,12 +1,14 @@
 import { eq, desc, asc, count, and, sql } from "drizzle-orm";
 import { db } from "../../../db/db";
-import { conversations, messages, users } from "../../../db/schema";
+import { conversations, users } from "../../../db/schema";
 import type {
   Conversation,
   NewConversation,
   ConversationWithMessages,
   ConversationWithLastMessage,
   PaginationParams,
+  Message,
+  NewMessage,
 } from "../../../db/types";
 
 // Get conversation by ID
@@ -21,7 +23,7 @@ export async function getConversationById(
   return result[0] || null;
 }
 
-// Get conversation with messages
+// Get conversation with messages (messages are now embedded)
 export async function getConversationWithMessages(
   id: string
 ): Promise<ConversationWithMessages | null> {
@@ -29,13 +31,102 @@ export async function getConversationWithMessages(
     where: eq(conversations.id, id),
     with: {
       user: true,
-      messages: {
-        orderBy: [asc(messages.createdAt)],
-      },
     },
   });
 
   return conversation || null;
+}
+
+// Get messages from a conversation
+export async function getConversationMessages(
+  conversationId: string
+): Promise<Message[]> {
+  const conversation = await getConversationById(conversationId);
+  if (!conversation) return [];
+
+  const messages = conversation.messages as any;
+  return Array.isArray(messages) ? messages : [];
+}
+
+// Add message to conversation
+export async function addMessageToConversation(
+  conversationId: string,
+  message: NewMessage
+): Promise<Conversation | null> {
+  const conversation = await getConversationById(conversationId);
+  if (!conversation) return null;
+
+  const existingMessages = (conversation.messages as any) || [];
+  const newMessage: Message = {
+    ...message,
+    createdAt: message.createdAt || new Date().toISOString(),
+  };
+
+  const updatedMessages = [...existingMessages, newMessage];
+
+  const result = await db
+    .update(conversations)
+    .set({
+      messages: updatedMessages as any,
+      updatedAt: new Date(),
+    })
+    .where(eq(conversations.id, conversationId))
+    .returning();
+
+  return result[0] || null;
+}
+
+// Add multiple messages to conversation (batch)
+export async function addMessagesToConversation(
+  conversationId: string,
+  newMessages: NewMessage[]
+): Promise<Conversation | null> {
+  const conversation = await getConversationById(conversationId);
+  if (!conversation) return null;
+
+  const existingMessages = (conversation.messages as any) || [];
+  const messagesToAdd: Message[] = newMessages.map((msg) => ({
+    ...msg,
+    createdAt: msg.createdAt || new Date().toISOString(),
+  }));
+
+  const updatedMessages = [...existingMessages, ...messagesToAdd];
+
+  const result = await db
+    .update(conversations)
+    .set({
+      messages: updatedMessages as any,
+      updatedAt: new Date(),
+    })
+    .where(eq(conversations.id, conversationId))
+    .returning();
+
+  return result[0] || null;
+}
+
+// Replace all messages in conversation
+export async function replaceConversationMessages(
+  conversationId: string,
+  newMessages: Message[]
+): Promise<Conversation | null> {
+  const result = await db
+    .update(conversations)
+    .set({
+      messages: newMessages as any,
+      updatedAt: new Date(),
+    })
+    .where(eq(conversations.id, conversationId))
+    .returning();
+
+  return result[0] || null;
+}
+
+// Get message count for a conversation
+export async function getConversationMessageCount(
+  conversationId: string
+): Promise<number> {
+  const messages = await getConversationMessages(conversationId);
+  return messages.length;
 }
 
 // Create new conversation
@@ -46,6 +137,7 @@ export async function createConversation(
     .insert(conversations)
     .values({
       ...conversationData,
+      messages: conversationData.messages || ([] as any),
       createdAt: new Date(),
       updatedAt: new Date(),
     })
@@ -99,8 +191,10 @@ export async function getConversationsByUserId(
     createdAt: conversations.createdAt,
     updatedAt: conversations.updatedAt,
   };
-  
-  const sortColumn = validSortColumns[sortBy as keyof typeof validSortColumns] || conversations.updatedAt;
+
+  const sortColumn =
+    validSortColumns[sortBy as keyof typeof validSortColumns] ||
+    conversations.updatedAt;
 
   const orderBy = sortOrder === "asc" ? asc(sortColumn) : desc(sortColumn);
 
@@ -141,30 +235,11 @@ export async function getConversationsWithLastMessage(
   const { page = 1, limit = 20, sortOrder = "desc" } = params;
   const offset = (page - 1) * limit;
 
-  // Get conversations with message counts
-  const conversationsWithStats = await db
-    .select({
-      id: conversations.id,
-      userId: conversations.userId,
-      title: conversations.title,
-      aiModel: conversations.aiModel,
-      metadata: conversations.metadata,
-      createdAt: conversations.createdAt,
-      updatedAt: conversations.updatedAt,
-      messageCount: count(messages.id),
-    })
+  // Get conversations
+  const conversationsList = await db
+    .select()
     .from(conversations)
-    .leftJoin(messages, eq(conversations.id, messages.conversationId))
     .where(eq(conversations.userId, userId))
-    .groupBy(
-      conversations.id,
-      conversations.userId,
-      conversations.title,
-      conversations.aiModel,
-      conversations.metadata,
-      conversations.createdAt,
-      conversations.updatedAt
-    )
     .orderBy(
       sortOrder === "asc"
         ? asc(conversations.updatedAt)
@@ -173,32 +248,20 @@ export async function getConversationsWithLastMessage(
     .limit(limit)
     .offset(offset);
 
-  // Get last messages for each conversation
-  const conversationIds = conversationsWithStats.map((c) => c.id);
-  const lastMessages =
-    conversationIds.length > 0
-      ? await db
-          .select()
-          .from(messages)
-          .where(
-            and(
-              sql`${messages.conversationId} IN ${conversationIds}`,
-              sql`${messages.id} IN (
-          SELECT id FROM ${messages} m2 
-          WHERE m2.conversation_id = ${messages.conversationId} 
-          ORDER BY m2.created_at DESC 
-          LIMIT 1
-        )`
-            )
-          )
-      : [];
-
-  // Combine data
+  // Transform to include last message and message count
   const conversationsWithLastMessage: ConversationWithLastMessage[] =
-    conversationsWithStats.map((conv) => ({
-      ...conv,
-      lastMessage: lastMessages.find((msg) => msg.conversationId === conv.id),
-    }));
+    conversationsList.map((conv) => {
+      const messages = (conv.messages as any) || [];
+      const messageCount = Array.isArray(messages) ? messages.length : 0;
+      const lastMessage =
+        messageCount > 0 ? messages[messages.length - 1] : undefined;
+
+      return {
+        ...conv,
+        lastMessage,
+        messageCount,
+      };
+    });
 
   // Get total count
   const totalCount = await db
@@ -243,10 +306,6 @@ export async function getRecentConversations(
     orderBy: [desc(conversations.createdAt)],
     with: {
       user: true,
-      messages: {
-        limit: 1,
-        orderBy: [desc(messages.createdAt)],
-      },
     },
   });
 }
@@ -291,4 +350,19 @@ export async function searchConversations(
     limit,
     totalPages: Math.ceil(totalCount[0].count / limit),
   };
+}
+
+// Get latest message in conversation
+export async function getLatestMessageInConversation(
+  conversationId: string
+): Promise<Message | null> {
+  const messages = await getConversationMessages(conversationId);
+  return messages.length > 0 ? messages[messages.length - 1] : null;
+}
+
+// Clear all messages from conversation
+export async function clearConversationMessages(
+  conversationId: string
+): Promise<Conversation | null> {
+  return replaceConversationMessages(conversationId, []);
 }

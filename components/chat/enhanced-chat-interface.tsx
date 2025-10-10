@@ -11,10 +11,12 @@ import { StreamingMessage } from "./streaming-message";
 import { MessageItem } from "./message-item";
 import { FileProcessingMessage } from "./file-processing-message";
 import { FileAttachment } from "./file-attachment";
+import { ContextWarning } from "./context-warning";
 import { ExtendedThinkingToggle } from "./extended-thinking-toggle";
 import { ThinkingModeToggle } from "./thinking-mode-toggle";
 import { ReasoningEffortSelector } from "./reasoning-effort-selector";
 import { SystemInstructionButton } from "./system-instruction-button";
+import { ChatHistorySkeleton } from "./message-skeleton";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -172,7 +174,6 @@ export function EnhancedChatInterface({
   // Clear local processing state when useAiChat takes over
   useEffect(() => {
     if (isProcessingFiles) {
-      console.log("🔧 [DEBUG] useAiChat processing started - clearing local processing");
       setIsLocalProcessing(false);
     }
   }, [isProcessingFiles]);
@@ -410,26 +411,10 @@ export function EnhancedChatInterface({
 
   const handleSendMessage = async () => {
     // Show processing indicator immediately when send button is clicked
-    console.log("🔧 [DEBUG] Setting isLocalProcessing to true");
     setIsLocalProcessing(true);
-    
-    // DEBUG: Check initial state
-    console.log("🎯 SEND MESSAGE DEBUG - Starting:");
-    console.log("🔧 [DEBUG] isLocalProcessing state after set:", isLocalProcessing);
-    console.log("- selectedFiles count:", selectedFiles.length);
-    console.log(
-      "- selectedFiles details:",
-      selectedFiles.map((f) => ({ name: f.name, type: f.type, size: f.size }))
-    );
-    console.log("- attachedFiles count:", attachedFiles.length);
-    console.log(
-      "- attachedFiles details:",
-      attachedFiles.map((f) => ({ name: f.originalName, mimeType: f.mimeType }))
-    );
 
     // Prevent sending messages if not authenticated
     if (!isAuthenticated) {
-      console.log("🔧 [DEBUG] Not authenticated - clearing isLocalProcessing");
       setIsLocalProcessing(false);
       return;
     }
@@ -439,13 +424,11 @@ export function EnhancedChatInterface({
       attachedFiles.length === 0 &&
       selectedFiles.length === 0
     ) {
-      console.log("🔧 [DEBUG] No content to send - clearing isLocalProcessing");
       setIsLocalProcessing(false);
       return;
     }
     
     if (!canSend) {
-      console.log("🔧 [DEBUG] Cannot send - clearing isLocalProcessing");
       setIsLocalProcessing(false);
       return;
     }
@@ -671,32 +654,10 @@ export function EnhancedChatInterface({
         }
       }
 
-      // DEBUG: Log what we're sending
-      console.log("🔥 ENHANCED CHAT DEBUG - Sending with files:");
-      console.log("- Message content:", messageContent);
-      console.log("- All files count:", allFiles.length);
-      console.log(
-        "- All files details:",
-        allFiles.map((f) => ({
-          name: f.name,
-          type: f.type,
-          size: f.size,
-          hasData: !!(f as any).data,
-        }))
-      );
-
       await sendMessage(messageContent, allFiles);
     } else {
-      // DEBUG: Log text-only message
-      console.log("🔥 ENHANCED CHAT DEBUG - Sending text-only:");
-      console.log("- Message content:", messageContent);
-
       await sendMessage(messageContent);
     }
-
-    // Keep local processing state until useAiChat takes over
-    // Don't clear it here - let it be cleared when actual processing starts
-    console.log("🔧 [DEBUG] Keeping isLocalProcessing active - useAiChat will take over");
 
     // Save to database after AI response is received
     // Note: We'll implement this in the useAiChat hook to avoid duplicate AI calls
@@ -978,33 +939,37 @@ export function EnhancedChatInterface({
         <div className="flex-1 overflow-hidden min-w-0 relative">
           <ScrollArea className="h-full w-full" ref={scrollAreaRef}>
             <div className="p-4 space-y-4 pb-4 max-w-full min-h-full">
-              {messages.length === 0 ? (
+              {isLoadingConversation ? (
+                <ChatHistorySkeleton messageCount={4} />
+              ) : messages.length === 0 ? (
                 <div className="flex items-center justify-center h-64">
-                  {isLoadingConversation ? (
-                    <div className="text-center">
-                      <Loader2 className="h-12 w-12 text-muted-foreground mx-auto mb-4 animate-spin" />
-                      <h3 className="text-lg font-semibold mb-2">
-                        Loading conversation...
-                      </h3>
-                      <p className="text-muted-foreground mb-4">
-                        Please wait while we fetch your messages
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="text-center">
-                      <Brain className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                      <h3 className="text-lg font-semibold mb-2">
-                        Start a conversation
-                      </h3>
-                      <p className="text-muted-foreground mb-4">
-                        Ask questions, upload files for analysis using the
-                        paperclip button, or start typing below
-                      </p>
-                    </div>
-                  )}
+                  <div className="text-center">
+                    <Brain className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">
+                      Start a conversation
+                    </h3>
+                    <p className="text-muted-foreground mb-4">
+                      Ask questions, upload files for analysis using the
+                      paperclip button, or start typing below
+                    </p>
+                  </div>
                 </div>
               ) : (
                 <>
+                  {/* Context Warning */}
+                  <ContextWarning
+                    messageCount={messages.length}
+                    onStartNew={() => {
+                      startNewConversation();
+                      // Clear URL to indicate new conversation
+                      const url = new URL(window.location.href);
+                      url.searchParams.delete("conversation");
+                      window.history.pushState({}, "", url);
+                      setCurrentConversationId(null);
+                      setConversationTitle("AI Assistant");
+                    }}
+                  />
+
                   {messages.map((message, index) => {
                     // Only show user or assistant messages
                     if (message.role !== "user" && message.role !== "assistant")
@@ -1027,10 +992,7 @@ export function EnhancedChatInterface({
                     );
                   })}
 
-                  {(isProcessingFiles || isLocalProcessing) && (
-                    console.log("🔧 [DEBUG] Rendering FileProcessingMessage - isProcessingFiles:", isProcessingFiles, "isLocalProcessing:", isLocalProcessing),
-                    <FileProcessingMessage progress={fileProcessingProgress} />
-                  )}
+                  {(isProcessingFiles || isLocalProcessing) && <FileProcessingMessage progress={fileProcessingProgress} />}
 
                   {isStreaming && streamingContent && (
                     <StreamingMessage
@@ -1133,7 +1095,7 @@ export function EnhancedChatInterface({
                           <FileText className="h-4 w-4 text-muted-foreground" />
                         )}
                         <span className="max-w-32 truncate">{file.name}</span>
-                        {isPDF && (
+                        {isPDF && !selectedModel.toLowerCase().includes('gemini') && (
                           <Badge variant="secondary" className="text-xs px-1 py-0">
                             OCR
                           </Badge>

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db/db";
-import { users, messages, conversations } from "@/db/schema";
+import { users, conversations } from "@/db/schema";
 import { desc, sql } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth/session";
 
@@ -38,15 +38,16 @@ export async function GET() {
       .from(users)
       .orderBy(desc(users.createdAt));
 
-    // Get message counts for each user
+    // Get message counts for each user from conversations
+    // Messages are now stored as JSONB array in conversations table
     console.log("🔍 [ADMIN USERS] Fetching message counts...");
     const messageCounts = await db
       .select({
-        userId: messages.userId,
-        count: sql<number>`COUNT(${messages.id})`.as("messageCount"),
+        userId: conversations.userId,
+        count: sql<number>`SUM(jsonb_array_length(${conversations.messages}))`.as("messageCount"),
       })
-      .from(messages)
-      .groupBy(messages.userId);
+      .from(conversations)
+      .groupBy(conversations.userId);
     console.log("✅ [ADMIN USERS] Message counts found:", messageCounts.length);
 
     // Get conversation counts for each user

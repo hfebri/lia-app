@@ -2,7 +2,7 @@
 
 import React, { memo, useCallback, useMemo } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { useConversations } from "@/hooks/use-conversations";
@@ -52,6 +52,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { AuthButton } from "@/components/auth/auth-button";
 import { LogoutButton } from "@/components/auth/logout-button";
+import { useNavigationLoader } from "@/components/providers/navigation-loader-provider";
 
 interface SidebarProps {
   className?: string;
@@ -113,11 +114,12 @@ const arePropsEqual = (prevProps: SidebarProps, nextProps: SidebarProps) => {
 function SidebarComponent({ className }: SidebarProps) {
   // Memoize navigation hooks to prevent unnecessary updates
   const pathname = usePathname();
-  const router = useRouter();
+  const searchParams = useSearchParams();
 
   // Destructure hooks with stable references
   const auth = useAuth();
   const conversations_hook = useConversations();
+  const { startNavigation } = useNavigationLoader();
 
   // Extract specific values to track changes more precisely
   const { user, isAuthenticated, checkRole } = auth;
@@ -142,9 +144,31 @@ function SidebarComponent({ className }: SidebarProps) {
       deleteConversation(...args),
     [deleteConversation]
   );
-  const stableRouterPush = useCallback(
-    (url: string) => router.push(url),
-    [router]
+  const currentSearch = searchParams.toString();
+  const currentLocation = useMemo(
+    () => (currentSearch ? `${pathname}?${currentSearch}` : pathname),
+    [pathname, currentSearch]
+  );
+
+  const handleLinkNavigation = useCallback(
+    (event: React.MouseEvent<HTMLAnchorElement>, targetHref: string) => {
+      if (
+        event.defaultPrevented ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.button !== 0
+      ) {
+        return;
+      }
+
+      if (targetHref === currentLocation) {
+        return;
+      }
+
+      startNavigation();
+    },
+    [currentLocation, startNavigation]
   );
 
   // Delete conversation using the hook - memoized to prevent re-renders
@@ -165,7 +189,11 @@ function SidebarComponent({ className }: SidebarProps) {
           {/* Logo and Theme Toggle */}
           <div className="px-3 py-2">
             <div className="flex items-center justify-between pl-3 mb-14">
-              <Link href="/" className="flex items-center">
+              <Link
+                href="/"
+                className="flex items-center"
+                onClick={(event) => handleLinkNavigation(event, "/")}
+              >
                 <Bot className="h-6 w-6 mr-2" />
                 <h1 className="text-xl font-bold">LIA App</h1>
               </Link>
@@ -192,7 +220,10 @@ function SidebarComponent({ className }: SidebarProps) {
                     className="w-full justify-start"
                     asChild
                   >
-                    <Link href={item.href}>
+                    <Link
+                      href={item.href}
+                      onClick={(event) => handleLinkNavigation(event, item.href)}
+                    >
                       <Icon className="mr-2 h-4 w-4" />
                       {item.title}
                       {item.badge && (
@@ -237,93 +268,102 @@ function SidebarComponent({ className }: SidebarProps) {
                     </p>
                   </div>
                 ) : (
-                  recentConversations.map((conversation) => (
-                    <div
-                      key={conversation.id}
-                      className="flex items-center gap-1 group"
-                    >
-                      <Button
-                        variant="ghost"
-                        className="flex-1 justify-start h-auto p-2 text-left"
-                        asChild
+                  recentConversations.map((conversation) => {
+                    const conversationHref = `/chat?conversation=${conversation.id}`;
+
+                    return (
+                      <div
+                        key={conversation.id}
+                        className="flex items-center gap-1 group"
                       >
-                        <Link href={`/chat?conversation=${conversation.id}`}>
-                          <div className="flex items-start gap-2 w-full">
-                            <Clock className="h-3 w-3 mt-1 text-muted-foreground flex-shrink-0" />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium truncate">
-                                {conversation.title || "Untitled Chat"}
-                              </p>
-                              <div className="flex items-center gap-2 mt-1">
-                                <p className="text-xs text-muted-foreground">
-                                  {new Date(
-                                    conversation.createdAt
-                                  ).toLocaleDateString()}
+                        <Button
+                          variant="ghost"
+                          className="flex-1 justify-start h-auto p-2 text-left"
+                          asChild
+                        >
+                          <Link
+                            href={conversationHref}
+                            onClick={(event) =>
+                              handleLinkNavigation(event, conversationHref)
+                            }
+                          >
+                            <div className="flex items-start gap-2 w-full">
+                              <Clock className="h-3 w-3 mt-1 text-muted-foreground flex-shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">
+                                  {conversation.title || "Untitled Chat"}
                                 </p>
-                                {conversation.aiModel && (
-                                  <span className={cn(
-                                    "inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium",
-                                    getModelColor(conversation.aiModel)
-                                  )}>
-                                    {getModelDisplayName(conversation.aiModel)}
-                                  </span>
-                                )}
+                                <div className="flex items-center gap-2 mt-1">
+                                  <p className="text-xs text-muted-foreground">
+                                    {new Date(
+                                      conversation.createdAt
+                                    ).toLocaleDateString()}
+                                  </p>
+                                  {conversation.aiModel && (
+                                    <span className={cn(
+                                      "inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium",
+                                      getModelColor(conversation.aiModel)
+                                    )}>
+                                      {getModelDisplayName(conversation.aiModel)}
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        </Link>
-                      </Button>
+                          </Link>
+                        </Button>
 
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
-                          >
-                            <MoreHorizontal className="h-3 w-3" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <DropdownMenuItem
-                                onSelect={(e) => e.preventDefault()}
-                              >
-                                <Trash2 className="h-3 w-3 mr-2" />
-                                <span className="text-red-600 text-xs">
-                                  Delete
-                                </span>
-                              </DropdownMenuItem>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>
-                                  Delete Conversation
-                                </AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Are you sure you want to delete &quot;
-                                  {conversation.title || "Untitled Chat"}&quot;?
-                                  This action cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() =>
-                                    handleDeleteConversation(conversation.id)
-                                  }
-                                  className="bg-red-600 hover:bg-red-700"
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                            >
+                              <MoreHorizontal className="h-3 w-3" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <DropdownMenuItem
+                                  onSelect={(e) => e.preventDefault()}
                                 >
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  ))
+                                  <Trash2 className="h-3 w-3 mr-2" />
+                                  <span className="text-red-600 text-xs">
+                                    Delete
+                                  </span>
+                                </DropdownMenuItem>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>
+                                    Delete Conversation
+                                  </AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to delete &quot;
+                                    {conversation.title || "Untitled Chat"}&quot;?
+                                    This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() =>
+                                      handleDeleteConversation(conversation.id)
+                                    }
+                                    className="bg-red-600 hover:bg-red-700"
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    );
+                  })
                 )}
               </div>
             </ScrollArea>
@@ -352,7 +392,12 @@ function SidebarComponent({ className }: SidebarProps) {
                         className="w-full justify-start"
                         asChild
                       >
-                        <Link href={item.href}>
+                        <Link
+                          href={item.href}
+                          onClick={(event) =>
+                            handleLinkNavigation(event, item.href)
+                          }
+                        >
                           <Icon className="mr-2 h-4 w-4" />
                           {item.title}
                           {item.badge && (

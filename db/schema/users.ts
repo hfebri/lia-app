@@ -24,19 +24,17 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Import other tables for relations (will be defined in other files)
+import { conversations } from "./conversations";
+import { files } from "./files";
+import { analytics } from "./analytics";
+
 // User relations
 export const usersRelations = relations(users, ({ many }) => ({
   conversations: many(conversations),
-  messages: many(messages),
   files: many(files),
   analytics: many(analytics),
 }));
 
 // Type inference for users table
 export type SelectUser = InferSelectModel<typeof users>;
-
-// Import other tables for relations (will be defined in other files)
-import { conversations } from "./conversations";
-import { messages } from "./conversations";
-import { files } from "./files";
-import { analytics } from "./analytics";

@@ -138,7 +138,6 @@ async function extractFromPDF(buffer: Buffer): Promise<TextExtractionResult> {
             creationDate: data.info?.CreationDate
               ? new Date(data.info.CreationDate)
               : undefined,
-            extractionMethod: "OCR (scanned PDF)",
           },
         };
       }

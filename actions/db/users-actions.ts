@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/db/db";
-import { users, messages, files, conversations } from "@/db/schema";
+import { users, files, conversations } from "@/db/schema";
 import type { User, NewUser } from "@/db/types";
 import { ActionState } from "@/types";
 import { eq, and, or, desc, count, sql } from "drizzle-orm";

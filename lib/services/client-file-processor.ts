@@ -43,9 +43,18 @@ export interface FileProcessingProgress {
 export class ClientFileProcessor {
   /**
    * Process files on the client side before sending to API
+   *
+   * OCR is ONLY run for:
+   * - Document files (PDF, DOCX, PPTX, etc.)
+   * - When using Claude/GPT models (via Replicate)
+   *
+   * OCR is SKIPPED for:
+   * - Image files (all models support natively)
+   * - Document files when using Gemini (native support)
    */
   static async processFiles(
     files: File[],
+    selectedModel: string,
     onProgress?: (fileName: string, progress: FileProcessingProgress) => void
   ): Promise<ProcessedFile[]> {
     console.log(`🚀 [CLIENT OCR] Starting client-side file processing for ${files.length} files`);
@@ -92,45 +101,62 @@ export class ClientFileProcessor {
             timeElapsed: Date.now() - startTime,
           });
         } else if (isDocument) {
-          console.log(`📄 [CLIENT OCR] Document file detected - running Tesseract OCR`);
-          
-          // Show immediate progress for document processing
-          onProgress?.(file.name, {
-            stage: "Starting OCR analysis",
-            progress: 5,
-            timeElapsed: Date.now() - startTime,
-          });
-          
-          const extractedText = await this.runTesseractOCR(file, (progress) => {
+          const isGeminiModel = selectedModel.toLowerCase().includes('gemini');
+
+          if (isGeminiModel) {
+            // Gemini supports documents natively - no OCR needed
+            console.log(`📄 [CLIENT] Document file detected - Gemini native support (no OCR needed)`);
+
+            const fileInfo = `📄 Document: ${file.name} (${Math.round(file.size/1024)}KB) - Native processing`;
+
+            processedFiles.push({
+              ...baseProcessedFile,
+              processingTime: Date.now() - startTime,
+              displayContent: fileInfo,
+              promptContent: fileInfo,
+            });
+
             onProgress?.(file.name, {
-              stage: progress.status,
-              progress: Math.round((progress.progress || 0) * 100),
+              stage: "Complete (Native)",
+              progress: 100,
               timeElapsed: Date.now() - startTime,
             });
-          });
+          } else {
+            // Claude/GPT models need OCR for documents
+            console.log(`📄 [CLIENT OCR] Document file detected - running OCR for ${selectedModel}`);
 
-          const fileInfo = `📄 Document: ${file.name} (${Math.round(file.size/1024)}KB) - Text extracted with OCR`;
-          const promptInfo = extractedText ? `📄 Document: ${file.name}\n\nExtracted Content:\n${extractedText}` : fileInfo;
+            // Show immediate progress for document processing
+            onProgress?.(file.name, {
+              stage: "Starting OCR analysis",
+              progress: 5,
+              timeElapsed: Date.now() - startTime,
+            });
 
-          console.log(`🔍 [DEBUG] File processing result for ${file.name}:`);
-          console.log(`🔍 [DEBUG] - extractedText length: ${extractedText?.length || 0}`);
-          console.log(`🔍 [DEBUG] - extractedText preview: "${extractedText?.substring(0, 200) || 'EMPTY'}"`);
-          console.log(`🔍 [DEBUG] - displayContent: ${fileInfo}`);
-          console.log(`🔍 [DEBUG] - promptContent length: ${promptInfo.length}`);
+            const extractedText = await this.runTesseractOCR(file, (progress) => {
+              onProgress?.(file.name, {
+                stage: progress.status,
+                progress: Math.round((progress.progress || 0) * 100),
+                timeElapsed: Date.now() - startTime,
+              });
+            });
 
-          processedFiles.push({
-            ...baseProcessedFile,
-            extractedText,
-            processingTime: Date.now() - startTime,
-            displayContent: fileInfo, // Just show file info in chat bubble
-            promptContent: promptInfo, // Include full text in prompt
-          });
+            const fileInfo = `📄 Document: ${file.name} (${Math.round(file.size/1024)}KB) - Text extracted with OCR`;
+            const promptInfo = extractedText ? `📄 Document: ${file.name}\n\nExtracted Content:\n${extractedText}` : fileInfo;
 
-          onProgress?.(file.name, {
-            stage: "Complete",
-            progress: 100,
-            timeElapsed: Date.now() - startTime,
-          });
+            processedFiles.push({
+              ...baseProcessedFile,
+              extractedText,
+              processingTime: Date.now() - startTime,
+              displayContent: fileInfo, // Just show file info in chat bubble
+              promptContent: promptInfo, // Include full text in prompt
+            });
+
+            onProgress?.(file.name, {
+              stage: "Complete",
+              progress: 100,
+              timeElapsed: Date.now() - startTime,
+            });
+          }
         } else {
           console.log(`❓ [CLIENT OCR] Unsupported file type: ${file.type}`);
           const errorInfo = `❌ Unsupported file: ${file.name} (${file.type})`;
@@ -235,7 +261,6 @@ export class ClientFileProcessor {
             const pageProgress = (m.progress || 0) * (ocrTotalRange / imagesToProcess.length);
             const totalProgress = Math.min(99, ocrStartProgress + baseProgress + pageProgress);
             
-            console.log(`🔧 [DEBUG PROGRESS] Page ${i + 1}/${imagesToProcess.length}: baseProgress=${baseProgress.toFixed(1)}, pageProgress=${pageProgress.toFixed(1)}, totalProgress=${totalProgress.toFixed(1)}`);
             
             onProgress({ 
               status: `${m.status}${pageNumber}`, 
@@ -244,13 +269,8 @@ export class ClientFileProcessor {
           },
         });
 
-        console.log(`🔍 [DEBUG] OCR result for page ${i + 1}: "${text.substring(0, 100)}..." (${text.length} chars)`);
-        
         if (text.trim()) {
           allTexts.push(text.trim());
-          console.log(`✅ [DEBUG] Added page ${i + 1} text to results (${text.trim().length} chars)`);
-        } else {
-          console.log(`⚠️ [DEBUG] Page ${i + 1} returned empty text`);
         }
       }
 

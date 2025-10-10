@@ -20,6 +20,8 @@ export async function POST(request: NextRequest) {
       thinking_budget_tokens = 1024,
       max_image_resolution = 0.5,
       reasoning_effort: "minimal" | "low" | "medium" | "high" = "medium",
+      enable_web_search = true,
+      verbosity: "low" | "medium" | "high" = "medium",
       systemInstruction = "",
       files: Array<{
         name: string;
@@ -44,6 +46,8 @@ export async function POST(request: NextRequest) {
         parseInt(formData.get("thinking_budget_tokens") as string) || 1024;
       max_image_resolution =
         parseFloat(formData.get("max_image_resolution") as string) || 0.5;
+      enable_web_search = formData.get("enable_web_search") !== "false";
+      verbosity = (formData.get("verbosity") as "low" | "medium" | "high") || "medium";
       systemInstruction = (formData.get("systemInstruction") as string) || "";
 
       // Extract files
@@ -75,6 +79,8 @@ export async function POST(request: NextRequest) {
         thinking_budget_tokens,
         max_image_resolution,
         reasoning_effort,
+        enable_web_search,
+        verbosity,
         systemInstruction,
       } = body);
 
@@ -157,6 +163,8 @@ export async function POST(request: NextRequest) {
               thinking_budget_tokens,
               max_image_resolution,
               reasoning_effort,
+              enable_web_search,
+              verbosity,
             });
             console.log("✅ AI stream created successfully");
 
@@ -219,6 +227,8 @@ export async function POST(request: NextRequest) {
         thinking_budget_tokens,
         max_image_resolution,
         reasoning_effort,
+        enable_web_search,
+        verbosity,
       });
 
       return NextResponse.json({

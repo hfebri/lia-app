@@ -8,9 +8,7 @@ export * from "./analytics";
 import { users, usersRelations } from "./users";
 import {
   conversations,
-  messages,
   conversationsRelations,
-  messagesRelations,
 } from "./conversations";
 import { files, filesRelations } from "./files";
 import { analytics, dailyMetrics, analyticsRelations } from "./analytics";
@@ -19,7 +17,6 @@ export const schema = {
   // Tables
   users,
   conversations,
-  messages,
   files,
   analytics,
   dailyMetrics,
@@ -27,7 +24,6 @@ export const schema = {
   // Relations
   usersRelations,
   conversationsRelations,
-  messagesRelations,
   filesRelations,
   analyticsRelations,
 };

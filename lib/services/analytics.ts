@@ -4,7 +4,6 @@ import {
   dailyMetrics,
   users,
   conversations,
-  messages,
   files,
 } from "@/db/schema";
 import { eq, gte, lte, count, sql, desc, asc } from "drizzle-orm";
@@ -81,13 +80,17 @@ export async function getAnalyticsData(
     ] = await Promise.all([
       db.select({ count: count() }).from(users),
       db.select({ count: count() }).from(conversations),
-      db.select({ count: count() }).from(messages),
+      // Count total messages from conversations JSON array
+      db.execute(sql`
+        SELECT COALESCE(SUM(jsonb_array_length(messages)), 0) as count
+        FROM conversations
+      `),
       db.select({ count: count() }).from(files),
     ]);
 
     const totalUsers = totalUsersResult[0]?.count || 0;
     const totalConversations = totalConversationsResult[0]?.count || 0;
-    const totalMessages = totalMessagesResult[0]?.count || 0;
+    const totalMessages = parseInt((totalMessagesResult.rows[0] as any)?.count) || 0;
     const totalFilesCount = totalFilesResult[0]?.count || 0;
 
     // Calculate average messages per conversation
@@ -200,10 +203,12 @@ export async function getUsageMetrics(): Promise<UsageMetrics> {
   try {
     // Get today's metrics
     const todayMetrics = await Promise.all([
-      db
-        .select({ count: count() })
-        .from(messages)
-        .where(gte(messages.createdAt, todayStart)),
+      // Count messages from conversations created today
+      db.execute(sql`
+        SELECT COALESCE(SUM(jsonb_array_length(messages)), 0) as count
+        FROM conversations
+        WHERE created_at >= ${todayStart}
+      `),
       db
         .select({ count: count() })
         .from(conversations)
@@ -216,10 +221,11 @@ export async function getUsageMetrics(): Promise<UsageMetrics> {
 
     // Get week's metrics
     const weekMetrics = await Promise.all([
-      db
-        .select({ count: count() })
-        .from(messages)
-        .where(gte(messages.createdAt, weekStart)),
+      db.execute(sql`
+        SELECT COALESCE(SUM(jsonb_array_length(messages)), 0) as count
+        FROM conversations
+        WHERE created_at >= ${weekStart}
+      `),
       db
         .select({ count: count() })
         .from(conversations)
@@ -232,10 +238,11 @@ export async function getUsageMetrics(): Promise<UsageMetrics> {
 
     // Get month's metrics
     const monthMetrics = await Promise.all([
-      db
-        .select({ count: count() })
-        .from(messages)
-        .where(gte(messages.createdAt, monthStart)),
+      db.execute(sql`
+        SELECT COALESCE(SUM(jsonb_array_length(messages)), 0) as count
+        FROM conversations
+        WHERE created_at >= ${monthStart}
+      `),
       db
         .select({ count: count() })
         .from(conversations)
@@ -248,12 +255,11 @@ export async function getUsageMetrics(): Promise<UsageMetrics> {
 
     // Get last month's metrics for growth calculation
     const lastMonthMetrics = await Promise.all([
-      db
-        .select({ count: count() })
-        .from(messages)
-        .where(
-          sql`${messages.createdAt} >= ${lastMonthStart} AND ${messages.createdAt} < ${monthStart}`
-        ),
+      db.execute(sql`
+        SELECT COALESCE(SUM(jsonb_array_length(messages)), 0) as count
+        FROM conversations
+        WHERE created_at >= ${lastMonthStart} AND created_at < ${monthStart}
+      `),
       db
         .select({ count: count() })
         .from(conversations)
@@ -287,27 +293,27 @@ export async function getUsageMetrics(): Promise<UsageMetrics> {
 
     return {
       today: {
-        messages: todayMetrics[0][0]?.count || 0,
+        messages: parseInt((todayMetrics[0].rows[0] as any)?.count) || 0,
         conversations: todayMetrics[1][0]?.count || 0,
         files: todayMetrics[2][0]?.count || 0,
         activeUsers: Math.floor(Math.random() * 100) + 50, // Mock active users
       },
       thisWeek: {
-        messages: weekMetrics[0][0]?.count || 0,
+        messages: parseInt((weekMetrics[0].rows[0] as any)?.count) || 0,
         conversations: weekMetrics[1][0]?.count || 0,
         files: weekMetrics[2][0]?.count || 0,
         activeUsers: Math.floor(Math.random() * 500) + 200,
       },
       thisMonth: {
-        messages: monthMetrics[0][0]?.count || 0,
+        messages: parseInt((monthMetrics[0].rows[0] as any)?.count) || 0,
         conversations: monthMetrics[1][0]?.count || 0,
         files: monthMetrics[2][0]?.count || 0,
         activeUsers: Math.floor(Math.random() * 1000) + 500,
       },
       growth: {
         messages: calculateGrowth(
-          monthMetrics[0][0]?.count || 0,
-          lastMonthMetrics[0][0]?.count || 0
+          parseInt((monthMetrics[0].rows[0] as any)?.count) || 0,
+          parseInt((lastMonthMetrics[0].rows[0] as any)?.count) || 0
         ),
         conversations: calculateGrowth(
           monthMetrics[1][0]?.count || 0,
@@ -422,12 +428,11 @@ export async function updateDailyMetrics(
         .where(
           sql`${users.updatedAt} >= ${dayStart} AND ${users.updatedAt} < ${dayEnd}`
         ),
-      db
-        .select({ count: count() })
-        .from(messages)
-        .where(
-          sql`${messages.createdAt} >= ${dayStart} AND ${messages.createdAt} < ${dayEnd}`
-        ),
+      db.execute(sql`
+        SELECT COALESCE(SUM(jsonb_array_length(messages)), 0) as count
+        FROM conversations
+        WHERE created_at >= ${dayStart} AND created_at < ${dayEnd}
+      `),
       db
         .select({ count: count() })
         .from(conversations)
@@ -450,7 +455,7 @@ export async function updateDailyMetrics(
         totalUsers: totalUsers[0]?.count || 0,
         // newUsers: newUsers[0]?.count || 0, // Field not in schema yet
         activeUsers: activeUsers[0]?.count || 0,
-        totalMessages: totalMessages[0]?.count || 0,
+        totalMessages: parseInt((totalMessages.rows[0] as any)?.count) || 0,
         totalConversations: totalConversations[0]?.count || 0,
         // totalFiles: totalFiles[0]?.count || 0, // Field not in schema yet
         // avgResponseTime: Math.random() * 2000 + 500, // Field not in schema yet

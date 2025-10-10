@@ -66,35 +66,46 @@ export class ReplicateProvider implements AIProvider {
           input.max_image_resolution = max_image_resolution;
         }
       } else if (this.isOpenAIModel(model)) {
-        // For OpenAI models, check if there are images
+        // Extract model variant: "openai/gpt-5-nano" → "gpt-5-nano"
+        const modelVariant = model.split("/")[1] || "gpt-5";
+
+        // For OpenAI models, use structured API format
         const userMessage = messages[messages.length - 1];
         const hasImage = userMessage?.files && userMessage.files.length > 0;
 
         if (hasImage) {
-          // Use OpenAI image schema
+          // Use structured API with images
           const imageUrls =
             userMessage.files?.map((file) => (file as any).url || file.data) ||
             [];
 
           input = {
+            model: modelVariant,
             prompt: userMessage?.content || "",
-            messages: [],
-            verbosity: "medium",
+            instructions: system_prompt || "",
+            verbosity: options.verbosity || "medium",
+            reasoning_effort: reasoning_effort || "medium",
+            enable_web_search: options.enable_web_search !== false,
             image_input: imageUrls,
-            reasoning_effort,
+            tools: [],
+            json_schema: {},
+            simple_schema: [],
+            input_item_list: [],
           };
         } else {
-          // Use regular OpenAI message format for text-only
-          const formattedMessages = this.formatMessages(
-            messages,
-            system_prompt
-          );
+          // Use structured API for text-only
           input = {
-            messages: formattedMessages,
-            temperature,
-            max_tokens,
-            top_p,
-            reasoning_effort,
+            model: modelVariant,
+            prompt: userMessage?.content || "",
+            instructions: system_prompt || "",
+            verbosity: options.verbosity || "medium",
+            reasoning_effort: reasoning_effort || "medium",
+            enable_web_search: options.enable_web_search !== false,
+            tools: [],
+            image_input: [],
+            json_schema: {},
+            simple_schema: [],
+            input_item_list: [],
           };
         }
       } else {
@@ -169,35 +180,46 @@ export class ReplicateProvider implements AIProvider {
           input.max_image_resolution = max_image_resolution;
         }
       } else if (this.isOpenAIModel(model)) {
-        // For OpenAI models, check if there are images
+        // Extract model variant: "openai/gpt-5-nano" → "gpt-5-nano"
+        const modelVariant = model.split("/")[1] || "gpt-5";
+
+        // For OpenAI models, use structured API format
         const userMessage = messages[messages.length - 1];
         const hasImage = userMessage?.files && userMessage.files.length > 0;
 
         if (hasImage) {
-          // Use OpenAI image schema
+          // Use structured API with images
           const imageUrls =
             userMessage.files?.map((file) => (file as any).url || file.data) ||
             [];
 
           input = {
+            model: modelVariant,
             prompt: userMessage?.content || "",
-            messages: [],
-            verbosity: "medium",
+            instructions: system_prompt || "",
+            verbosity: options.verbosity || "medium",
+            reasoning_effort: reasoning_effort || "medium",
+            enable_web_search: options.enable_web_search !== false,
             image_input: imageUrls,
-            reasoning_effort,
+            tools: [],
+            json_schema: {},
+            simple_schema: [],
+            input_item_list: [],
           };
         } else {
-          // Use regular OpenAI message format for text-only
-          const formattedMessages = this.formatMessages(
-            messages,
-            system_prompt
-          );
+          // Use structured API for text-only
           input = {
-            messages: formattedMessages,
-            temperature,
-            max_tokens,
-            top_p,
-            reasoning_effort,
+            model: modelVariant,
+            prompt: userMessage?.content || "",
+            instructions: system_prompt || "",
+            verbosity: options.verbosity || "medium",
+            reasoning_effort: reasoning_effort || "medium",
+            enable_web_search: options.enable_web_search !== false,
+            tools: [],
+            image_input: [],
+            json_schema: {},
+            simple_schema: [],
+            input_item_list: [],
           };
         }
       } else {

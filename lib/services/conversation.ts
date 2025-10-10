@@ -8,14 +8,12 @@ import {
   updateConversationTitle,
   getConversationsCountByUser,
   searchConversations,
-} from "@/lib/db/queries/conversations";
-
-import {
-  createMessage as dbCreateMessage,
-  getMessagesByConversationId,
+  getConversationMessages,
+  addMessageToConversation,
   getLatestMessageInConversation,
-  getMessagesCountByConversation,
-} from "@/lib/db/queries/messages";
+  getConversationMessageCount,
+  addMessagesToConversation,
+} from "@/lib/db/queries/conversations";
 
 import type {
   Conversation,
@@ -61,12 +59,13 @@ export class ConversationService {
           ? generateConversationTitle(initialMessage)
           : "New Conversation"),
       aiModel: aiModel || "openai/gpt-5", // Use provided model or default
+      messages: [] as any, // Start with empty messages array
       metadata: null,
     };
 
     const conversation = await dbCreateConversation(conversationData);
 
-    // If there's an initial message, create it
+    // If there's an initial message, add it
     if (initialMessage) {
       await this.addMessage(conversation.id, userId, {
         content: initialMessage,
@@ -131,26 +130,48 @@ export class ConversationService {
     userId: string,
     messageData: {
       content: string;
-      role: "user" | "assistant";
+      role: "user" | "assistant" | "system";
       metadata?: any;
     }
   ): Promise<Message> {
     const newMessage: NewMessage = {
-      conversationId,
-      userId,
       content: messageData.content,
       role: messageData.role,
       metadata: messageData.metadata || null,
     };
 
-    const message = await dbCreateMessage(newMessage);
+    // Add message to conversation's messages array
+    await addMessageToConversation(conversationId, newMessage);
 
-    // Update conversation's updatedAt timestamp
-    await dbUpdateConversation(conversationId, {
-      updatedAt: new Date(),
-    });
+    // Return the message (note: no longer has conversationId or userId since it's embedded)
+    return {
+      ...newMessage,
+      createdAt: new Date().toISOString(),
+    } as Message;
+  }
 
-    return message;
+  // Add multiple messages to conversation (batch)
+  static async addMessages(
+    conversationId: string,
+    userId: string,
+    messages: Array<{
+      content: string;
+      role: "user" | "assistant" | "system";
+      metadata?: any;
+    }>
+  ): Promise<Message[]> {
+    const newMessages: NewMessage[] = messages.map((msg) => ({
+      content: msg.content,
+      role: msg.role,
+      metadata: msg.metadata || null,
+    }));
+
+    await addMessagesToConversation(conversationId, newMessages);
+
+    return newMessages.map((msg) => ({
+      ...msg,
+      createdAt: new Date().toISOString(),
+    })) as Message[];
   }
 
   // Get messages for a conversation
@@ -158,7 +179,25 @@ export class ConversationService {
     conversationId: string,
     params: PaginationParams = {}
   ) {
-    return getMessagesByConversationId(conversationId, params);
+    const messages = await getConversationMessages(conversationId);
+    const { page = 1, limit = 50 } = params;
+    const offset = (page - 1) * limit;
+
+    // Simple pagination on the array
+    const paginatedMessages = messages.slice(offset, offset + limit);
+
+    return {
+      messages: paginatedMessages,
+      total: messages.length,
+      page,
+      limit,
+      totalPages: Math.ceil(messages.length / limit),
+    };
+  }
+
+  // Get all messages for a conversation (no pagination)
+  static async getAllMessages(conversationId: string): Promise<Message[]> {
+    return getConversationMessages(conversationId);
   }
 
   // Search conversations
@@ -172,7 +211,7 @@ export class ConversationService {
 
   // Get conversation statistics
   static async getConversationStats(conversationId: string) {
-    const messageCount = await getMessagesCountByConversation(conversationId);
+    const messageCount = await getConversationMessageCount(conversationId);
     const latestMessage = await getLatestMessageInConversation(conversationId);
 
     return {
@@ -232,6 +271,9 @@ export class ConversationService {
   static formatConversationForResponse(
     conversation: Conversation | ConversationWithLastMessage
   ): any {
+    const messages = (conversation.messages as any) || [];
+    const messageCount = Array.isArray(messages) ? messages.length : 0;
+
     return {
       id: conversation.id,
       title: conversation.title,
@@ -240,9 +282,11 @@ export class ConversationService {
       updatedAt: conversation.updatedAt,
       userId: conversation.userId,
       messageCount:
-        "messageCount" in conversation ? conversation.messageCount : 0,
+        "messageCount" in conversation ? conversation.messageCount : messageCount,
       lastMessage:
-        "lastMessage" in conversation ? conversation.lastMessage : undefined,
+        "lastMessage" in conversation
+          ? conversation.lastMessage
+          : (messageCount > 0 ? messages[messages.length - 1] : undefined),
       metadata: conversation.metadata,
     };
   }
@@ -250,12 +294,25 @@ export class ConversationService {
   // Format message for API response
   static formatMessageForResponse(message: Message): any {
     return {
-      id: message.id,
       content: message.content,
       role: message.role,
       timestamp: message.createdAt,
-      conversationId: message.conversationId,
       metadata: message.metadata,
+    };
+  }
+
+  // Check if conversation is approaching context limit (50 messages)
+  static async checkContextLimit(conversationId: string): Promise<{
+    messageCount: number;
+    shouldWarn: boolean;
+    shouldAlert: boolean;
+  }> {
+    const messageCount = await getConversationMessageCount(conversationId);
+
+    return {
+      messageCount,
+      shouldWarn: messageCount >= 45, // Soft warning at 45
+      shouldAlert: messageCount >= 50, // Strong alert at 50
     };
   }
 }

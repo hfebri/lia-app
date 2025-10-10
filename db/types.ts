@@ -2,12 +2,10 @@ import { InferSelectModel, InferInsertModel } from "drizzle-orm";
 import {
   users,
   conversations,
-  messages,
   files,
   analytics,
   dailyMetrics,
   userRoleEnum,
-  messageRoleEnum,
 } from "./schema";
 
 // User types
@@ -19,10 +17,20 @@ export type UserRole = (typeof userRoleEnum.enumValues)[number];
 export type Conversation = InferSelectModel<typeof conversations>;
 export type NewConversation = InferInsertModel<typeof conversations>;
 
-// Message types
-export type Message = InferSelectModel<typeof messages>;
-export type NewMessage = InferInsertModel<typeof messages>;
-export type MessageRole = (typeof messageRoleEnum.enumValues)[number];
+// Message types (now embedded in conversations)
+export type MessageRole = "user" | "assistant" | "system";
+
+export type Message = {
+  role: MessageRole;
+  content: string;
+  metadata?: Record<string, any>;
+  tokens?: Record<string, any>;
+  createdAt: Date | string;
+};
+
+export type NewMessage = Omit<Message, "createdAt"> & {
+  createdAt?: Date | string;
+};
 
 // Template types (commented out as schema doesn't exist yet)
 // export type Template = InferSelectModel<typeof templates>;
@@ -40,7 +48,6 @@ export type NewDailyMetrics = InferInsertModel<typeof dailyMetrics>;
 
 // Extended types for API responses
 export type ConversationWithMessages = Conversation & {
-  messages: Message[];
   user: User;
   // template?: Template; // Commented out as schema doesn't exist yet
 };
@@ -49,6 +56,9 @@ export type ConversationWithLastMessage = Conversation & {
   lastMessage?: Message;
   messageCount: number;
 };
+
+// Helper type to work with conversation messages
+export type ConversationMessages = Message[];
 
 export type UserWithStats = User & {
   conversationCount: number;

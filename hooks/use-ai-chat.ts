@@ -100,9 +100,13 @@ export function useAiChat(options: UseAiChatOptions = {}) {
   const loadModels = useCallback(async () => {
     try {
       const modelsData = await chatService.current.getAvailableModels();
+      // Filter out Gemini models from the available models list
+      const filteredModels = modelsData.models.filter(
+        (model: any) => !model.id.toLowerCase().includes('gemini')
+      );
       setState((prev) => ({
         ...prev,
-        availableModels: modelsData.models,
+        availableModels: filteredModels,
         selectedModel: prev.selectedModel || modelsData.defaultModel,
       }));
     } catch (error) {
@@ -164,16 +168,15 @@ export function useAiChat(options: UseAiChatOptions = {}) {
           error: null,
         }));
 
-        // Clear any local processing state from the UI component
-        console.log("🔧 [DEBUG] useAiChat taking over - clearing local processing");
 
         try {
           // Dynamically import ClientFileProcessor to avoid SSR issues
           const { ClientFileProcessor } = await import("@/lib/services/client-file-processor");
-          
+
           // Process files with progress tracking
           processedFiles = await ClientFileProcessor.processFiles(
             files,
+            state.selectedModel, // Pass current model to determine if OCR is needed
             (fileName, progress) => {
               setState((prev) => ({
                 ...prev,
@@ -198,20 +201,6 @@ export function useAiChat(options: UseAiChatOptions = {}) {
             (processedFiles as any).displayForMessage = `${content}\n\n${displayContent}`;
           }
 
-          console.log("✅ [CLIENT] File processing completed");
-          console.log("📝 [CLIENT] Enhanced prompt length:", finalContent.length);
-          console.log("🔍 [CLIENT] Display content:", displayContent);
-          console.log("🔍 [CLIENT] Enhanced prompt preview:", finalContent.substring(0, 500) + "...");
-          console.log("🔍 [CLIENT] Processed files count:", processedFiles.length);
-          processedFiles.forEach((file, idx) => {
-            console.log(`🔍 [CLIENT] File ${idx + 1}:`, {
-              name: file.name,
-              hasExtractedText: !!file.extractedText,
-              extractedTextLength: file.extractedText?.length || 0,
-              displayContent: file.displayContent?.substring(0, 100),
-              promptContent: file.promptContent?.substring(0, 100)
-            });
-          });
         } catch (error) {
           console.error("❌ [CLIENT] File processing failed:", error);
           setState((prev) => ({

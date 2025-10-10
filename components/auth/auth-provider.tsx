@@ -19,11 +19,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isFetchingUser, setIsFetchingUser] = useState(false);
 
   const supabase = useMemo(() => createClient(), []);
 
+  const abortControllerRef = useCallback(() => {
+    let controller: AbortController | null = null;
+    return {
+      get: () => controller,
+      set: (newController: AbortController | null) => {
+        controller = newController;
+      },
+      abort: () => {
+        if (controller) {
+          controller.abort();
+          controller = null;
+        }
+      },
+    };
+  }, [])();
+
   const fetchUserProfile = useCallback(
     async (email: string) => {
+      setIsFetchingUser(true);
+
+      // Create AbortController only if it doesn't exist
+      // Don't abort existing requests - let them complete
+      if (!abortControllerRef.get()) {
+        const controller = new AbortController();
+        abortControllerRef.set(controller);
+      }
+
       try {
         const response = await fetch("/api/auth/user", {
           method: "POST",
@@ -31,11 +57,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ email }),
+          signal: abortControllerRef.get()?.signal,
         });
 
         if (response.ok) {
           const userData = await response.json();
-
           setUser(userData);
         } else {
           const errorText = await response.text();
@@ -45,8 +71,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             await supabase.auth.signOut();
           }
         }
-      } catch (error) {
-        setUser(null);
+      } catch (error: any) {
+        // Ignore abort errors
+        if (error.name !== "AbortError") {
+          setUser(null);
+        }
+      } finally {
+        setIsFetchingUser(false);
       }
     },
     [supabase]
@@ -95,7 +126,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      // Cleanup: abort any pending user fetch on unmount
+      abortControllerRef.abort();
+    };
   }, [supabase, fetchUserProfile]);
 
   const signInWithGoogle = useCallback(async () => {
@@ -180,11 +215,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [supabase, fetchUserProfile]);
 
   // Check for authentication issues and auto-logout
+  // Only logout if we're NOT currently fetching the user profile
   useEffect(() => {
-    if (!isLoading && session && !user) {
+    if (!isLoading && !isFetchingUser && session && !user) {
+      console.warn("⚠️ Session exists but user not found - forcing logout");
       forceLogout();
     }
-  }, [isLoading, session, user, forceLogout]);
+  }, [isLoading, isFetchingUser, session, user, forceLogout]);
 
   // Memoize the context value to prevent unnecessary re-renders
   const value: AuthContextType = useMemo(
