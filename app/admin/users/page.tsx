@@ -126,7 +126,7 @@ export default function AdminUsersPage() {
   };
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="h-full flex flex-col p-6 gap-6">
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center space-x-2">
@@ -166,8 +166,8 @@ export default function AdminUsersPage() {
       )}
 
       {/* User Table */}
-      <Card>
-        <CardHeader>
+      <Card className="flex-1 flex flex-col min-h-0">
+        <CardHeader className="flex-shrink-0">
           <CardTitle className="flex items-center space-x-2">
             <Users className="h-5 w-5" />
             <span>All Users</span>
@@ -176,11 +176,12 @@ export default function AdminUsersPage() {
             Manage user accounts, roles, and access permissions
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex-1 overflow-hidden">
           <UserTable
             users={convertToUserTableFormat(users)}
             onUserAction={handleUserAction}
             onRefresh={loadData}
+            isLoading={loading}
           />
         </CardContent>
       </Card>

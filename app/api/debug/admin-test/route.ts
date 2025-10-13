@@ -1,30 +1,24 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db/db";
-import { users, files } from "@/db/schema";
+import { users, files, conversations } from "@/db/schema";
 import { desc, sql, eq } from "drizzle-orm";
 
 export async function GET() {
   try {
-    console.log("🔍 [DEBUG ADMIN TEST] Testing admin users API logic");
-
     // Get all users first
     const allUsers = await db
       .select()
       .from(users)
       .orderBy(desc(users.createdAt));
 
-    console.log("✅ [DEBUG ADMIN TEST] Found users:", allUsers.length);
-
-    // Get message counts for each user
+    // Get message counts for each user from conversations JSONB
     const messageCounts = await db
       .select({
-        userId: messages.userId,
-        count: sql<number>`COUNT(${messages.id})`.as("messageCount"),
+        userId: conversations.userId,
+        count: sql<number>`SUM(jsonb_array_length(${conversations.messages}))`.as("messageCount"),
       })
-      .from(messages)
-      .groupBy(messages.userId);
-
-    console.log("✅ [DEBUG ADMIN TEST] Message counts:", messageCounts.length);
+      .from(conversations)
+      .groupBy(conversations.userId);
 
     // Get file counts for each user
     const fileCounts = await db
@@ -35,8 +29,6 @@ export async function GET() {
       .from(files)
       .where(eq(files.isActive, true))
       .groupBy(files.userId);
-
-    console.log("✅ [DEBUG ADMIN TEST] File counts:", fileCounts.length);
 
     // Combine the data
     const usersWithCounts = allUsers.map((user) => {

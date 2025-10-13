@@ -5,14 +5,9 @@ import type { AIMessage, AIProviderName } from "@/lib/ai/types";
 import { LIA_SYSTEM_INSTRUCTION } from "@/lib/constants/ai-models";
 
 export async function POST(request: NextRequest) {
-  console.log("🚀 API ROUTE /api/chat - POST request received");
-  console.log("🔍 API ROUTE - Request headers:", Object.fromEntries(request.headers.entries()));
-  
   try {
-    console.log("🔐 API ROUTE - Checking authentication...");
     // Require authentication for all chat requests
     await requireAuthenticatedUser();
-    console.log("✅ API ROUTE - Authentication passed");
     let messages,
       model = "openai/gpt-5",
       stream = false,
@@ -31,10 +26,8 @@ export async function POST(request: NextRequest) {
       }> = [];
 
     const contentType = request.headers.get("content-type") || "";
-    console.log("📦 API ROUTE - Content-Type:", contentType);
     
     if (contentType.includes("multipart/form-data")) {
-      console.log("📁 API ROUTE - Processing multipart/form-data...");
       // Handle FormData for file uploads
       const formData = await request.formData();
 
@@ -67,10 +60,8 @@ export async function POST(request: NextRequest) {
         })
       );
     } else {
-      console.log("📄 API ROUTE - Processing JSON request...");
       // Handle JSON for text-only messages or messages with base64 files
       const body = await request.json();
-      console.log("📊 API ROUTE - Parsed JSON body keys:", Object.keys(body));
       ({
         messages,
         model,
@@ -123,30 +114,32 @@ export async function POST(request: NextRequest) {
       provider = "replicate";
     }
 
-    console.log(`🔍 API ROUTE DEBUG - Provider: ${provider}, Model: ${model}, Files: ${files.length}`);
-    console.log(`📝 API ROUTE - File processing now handled client-side, API receives processed text`);
-
-    // Convert messages to AI format - files already processed client-side
+    // Convert messages to AI format - preserve files in messages
     const aiMessages: AIMessage[] = messages.map(
       (msg: {
         role: string;
         content: string;
+        files?: Array<{
+          name: string;
+          type: string;
+          size?: number;
+          data?: string;
+          url?: string;
+        }>;
         [key: string]: unknown;
       }) => ({
         role: msg.role as "user" | "assistant" | "system",
         content: msg.content,
+        files: msg.files, // Preserve files from message
       })
     );
 
     if (stream) {
       // Create streaming response
-      console.log("🌊 Starting streaming response...");
       const encoder = new TextEncoder();
       const readable = new ReadableStream({
         async start(controller) {
           try {
-            console.log("🚀 Generating AI stream...");
-
             // Combine default LIA system instruction with user's custom instruction
             let combinedSystemPrompt = LIA_SYSTEM_INSTRUCTION;
             if (systemInstruction && systemInstruction.trim()) {
@@ -166,7 +159,6 @@ export async function POST(request: NextRequest) {
               enable_web_search,
               verbosity,
             });
-            console.log("✅ AI stream created successfully");
 
             for await (const chunk of stream) {
               const data = JSON.stringify({
@@ -242,6 +234,7 @@ export async function POST(request: NextRequest) {
       });
     }
   } catch (error) {
+    console.error("[API /api/chat] Failed to process request:", error);
     return NextResponse.json(
       {
         success: false,

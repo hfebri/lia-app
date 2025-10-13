@@ -11,8 +11,6 @@ export async function GET() {
       .from(users)
       .where(eq(users.role, "admin"));
 
-    console.log("✅ [DEBUG ADMINS] Found admin users:", adminUsers.length);
-
     return NextResponse.json({
       success: true,
       totalAdmins: adminUsers.length,

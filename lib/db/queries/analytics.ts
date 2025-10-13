@@ -5,7 +5,6 @@ import {
   dailyMetrics,
   users,
   conversations,
-  messages,
 } from "../../../db/schema";
 import type {
   Analytics,
@@ -369,19 +368,21 @@ export async function generateDailyMetrics(
       .from(conversations)
       .where(lte(conversations.createdAt, endOfDay)),
 
-    // Total messages up to this date
+    // Total messages up to this date (count from JSONB arrays)
     db
-      .select({ count: count() })
-      .from(messages)
-      .where(lte(messages.createdAt, endOfDay)),
+      .select({
+        count: sql<number>`COALESCE(SUM(jsonb_array_length(${conversations.messages})), 0)`,
+      })
+      .from(conversations)
+      .where(lte(conversations.createdAt, endOfDay)),
   ]);
 
   const metricsData: Partial<NewDailyMetrics> = {
     totalUsers: totalUsersResult[0].count,
     activeUsers: activeUsersResult.length,
     totalConversations: totalConversationsResult[0].count,
-    totalMessages: totalMessagesResult[0].count,
-    totalTokensUsed: 0, // Would be calculated from messages.tokens
+    totalMessages: totalMessagesResult[0].count || 0,
+    totalTokensUsed: 0, // Would be calculated from messages metadata
     popularTopics: null, // Would be generated from text analysis
     modelUsage: null, // Would be calculated from conversation data
   };
@@ -421,7 +422,10 @@ export async function getAnalyticsDashboardData(
         )
       ),
     db.select({ count: count() }).from(conversations),
-    db.select({ count: count() }).from(messages),
+    // Count total messages from JSONB arrays
+    db.select({
+      count: sql<number>`COALESCE(SUM(jsonb_array_length(${conversations.messages})), 0)`,
+    }).from(conversations),
     getEventCountsByType(startDate, endDate),
     getDailyMetricsByDateRange(
       startDate.toISOString().split("T")[0],

@@ -186,13 +186,14 @@ export class GeminiProvider implements AIProvider {
         for (let j = 0; j < message.files.length; j++) {
           const file = message.files[j];
 
-          // For files (images, PDFs, etc.), use inlineData format as per Gemini API
-          parts.push({
-            inlineData: {
-              data: file.data, // base64 data
-              mimeType: file.type,
-            },
-          });
+          if (file.data) {
+            parts.push({
+              inlineData: {
+                data: file.data,
+                mimeType: file.type,
+              },
+            });
+          }
         }
       }
 

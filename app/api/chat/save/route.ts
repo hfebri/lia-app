@@ -20,6 +20,7 @@ export async function POST(request: NextRequest) {
     }
 
     let currentConversationId = conversationId;
+    let conversationTitleForResponse: string | null = null;
 
     // Create new conversation if no ID provided
     if (!currentConversationId) {
@@ -31,6 +32,7 @@ export async function POST(request: NextRequest) {
         }
       );
       currentConversationId = conversation.id;
+      conversationTitleForResponse = conversation.title;
     } else {
       // Verify user owns the conversation
       const conversation = await ConversationService.getConversation(
@@ -72,19 +74,23 @@ export async function POST(request: NextRequest) {
     // Auto-update conversation title if it's still "New Chat" and we have the first user message
     if (!conversationId && userMessage?.content) {
       const titleFromMessage = userMessage.content.slice(0, 50).trim();
-      const finalTitle = titleFromMessage.length > 50 
-        ? titleFromMessage.slice(0, 47) + "..." 
+      const finalTitle = titleFromMessage.length > 50
+        ? titleFromMessage.slice(0, 47) + "..."
         : titleFromMessage;
-      
+
       await ConversationService.updateConversation(currentConversationId, {
         title: finalTitle,
       });
+
+      // Update the title for response
+      conversationTitleForResponse = finalTitle;
     }
 
     return NextResponse.json({
       success: true,
       data: {
         conversationId: currentConversationId,
+        title: conversationTitleForResponse, // Include the title in response
         userMessage:
           ConversationService.formatMessageForResponse(savedUserMessage),
         assistantMessage: savedAssistantMessage

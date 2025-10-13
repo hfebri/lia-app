@@ -2,11 +2,7 @@
 
 import { useState } from "react";
 import {
-  Table,
-  TableBody,
   TableCell,
-  TableHead,
-  TableHeader,
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -49,7 +45,6 @@ import {
 import {
   MoreHorizontal,
   Search,
-  Filter,
   Users,
   Shield,
   UserCheck,
@@ -84,6 +79,7 @@ interface UserTableProps {
   onUserAction?: (userId: string, action: string) => void;
   onRefresh?: () => void;
   className?: string;
+  isLoading?: boolean;
 }
 
 export function UserTable({
@@ -91,22 +87,8 @@ export function UserTable({
   onUserAction,
   onRefresh,
   className,
+  isLoading = false,
 }: UserTableProps) {
-  console.log("🔍 [USER TABLE] Received users:", users.length);
-  if (users.length > 0) {
-    console.log("🔍 [USER TABLE] Sample user:", users[0]);
-    const helmiUser = users.find(
-      (u) => u.email === "hfebri@leverategroup.asia"
-    );
-    if (helmiUser) {
-      console.log("🔍 [USER TABLE] Helmi user data:", {
-        email: helmiUser.email,
-        messageCount: helmiUser.messageCount,
-        fileCount: helmiUser.fileCount,
-      });
-    }
-  }
-
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [roleFilter, setRoleFilter] = useState<string>("all");
@@ -116,7 +98,6 @@ export function UserTable({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [selectedRole, setSelectedRole] = useState<"admin" | "user">("user");
-  const [isLoading, setIsLoading] = useState(false);
 
   const filteredUsers = users.filter((user) => {
     const matchesSearch =
@@ -193,7 +174,6 @@ export function UserTable({
   const confirmRoleChange = async () => {
     if (!selectedUser) return;
 
-    setIsLoading(true);
     try {
       const result = await updateUserRoleAction(selectedUser.id, selectedRole);
 
@@ -203,10 +183,9 @@ export function UserTable({
       } else {
         toast.error(result.message);
       }
-    } catch (error) {
+    } catch {
       toast.error("Failed to update user role");
     } finally {
-      setIsLoading(false);
       setRoleDialogOpen(false);
       setSelectedUser(null);
     }
@@ -215,7 +194,6 @@ export function UserTable({
   const confirmDeleteUser = async () => {
     if (!selectedUser) return;
 
-    setIsLoading(true);
     try {
       const result = await deleteUserAction(selectedUser.id);
 
@@ -225,17 +203,16 @@ export function UserTable({
       } else {
         toast.error(result.message);
       }
-    } catch (error) {
+    } catch {
       toast.error("Failed to delete user");
     } finally {
-      setIsLoading(false);
       setDeleteDialogOpen(false);
       setSelectedUser(null);
     }
   };
 
   return (
-    <div className={cn("space-y-4", className)}>
+    <div className={cn("h-full flex flex-col gap-4", className)}>
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
@@ -276,20 +253,22 @@ export function UserTable({
       </div>
 
       {/* Table */}
-      <div className="border rounded-lg">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>User</TableHead>
-              <TableHead>Role</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Activity</TableHead>
-              <TableHead>Joined</TableHead>
-              <TableHead>Usage</TableHead>
-              <TableHead className="w-[50px]"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
+      <div className="border rounded-lg flex-1 min-h-0 flex flex-col">
+        {!isLoading && (
+          <div className="flex-1 overflow-auto">
+            <table className="w-max min-w-full caption-bottom text-sm">
+              <thead className="sticky top-0 bg-background z-10 border-b">
+              <tr className="border-b transition-colors hover:bg-muted/50">
+                <th className="bg-background h-10 px-2 text-left align-middle font-medium whitespace-nowrap">User</th>
+                <th className="bg-background h-10 px-2 text-left align-middle font-medium whitespace-nowrap">Role</th>
+                <th className="bg-background h-10 px-2 text-left align-middle font-medium whitespace-nowrap">Status</th>
+                <th className="bg-background h-10 px-2 text-left align-middle font-medium whitespace-nowrap">Activity</th>
+                <th className="bg-background h-10 px-2 text-left align-middle font-medium whitespace-nowrap">Joined</th>
+                <th className="bg-background h-10 px-2 text-left align-middle font-medium whitespace-nowrap">Usage</th>
+                <th className="w-[50px] bg-background h-10 px-2 text-left align-middle font-medium whitespace-nowrap"></th>
+              </tr>
+              </thead>
+              <tbody className="[&_tr:last-child]:border-0">
             {filteredUsers.map((user) => (
               <TableRow key={user.id}>
                 <TableCell>
@@ -390,13 +369,58 @@ export function UserTable({
                 </TableCell>
               </TableRow>
             ))}
-          </TableBody>
-        </Table>
+            </tbody>
+          </table>
 
-        {filteredUsers.length === 0 && (
-          <div className="text-center py-8 text-muted-foreground">
-            <Users className="h-8 w-8 mx-auto mb-2" />
-            <p>No users found matching your criteria</p>
+          {filteredUsers.length === 0 && (
+            <div className="text-center py-8 text-muted-foreground">
+              <Users className="h-8 w-8 mx-auto mb-2" />
+              <p>No users found matching your criteria</p>
+            </div>
+          )}
+          </div>
+        )}
+
+        {isLoading && (
+          <div className="flex-1 overflow-auto">
+            <table className="w-max min-w-full caption-bottom text-sm">
+              <tbody>
+                {[...Array(5)].map((_, i) => (
+                  <tr key={i} className="border-b">
+                    <td className="p-2">
+                      <div className="flex items-center space-x-3">
+                        <div className="h-8 w-8 rounded-full bg-muted animate-pulse"></div>
+                        <div className="space-y-2">
+                          <div className="h-4 w-32 bg-muted animate-pulse rounded"></div>
+                          <div className="h-3 w-48 bg-muted animate-pulse rounded"></div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="p-2">
+                      <div className="h-6 w-16 bg-muted animate-pulse rounded-full"></div>
+                    </td>
+                    <td className="p-2">
+                      <div className="h-6 w-16 bg-muted animate-pulse rounded-full"></div>
+                    </td>
+                    <td className="p-2">
+                      <div className="h-4 w-24 bg-muted animate-pulse rounded"></div>
+                    </td>
+                    <td className="p-2">
+                      <div className="h-4 w-20 bg-muted animate-pulse rounded"></div>
+                    </td>
+                    <td className="p-2">
+                      <div className="space-y-1">
+                        <div className="h-3 w-24 bg-muted animate-pulse rounded"></div>
+                        <div className="h-3 w-20 bg-muted animate-pulse rounded"></div>
+                      </div>
+                    </td>
+                    <td className="p-2">
+                      <div className="h-8 w-8 bg-muted animate-pulse rounded"></div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>

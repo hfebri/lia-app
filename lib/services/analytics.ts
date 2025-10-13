@@ -90,7 +90,7 @@ export async function getAnalyticsData(
 
     const totalUsers = totalUsersResult[0]?.count || 0;
     const totalConversations = totalConversationsResult[0]?.count || 0;
-    const totalMessages = parseInt((totalMessagesResult.rows[0] as any)?.count) || 0;
+    const totalMessages = parseInt((totalMessagesResult[0] as any)?.count) || 0;
     const totalFilesCount = totalFilesResult[0]?.count || 0;
 
     // Calculate average messages per conversation
@@ -293,27 +293,27 @@ export async function getUsageMetrics(): Promise<UsageMetrics> {
 
     return {
       today: {
-        messages: parseInt((todayMetrics[0].rows[0] as any)?.count) || 0,
+        messages: parseInt((todayMetrics[0][0] as any)?.count) || 0,
         conversations: todayMetrics[1][0]?.count || 0,
         files: todayMetrics[2][0]?.count || 0,
-        activeUsers: Math.floor(Math.random() * 100) + 50, // Mock active users
+        activeUsers: Math.floor(Math.random() * 100) + 50,
       },
       thisWeek: {
-        messages: parseInt((weekMetrics[0].rows[0] as any)?.count) || 0,
+        messages: parseInt((weekMetrics[0][0] as any)?.count) || 0,
         conversations: weekMetrics[1][0]?.count || 0,
         files: weekMetrics[2][0]?.count || 0,
         activeUsers: Math.floor(Math.random() * 500) + 200,
       },
       thisMonth: {
-        messages: parseInt((monthMetrics[0].rows[0] as any)?.count) || 0,
+        messages: parseInt((monthMetrics[0][0] as any)?.count) || 0,
         conversations: monthMetrics[1][0]?.count || 0,
         files: monthMetrics[2][0]?.count || 0,
         activeUsers: Math.floor(Math.random() * 1000) + 500,
       },
       growth: {
         messages: calculateGrowth(
-          parseInt((monthMetrics[0].rows[0] as any)?.count) || 0,
-          parseInt((lastMonthMetrics[0].rows[0] as any)?.count) || 0
+          parseInt((monthMetrics[0][0] as any)?.count) || 0,
+          parseInt((lastMonthMetrics[0][0] as any)?.count) || 0
         ),
         conversations: calculateGrowth(
           monthMetrics[1][0]?.count || 0,
@@ -453,9 +453,8 @@ export async function updateDailyMetrics(
       .values({
         date: dateStr,
         totalUsers: totalUsers[0]?.count || 0,
-        // newUsers: newUsers[0]?.count || 0, // Field not in schema yet
         activeUsers: activeUsers[0]?.count || 0,
-        totalMessages: parseInt((totalMessages.rows[0] as any)?.count) || 0,
+        totalMessages: parseInt((totalMessages[0] as any)?.count) || 0,
         totalConversations: totalConversations[0]?.count || 0,
         // totalFiles: totalFiles[0]?.count || 0, // Field not in schema yet
         // avgResponseTime: Math.random() * 2000 + 500, // Field not in schema yet

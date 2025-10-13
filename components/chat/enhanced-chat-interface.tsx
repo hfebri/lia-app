@@ -77,12 +77,14 @@ export function EnhancedChatInterface({
   const [tempTitle, setTempTitle] = useState("");
   const [showFilePicker, setShowFilePicker] = useState(false);
   const [preventModelOverride, setPreventModelOverride] = useState(false);
-  const [isLocalProcessing, setIsLocalProcessing] = useState(false);
 
   // Ref for auto-scrolling to bottom
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Ref to track if we just created a conversation (to skip fetch)
+  const justCreatedConversationRef = useRef<string | null>(null);
 
   // Get conversation ID from URL
   const searchParams = useSearchParams();
@@ -120,6 +122,8 @@ export function EnhancedChatInterface({
     clearError,
     loadModels,
     setMessages,
+    startNewConversation,
+    setConversationId,
     hasMessages,
     canSend,
     currentModel,
@@ -128,14 +132,25 @@ export function EnhancedChatInterface({
     isOpenAIModel,
     setConversationModel,
   } = useAiChat({
-    onConversationCreated: (conversationId: string) => {
-      // Update URL when a new conversation is created during message sending
-      const newUrl = new URL(window.location.href);
-      newUrl.searchParams.set("conversation", conversationId);
-      window.history.pushState({}, "", newUrl);
+    onConversationCreated: (conversationData: {
+      id: string;
+      title: string | null;
+    }) => {
+      // Mark that we just created this conversation (to skip fetch in useEffect)
+      justCreatedConversationRef.current = conversationData.id;
 
-      // Update local state
-      setCurrentConversationId(conversationId);
+      // Update local state FIRST to prevent useEffect from triggering loadConversationData
+      setCurrentConversationId(conversationData.id);
+
+      // Update conversation title if provided
+      if (conversationData.title) {
+        setConversationTitle(conversationData.title);
+      }
+
+      // Then update URL
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.set("conversation", conversationData.id);
+      window.history.pushState({}, "", newUrl);
     },
   });
 
@@ -171,20 +186,12 @@ export function EnhancedChatInterface({
     }
   }, [streamingContent, isStreaming, scrollToBottom]);
 
-  // Clear local processing state when useAiChat takes over
-  useEffect(() => {
-    if (isProcessingFiles) {
-      setIsLocalProcessing(false);
-    }
-  }, [isProcessingFiles]);
-
   // Function to load conversation data from the database
   const loadConversationData = useCallback(
     async (conversationId: string) => {
       setIsLoadingConversation(true);
 
       try {
-        // Fetch conversation details and messages in parallel
         const [conversationResponse, messagesResponse] = await Promise.all([
           fetch(`/api/conversations/${conversationId}`),
           fetch(`/api/conversations/${conversationId}/messages`),
@@ -224,6 +231,9 @@ export function EnhancedChatInterface({
 
         const conversation = conversationResult.data;
 
+        // Sync conversation ID to useAiChat hook state
+        setConversationId(conversationId);
+
         // Update conversation title
         // But only if we're not in the middle of a manual model change
         if (conversation.title && !preventModelOverride) {
@@ -242,19 +252,33 @@ export function EnhancedChatInterface({
             id: string;
             role: string;
             content: string;
-            metadata?: { model?: string };
-          }) => ({
-            id: message.id,
-            role: message.role,
-            content: message.content,
-            model: message.metadata?.model || undefined,
-          })
+            metadata?: { model?: string; files?: any[] };
+          }) => {
+            // Extract files from metadata if present
+            const files = message.metadata?.files
+              ?.map((f) => ({
+                url: f.url,
+                data: f.data,
+                type: f.type,
+                name: f.name,
+              }))
+              .filter((f) => f.url || f.data);
+
+            return {
+              id: message.id,
+              role: message.role,
+              content: message.content,
+              model: message.metadata?.model || undefined,
+              files: files && files.length > 0 ? files : undefined,
+            };
+          }
         );
 
         // Set the loaded messages directly (no clearing first to prevent flashing)
         // But only if we're not in the middle of a manual model change
         if (!preventModelOverride) {
           setMessages(aiMessages);
+        } else {
         }
 
         // Clear system instruction for loaded conversation (fresh start per conversation)
@@ -263,6 +287,7 @@ export function EnhancedChatInterface({
         // Scroll to bottom after loading conversation
         setTimeout(scrollToBottom, 100);
       } catch (error) {
+        console.error("❌ Error loading conversation:", error);
         setConversationTitle("AI Assistant");
         // Don't clear messages on error to maintain current state
       } finally {
@@ -283,22 +308,29 @@ export function EnhancedChatInterface({
     const conversationId = searchParams.get("conversation");
 
     if (conversationId && conversationId !== currentConversationId) {
-      // Loading a different conversation
+      // Check if we just created this conversation
+      if (justCreatedConversationRef.current === conversationId) {
+        // We just created this conversation, no need to fetch
+        justCreatedConversationRef.current = null; // Clear the flag
+        setCurrentConversationId(conversationId); // Just sync the state
+        return;
+      }
+
+      // Loading a different conversation - need to fetch
       setCurrentConversationId(conversationId);
       loadConversationData(conversationId);
     } else if (!conversationId && currentConversationId) {
-      // No conversation ID in URL but we have one set - clear it
+      // No conversation ID in URL but we have one set - clear everything
       setCurrentConversationId(null);
       setConversationTitle("AI Assistant");
-      // Don't call setMessages([]) here - let changeModel handle message clearing
-      // to avoid conflicts with the useAiChat state management
-      setSystemInstruction(""); // Clear system instruction for new conversation
+      startNewConversation(); // Clear messages and reset conversation state
+    } else {
     }
   }, [
     searchParams,
     currentConversationId,
     loadConversationData,
-    setSystemInstruction,
+    startNewConversation,
   ]);
 
   // Rename conversation
@@ -410,12 +442,8 @@ export function EnhancedChatInterface({
   };
 
   const handleSendMessage = async () => {
-    // Show processing indicator immediately when send button is clicked
-    setIsLocalProcessing(true);
-
     // Prevent sending messages if not authenticated
     if (!isAuthenticated) {
-      setIsLocalProcessing(false);
       return;
     }
 
@@ -424,12 +452,10 @@ export function EnhancedChatInterface({
       attachedFiles.length === 0 &&
       selectedFiles.length === 0
     ) {
-      setIsLocalProcessing(false);
       return;
     }
-    
+
     if (!canSend) {
-      setIsLocalProcessing(false);
       return;
     }
 
@@ -440,7 +466,7 @@ export function EnhancedChatInterface({
     setInputValue("");
     setAttachedFiles([]);
     setSelectedFiles([]); // Also clear selected files
-    
+
     // Reset textarea height
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
@@ -521,7 +547,6 @@ export function EnhancedChatInterface({
 
           // Add processed files to message
           messageFiles = [...messageFiles, ...processedFiles];
-
         } catch (error) {
           return;
         }
@@ -643,19 +668,41 @@ export function EnhancedChatInterface({
             (file as any).url = fileItem.url;
             allFiles.push(file);
           } else if (fileItem.url) {
-            // File has URL (from Supabase) - fetch and convert to File for non-Claude models
-            const response = await fetch(fileItem.url);
-            const blob = await response.blob();
-            const file = new File([blob], fileItem.originalName, {
-              type: fileItem.mimeType,
-            });
-            allFiles.push(file);
+            // File has URL (from Supabase) - for OpenAI models, attach URL to file
+            // For image files, we can pass URL directly without fetching blob
+            if (fileItem.mimeType.startsWith("image/")) {
+              const file = new File([], fileItem.originalName, {
+                type: fileItem.mimeType,
+              });
+              // Attach the URL to the file for OpenAI processing
+              (file as any).url = fileItem.url;
+              allFiles.push(file);
+            } else {
+              // For non-image files, fetch and convert to File
+              const response = await fetch(fileItem.url);
+              const blob = await response.blob();
+              const file = new File([blob], fileItem.originalName, {
+                type: fileItem.mimeType,
+              });
+              allFiles.push(file);
+            }
           }
         }
       }
 
+      console.log(
+        "📤 Sending message with files:",
+        allFiles.length,
+        allFiles.map((f) => ({
+          name: f.name,
+          type: f.type,
+          hasUrl: !!(f as any).url,
+          hasData: !!(f as any).data,
+        }))
+      );
       await sendMessage(messageContent, allFiles);
     } else {
+      console.log("📤 Sending message without files");
       await sendMessage(messageContent);
     }
 
@@ -791,10 +838,11 @@ export function EnhancedChatInterface({
       <div className="flex-1 flex flex-col min-w-0 w-full h-full">
         {/* Header - Fixed at top */}
         <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shrink-0 z-10">
-          <div className="flex items-center justify-between p-4">
-            <div className="flex items-center space-x-4">
+          {/* Desktop layout - single row */}
+          <div className="hidden xl:flex items-center justify-between p-4 gap-3">
+            <div className="flex items-center space-x-4 min-w-0 flex-1">
               <div className="flex items-center space-x-2">
-                <Brain className="h-6 w-6 text-primary" />
+                <Brain className="h-6 w-6 text-primary shrink-0" />
                 <div>
                   <div className="flex items-center gap-2">
                     {isEditingTitle && currentConversationId ? (
@@ -862,20 +910,154 @@ export function EnhancedChatInterface({
               )}
             </div>
 
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2 shrink-0">
               {/* Extended Thinking Toggle - Show only for Claude models */}
               {isClaudeModel && (
-                <>
-                  <ExtendedThinkingToggle
-                    enabled={extendedThinking}
-                    onToggle={toggleExtendedThinking}
-                    disabled={isLoading || isStreaming}
-                  />
-                  {/* Debug info */}
-                  <div className="text-xs text-muted-foreground">
-                    Thinking: {extendedThinking ? "ON" : "OFF"}
+                <ExtendedThinkingToggle
+                  enabled={extendedThinking}
+                  onToggle={toggleExtendedThinking}
+                  disabled={isLoading || isStreaming}
+                />
+              )}
+
+              {/* Thinking Mode Toggle - Show only for Gemini models */}
+              <ThinkingModeToggle
+                enabled={thinkingMode}
+                onToggle={toggleThinkingMode}
+                disabled={isLoading || isStreaming}
+                selectedModel={selectedModel}
+              />
+
+              {/* Reasoning Effort Selector - Show only for OpenAI models */}
+              {isOpenAIModel && (
+                <ReasoningEffortSelector
+                  value={reasoningEffort}
+                  onValueChange={setReasoningEffort}
+                  disabled={isLoading || isStreaming}
+                />
+              )}
+
+              <SystemInstructionButton
+                systemInstruction={systemInstruction}
+                onSystemInstructionChange={setSystemInstruction}
+                disabled={isLoading || isStreaming}
+              />
+
+              <ModelSelector
+                models={availableModels}
+                selectedModel={selectedModel}
+                onModelChange={async (modelId: string) => {
+                  // Only start a new conversation if the model is different
+                  if (modelId !== selectedModel) {
+                    // Prevent conversation loading from overriding the model change
+                    setPreventModelOverride(true);
+
+                    // Clear current conversation and URL - new conversation will be created when user sends first message
+                    const url = new URL(window.location.href);
+                    url.searchParams.delete("conversation");
+                    window.history.pushState({}, "", url);
+
+                    // Update local state immediately
+                    setCurrentConversationId(null);
+                    setConversationTitle("AI Assistant");
+
+                    // Clear messages immediately to prevent any loaded conversation data from showing
+                    setMessages([]);
+
+                    // Change model and clear messages
+                    changeModel(modelId);
+
+                    // Reset the flag after a brief delay to allow the model change to take effect
+                    setTimeout(() => setPreventModelOverride(false), 100);
+                  }
+                }}
+                disabled={isLoading || isStreaming}
+              />
+            </div>
+          </div>
+
+          {/* Mobile/Tablet layout - two rows */}
+          <div className="flex xl:hidden flex-col gap-3 p-4">
+            {/* Top row: Title and Message Count */}
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center space-x-3 min-w-0 flex-1">
+                <Brain className="h-6 w-6 text-primary shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    {isEditingTitle && currentConversationId ? (
+                      <div className="flex items-center gap-2">
+                        <Input
+                          value={tempTitle}
+                          onChange={(e) => setTempTitle(e.target.value)}
+                          onKeyDown={handleTitleKeyPress}
+                          onBlur={() => handleRenameConversation(tempTitle)}
+                          className="text-lg font-semibold h-8 px-2 min-w-[200px]"
+                          autoFocus
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRenameConversation(tempTitle)}
+                          className="h-8 w-8 p-0"
+                        >
+                          <Check className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={cancelEditingTitle}
+                          className="h-8 w-8 p-0"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 group min-w-0">
+                        <h1 className="text-lg font-semibold truncate">
+                          {conversationTitle}
+                          {isLoadingConversation && (
+                            <span className="ml-2 inline-block">
+                              <Loader2 className="h-3 w-3 animate-spin inline" />
+                            </span>
+                          )}
+                        </h1>
+                        {currentConversationId && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={startEditingTitle}
+                            className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    )}
                   </div>
-                </>
+                  {currentModel && (
+                    <p className="text-sm text-muted-foreground truncate">
+                      {currentModel.name}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {hasMessages && (
+                <Badge variant="secondary" className="text-xs shrink-0">
+                  {messages.length}
+                </Badge>
+              )}
+            </div>
+
+            {/* Bottom row: Model settings and controls */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Extended Thinking Toggle - Show only for Claude models */}
+              {isClaudeModel && (
+                <ExtendedThinkingToggle
+                  enabled={extendedThinking}
+                  onToggle={toggleExtendedThinking}
+                  disabled={isLoading || isStreaming}
+                />
               )}
 
               {/* Thinking Mode Toggle - Show only for Gemini models */}
@@ -992,7 +1174,9 @@ export function EnhancedChatInterface({
                     );
                   })}
 
-                  {(isProcessingFiles || isLocalProcessing) && <FileProcessingMessage progress={fileProcessingProgress} />}
+                  {isProcessingFiles && (
+                    <FileProcessingMessage progress={fileProcessingProgress} />
+                  )}
 
                   {isStreaming && streamingContent && (
                     <StreamingMessage
@@ -1095,11 +1279,7 @@ export function EnhancedChatInterface({
                           <FileText className="h-4 w-4 text-muted-foreground" />
                         )}
                         <span className="max-w-32 truncate">{file.name}</span>
-                        {isPDF && !selectedModel.toLowerCase().includes('gemini') && (
-                          <Badge variant="secondary" className="text-xs px-1 py-0">
-                            OCR
-                          </Badge>
-                        )}
+
                         <Button
                           variant="ghost"
                           size="sm"
@@ -1136,7 +1316,7 @@ export function EnhancedChatInterface({
                     }
                   }}
                   multiple
-                  accept=".pdf,.doc,.docx,.txt,.rtf,.xls,.xlsx,.csv,.jpg,.jpeg,.png,.gif,.bmp,.webp,.svg"
+                  accept=".pdf,.doc,.docx,.pptx,.ppt,.txt,.rtf,.csv,.md,.xls,.xlsx,.xlsm,.jpg,.jpeg,.png,.gif,.bmp,.webp,.svg"
                 />
                 <Button
                   variant="ghost"

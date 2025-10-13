@@ -2,6 +2,13 @@ import type { AIProviderName } from "../ai/types";
 import Replicate from "replicate";
 import Tesseract from "tesseract.js";
 
+const isDev = process.env.NODE_ENV !== "production";
+const debugLog = (...args: unknown[]) => {
+  if (isDev) {
+    console.log(...args);
+  }
+};
+
 export interface FileAnalysisResult {
   extractedText: string;
   markdownContent: string;
@@ -49,10 +56,10 @@ export class FileAnalysisService {
     provider: AIProviderName,
     model: string
   ): Promise<FileAnalysisResult[]> {
-    console.log(`🔍 FILE ANALYSIS DEBUG - Analyzing ${files.length} files:`);
-    console.log(`- Provider: ${provider}`);
-    console.log(`- Model: ${model}`);
-    console.log(
+    debugLog(`🔍 FILE ANALYSIS DEBUG - Analyzing ${files.length} files:`);
+    debugLog(`- Provider: ${provider}`);
+    debugLog(`- Model: ${model}`);
+    debugLog(
       `- Files:`,
       files.map((f) => `${f.name} (${f.type})`)
     );
@@ -60,11 +67,11 @@ export class FileAnalysisService {
     const results: FileAnalysisResult[] = [];
 
     for (const file of files) {
-      console.log(`\n📁 Processing file: ${file.name} (${file.type})`);
+      debugLog(`\n📁 Processing file: ${file.name} (${file.type})`);
       try {
         let result: FileAnalysisResult;
         if (provider === "gemini") {
-          console.log(`✅ Gemini provider - handling all files natively`);
+          debugLog(`✅ Gemini provider - handling all files natively`);
           // Gemini handles all files natively - no preprocessing needed
           result = {
             extractedText: "",
@@ -72,7 +79,7 @@ export class FileAnalysisService {
             success: true,
           };
         } else if (this.isImageFile(file)) {
-          console.log(
+          debugLog(
             `✅ ${provider.toUpperCase()} + Image - handling natively`
           );
           // All providers handle image files natively
@@ -85,22 +92,22 @@ export class FileAnalysisService {
           };
         } else {
           // Use selected model to extract content for all non-Gemini, non-image files
-          console.log(
+          debugLog(
             `🔧 Using ${FileAnalysisService.ACTIVE_MODEL} for processing document`
           );
-          console.log(`📊 File analysis details:`);
-          console.log(`  - File name: ${file.name}`);
-          console.log(`  - File type: ${file.type}`);
-          console.log(`  - File size: ${file.size} bytes`);
-          console.log(`  - Is image file: ${this.isImageFile(file)}`);
-          console.log(`  - Is document file: ${this.isDocumentFile(file)}`);
-          console.log(`  - Active model: ${FileAnalysisService.ACTIVE_MODEL}`);
+          debugLog(`📊 File analysis details:`);
+          debugLog(`  - File name: ${file.name}`);
+          debugLog(`  - File type: ${file.type}`);
+          debugLog(`  - File size: ${file.size} bytes`);
+          debugLog(`  - Is image file: ${this.isImageFile(file)}`);
+          debugLog(`  - Is document file: ${this.isDocumentFile(file)}`);
+          debugLog(`  - Active model: ${FileAnalysisService.ACTIVE_MODEL}`);
 
           if (FileAnalysisService.ACTIVE_MODEL === "marker") {
-            console.log(`🚀 Starting Marker model processing...`);
+            debugLog(`🚀 Starting Marker model processing...`);
             result = await this.analyzeFileWithMarker(file);
           } else {
-            console.log(`🚀 Starting Tesseract OCR processing...`);
+            debugLog(`🚀 Starting Tesseract OCR processing...`);
             result = await this.analyzeFileWithTesseract(file);
           }
         }
@@ -126,18 +133,18 @@ export class FileAnalysisService {
   private async analyzeFileWithTesseract(
     file: FileContent
   ): Promise<FileAnalysisResult> {
-    console.log(
+    debugLog(
       `\n🚀 [TESSERACT START] Beginning OCR analysis for: ${file.name}`
     );
-    console.log(
+    debugLog(
       `📝 [TESSERACT] File details: ${file.type}, ${file.size} bytes`
     );
 
     try {
       // Check if file is a document type that Tesseract can handle
-      console.log(`🔍 [TESSERACT] Checking file type compatibility...`);
+      debugLog(`🔍 [TESSERACT] Checking file type compatibility...`);
       if (!this.isDocumentFile(file)) {
-        console.log(
+        debugLog(
           `❌ [TESSERACT] File type ${file.type} not supported by Tesseract OCR`
         );
         return {
@@ -149,29 +156,29 @@ export class FileAnalysisService {
         };
       }
 
-      console.log(`✅ [TESSERACT] File type ${file.type} is supported`);
-      console.log(`🔍 [TESSERACT] Starting OCR processing for: ${file.name}`);
+      debugLog(`✅ [TESSERACT] File type ${file.type} is supported`);
+      debugLog(`🔍 [TESSERACT] Starting OCR processing for: ${file.name}`);
       const startTime = Date.now();
 
       // Convert base64 to buffer for Tesseract (Node.js compatible)
-      console.log(
+      debugLog(
         `📦 [TESSERACT] Converting base64 to buffer for file: ${file.name}`
       );
-      console.log(
+      debugLog(
         `📦 [TESSERACT] Base64 data length: ${file.data.length} characters`
       );
 
       const buffer = Buffer.from(file.data, "base64");
-      console.log(`📦 [TESSERACT] Buffer created successfully`);
-      console.log(
+      debugLog(`📦 [TESSERACT] Buffer created successfully`);
+      debugLog(
         `📊 [TESSERACT] Buffer details: size=${buffer.length} bytes, type=${file.type}`
       );
 
       // Use Tesseract to extract text
-      console.log(
+      debugLog(
         `🚀 [TESSERACT] Starting Tesseract.recognize() for: ${file.name}`
       );
-      console.log(`🔧 [TESSERACT] Language: eng, Options: logger enabled`);
+      debugLog(`🔧 [TESSERACT] Language: eng, Options: logger enabled`);
 
       const recognitionStart = Date.now();
       const {
@@ -182,7 +189,7 @@ export class FileAnalysisService {
             ? `(${Math.round(m.progress * 100)}%)`
             : "";
           const elapsed = Date.now() - recognitionStart;
-          console.log(
+          debugLog(
             `🔧 [TESSERACT PROGRESS] [${file.name}] ${m.status} ${progressText} - ${elapsed}ms elapsed`
           );
         },
@@ -190,23 +197,23 @@ export class FileAnalysisService {
 
       const recognitionEnd = Date.now();
       const recognitionTime = recognitionEnd - recognitionStart;
-      console.log(`✅ [TESSERACT] OCR recognition completed for: ${file.name}`);
-      console.log(`⏱️  [TESSERACT] Recognition time: ${recognitionTime}ms`);
+      debugLog(`✅ [TESSERACT] OCR recognition completed for: ${file.name}`);
+      debugLog(`⏱️  [TESSERACT] Recognition time: ${recognitionTime}ms`);
 
       const endTime = Date.now();
       const processingTime = endTime - startTime;
-      console.log(`⏱️  [TESSERACT] Total processing time: ${processingTime}ms`);
+      debugLog(`⏱️  [TESSERACT] Total processing time: ${processingTime}ms`);
 
       const cleanContent = text.trim();
-      console.log(
+      debugLog(
         `📝 [TESSERACT] Extracted text length: ${text.length} characters`
       );
-      console.log(
+      debugLog(
         `📝 [TESSERACT] Clean content length: ${cleanContent.length} characters`
       );
 
       if (!cleanContent) {
-        console.log(
+        debugLog(
           `❌ [TESSERACT] No text content extracted from document: ${file.name}`
         );
         return {
@@ -217,7 +224,7 @@ export class FileAnalysisService {
         };
       }
 
-      console.log(
+      debugLog(
         `📄 [TESSERACT] Text preview (first 100 chars): "${cleanContent.substring(
           0,
           100
@@ -225,7 +232,7 @@ export class FileAnalysisService {
       );
 
       // Format as markdown with analysis details
-      console.log(`📝 [TESSERACT] Formatting content as markdown...`);
+      debugLog(`📝 [TESSERACT] Formatting content as markdown...`);
       const markdownContent = this.formatAsMarkdownForTesseract(
         file.name,
         file.type,
@@ -233,10 +240,10 @@ export class FileAnalysisService {
         processingTime
       );
 
-      console.log(
+      debugLog(
         `✅ [TESSERACT COMPLETE] Successfully processed: ${file.name}`
       );
-      console.log(
+      debugLog(
         `📊 [TESSERACT SUMMARY] ${cleanContent.length} chars extracted in ${processingTime}ms`
       );
 
@@ -246,16 +253,16 @@ export class FileAnalysisService {
         success: true,
       };
     } catch (error) {
-      console.log(
+      debugLog(
         `❌ [TESSERACT ERROR] Failed to process ${file.name}:`,
         error
       );
-      console.log(
+      debugLog(
         `💥 [TESSERACT ERROR] Error type: ${
           error instanceof Error ? error.constructor.name : typeof error
         }`
       );
-      console.log(
+      debugLog(
         `💥 [TESSERACT ERROR] Error message: ${
           error instanceof Error ? error.message : String(error)
         }`
@@ -502,15 +509,15 @@ ${content}
     ];
     const isDocument = documentTypes.includes(file.type.toLowerCase());
 
-    console.log(
+    debugLog(
       `🔍 [FILE TYPE CHECK] Checking if ${file.name} (${file.type}) is a document...`
     );
-    console.log(
+    debugLog(
       `📋 [FILE TYPE CHECK] Supported document types: ${documentTypes.join(
         ", "
       )}`
     );
-    console.log(
+    debugLog(
       `✅ [FILE TYPE CHECK] Result: ${
         isDocument ? "DOCUMENT" : "NOT A DOCUMENT"
       }`

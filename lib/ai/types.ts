@@ -7,8 +7,9 @@ export interface AIMessage {
   files?: Array<{
     name: string;
     type: string;
-    size: number;
-    data: string; // base64 encoded
+    size?: number;
+    data?: string;
+    url?: string;
   }>;
 }
 

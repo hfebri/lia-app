@@ -31,7 +31,7 @@ interface UseAiChatOptions {
   initialModel?: string;
   maxMessages?: number;
   autoScroll?: boolean;
-  onConversationCreated?: (conversationId: string) => void;
+  onConversationCreated?: (conversationData: { id: string; title: string | null }) => void;
 }
 
 // Helper function to save chat messages to database
@@ -117,23 +117,46 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     }
   }, []);
 
+  // Build file context from all previous messages in conversation
+  const buildConversationFileContext = useCallback(() => {
+    const allFiles = state.messages
+      .filter((msg) => msg.role === "user" && msg.metadata?.files)
+      .flatMap((msg) => msg.metadata!.files!);
+
+    if (allFiles.length === 0) return "";
+
+    const context = allFiles
+      .map(
+        (file, idx) =>
+          `[File ${idx + 1}: ${file.name}${file.error ? " (Error)" : ""}]\n${
+            file.extractedText || "No text extracted"
+          }`
+      )
+      .join("\n\n---\n\n");
+
+    return `\n\n[CONVERSATION CONTEXT - Available Files]\n${context}\n[END CONVERSATION CONTEXT]\n\n`;
+  }, [state.messages]);
+
+  // Check if a file has already been processed in this conversation
+  const isFileAlreadyProcessed = useCallback(
+    (file: File): boolean => {
+      return state.messages.some(
+        (msg) =>
+          msg.metadata?.files?.some(
+            (f) =>
+              f.name === file.name &&
+              f.size === file.size &&
+              f.extractedText &&
+              !f.error
+          )
+      );
+    },
+    [state.messages]
+  );
+
   // Send a message with streaming response
   const sendMessage = useCallback(
     async (content: string, files?: File[], stream: boolean = true) => {
-      console.log("🚀 USE-AI-CHAT - sendMessage called with:", {
-        content,
-        filesCount: files?.length || 0,
-        stream,
-      });
-
-      // Log system instruction if present
-      if (state.systemInstruction) {
-        console.log(
-          "🎯 Using system instruction:",
-          state.systemInstruction.substring(0, 50) + "..."
-        );
-      }
-
       // Validate message
       const validation = chatService.current.validateMessage(content);
       if (!validation.isValid) {
@@ -148,22 +171,116 @@ export function useAiChat(options: UseAiChatOptions = {}) {
       let finalContent = content;
       let processedFiles: ProcessedFile[] = [];
 
+      // ALWAYS include file context if conversation has files (even without new uploads)
+      const fileContext = buildConversationFileContext();
+      if (fileContext && (!files || files.length === 0)) {
+        // No new files, but conversation has files - include context
+        finalContent = content + fileContext;
+      }
+
       if (files && files.length > 0) {
-        console.log("📁 [CLIENT] Starting client-side file processing...");
-        
-        // Initialize progress for all files immediately
+        // Upload images with base64 data to Supabase to get URLs first
+        const imageFilesWithData = files.filter(file =>
+          file.type.startsWith('image/') &&
+          !(file as any).url &&
+          (file as any).data
+        );
+
+        if (imageFilesWithData.length > 0) {
+          for (const file of imageFilesWithData) {
+            try {
+              // Convert base64 to Blob
+              const base64Data = (file as any).data;
+              const byteCharacters = atob(base64Data);
+              const byteNumbers = new Array(byteCharacters.length);
+              for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+              }
+              const byteArray = new Uint8Array(byteNumbers);
+              const blob = new Blob([byteArray], { type: file.type });
+
+              // Create FormData
+              const formData = new FormData();
+              formData.append('file', blob, file.name);
+
+              // Upload to Supabase
+              const uploadResponse = await fetch('/api/upload-image', {
+                method: 'POST',
+                body: formData,
+              });
+
+              const uploadResult = await uploadResponse.json();
+
+              if (uploadResult.success) {
+                (file as any).url = uploadResult.url;
+                delete (file as any).data;
+              } else {
+                console.error("Failed to upload image:", uploadResult.error);
+              }
+            } catch (error) {
+              console.error("Error uploading image:", error);
+            }
+          }
+        }
+
+        // Now separate files after upload
+        const filesWithUrls = files.filter(file => (file as any).url);
+        const filesWithData = files.filter(file => !(file as any).url && (file as any).data);
+        const filesNeedingProcessing = files.filter(file => !(file as any).url && !(file as any).data && !isFileAlreadyProcessed(file));
+
+        // Convert files with URLs to ProcessedFile format
+        if (filesWithUrls.length > 0) {
+          const filesFromUrls = filesWithUrls.map(file => ({
+            name: file.name,
+            type: file.type,
+            size: file.size,
+            url: (file as any).url,
+            data: undefined,
+            extractedText: "",
+            isImage: file.type.startsWith("image/"),
+            isDocument: false,
+            isText: false,
+            isSpreadsheet: false,
+          }));
+          processedFiles.push(...filesFromUrls);
+        }
+
+        // Convert files with base64 data to ProcessedFile format
+        if (filesWithData.length > 0) {
+          const filesFromData = filesWithData.map(file => {
+            const base64Data = (file as any).data;
+            return {
+              name: file.name,
+              type: file.type,
+              size: file.size,
+              url: undefined,
+              data: base64Data,
+              extractedText: "",
+              isImage: file.type.startsWith("image/"),
+              isDocument: false,
+              isText: false,
+              isSpreadsheet: false,
+            };
+          });
+          processedFiles.push(...filesFromData);
+        }
+
+        // Filter out already-processed files
+        const filesToProcess = filesNeedingProcessing;
+
+        // Initialize progress for files that need processing
         const initialProgress: Record<string, any> = {};
-        files.forEach(file => {
+        filesToProcess.forEach(file => {
           initialProgress[file.name] = {
             stage: "Initializing...",
             progress: 0,
             timeElapsed: 0,
           };
         });
-        
+
         setState((prev) => ({
           ...prev,
-          isProcessingFiles: true,
+          isProcessingFiles: filesToProcess.length > 0,
           fileProcessingProgress: initialProgress,
           error: null,
         }));
@@ -173,36 +290,58 @@ export function useAiChat(options: UseAiChatOptions = {}) {
           // Dynamically import ClientFileProcessor to avoid SSR issues
           const { ClientFileProcessor } = await import("@/lib/services/client-file-processor");
 
-          // Process files with progress tracking
-          processedFiles = await ClientFileProcessor.processFiles(
-            files,
-            state.selectedModel, // Pass current model to determine if OCR is needed
-            (fileName, progress) => {
-              setState((prev) => ({
-                ...prev,
-                fileProcessingProgress: {
-                  ...prev.fileProcessingProgress,
-                  [fileName]: progress,
-                },
-              }));
-            }
-          );
+          // Process only new files with progress tracking
+          if (filesToProcess.length > 0) {
+            processedFiles = await ClientFileProcessor.processFiles(
+              filesToProcess,
+              state.selectedModel, // Pass current model to determine if OCR is needed
+              (fileName, progress) => {
+                setState((prev) => ({
+                  ...prev,
+                  fileProcessingProgress: {
+                    ...prev.fileProcessingProgress,
+                    [fileName]: progress,
+                  },
+                }));
+              }
+            );
+          }
 
-          // Create enhanced prompt with extracted text (for AI)
-          finalContent = ClientFileProcessor.createEnhancedPrompt(
-            content,
-            processedFiles
-          );
+          // Get conversation file context (from all previous messages)
+          const fileContext = buildConversationFileContext();
 
-          // Create display content (for user message in chat)
-          const displayContent = ClientFileProcessor.createDisplayContent(processedFiles);
+          // Create enhanced prompt with:
+          // 1. Conversation file context (all files from previous messages)
+          // 2. New extracted text from newly uploaded files
+          let enhancedContent = content;
+
+          // Add conversation file context first (if any files exist in conversation)
+          if (fileContext) {
+            enhancedContent = content + fileContext;
+          }
+
+          // Then add newly processed files
+          if (processedFiles.length > 0) {
+            enhancedContent = ClientFileProcessor.createEnhancedPrompt(
+              enhancedContent,
+              processedFiles
+            );
+          }
+
+          finalContent = enhancedContent;
+
+          // Create display content (for user message in chat) - only new files
+          const displayContent = processedFiles.length > 0
+            ? ClientFileProcessor.createDisplayContent(processedFiles)
+            : "";
+
           if (displayContent) {
             // Store the display content separately so we can show it in the user message
             (processedFiles as any).displayForMessage = `${content}\n\n${displayContent}`;
           }
 
         } catch (error) {
-          console.error("❌ [CLIENT] File processing failed:", error);
+          console.error("File processing failed:", error);
           setState((prev) => ({
             ...prev,
             error: error instanceof Error ? error.message : "File processing failed",
@@ -217,10 +356,30 @@ export function useAiChat(options: UseAiChatOptions = {}) {
       const userMessageContent = (processedFiles as any).displayForMessage || content;
       const userMessage = chatService.current.createMessage("user", userMessageContent);
 
+      // Add file metadata to user message
+      if (processedFiles.length > 0) {
+        const { ClientFileProcessor } = await import("@/lib/services/client-file-processor");
+        userMessage.metadata = {
+          files: ClientFileProcessor.toMetadata(processedFiles),
+        };
+      }
+
       // For AI processing, we need to use the enhanced content with extracted text
+      const fileDataForAI = processedFiles
+        .filter(f => f.url || f.data)
+        .map(file => ({
+          url: file.url,
+          data: file.data,
+          type: file.type,
+          name: file.name,
+          size: file.size,
+        }));
+
       const messagesForAI = [
         ...state.messages,
-        chatService.current.createMessage("user", finalContent) // Use enhanced prompt for AI
+        chatService.current.createMessage("user", finalContent, {
+          files: fileDataForAI.length > 0 ? fileDataForAI as any : undefined
+        })
       ].slice(-maxMessages);
 
       setState((prev) => ({
@@ -277,45 +436,49 @@ export function useAiChat(options: UseAiChatOptions = {}) {
             }));
 
             // Create or update assistant message when complete
-            if (chunk.isComplete && accumulatedContent.trim()) {
-              const assistantMessage = chatService.current.createMessage(
-                "assistant",
-                accumulatedContent,
-                {
-                  model: state.selectedModel,
-                  usage: chunk.usage,
-                }
-              );
-
-              setState((prev) => ({
-                ...prev,
-                messages: [...prev.messages, assistantMessage].slice(
-                  -maxMessages
-                ),
-                streamingContent: "",
-                isLoading: false,
-                isStreaming: false,
-              }));
-
-              // Save both messages to database after streaming is complete
-              try {
-                const result = await saveChatToDatabase(
-                  userMessage,
-                  assistantMessage,
-                  state.currentConversationId || undefined,
-                  state.selectedModel // Pass the selected AI model
+              if (chunk.isComplete && accumulatedContent.trim()) {
+                const assistantMessage = chatService.current.createMessage(
+                  "assistant",
+                  accumulatedContent,
+                  {
+                    model: state.selectedModel,
+                    usage: chunk.usage,
+                  }
                 );
-                // Update conversation ID if this was the first message
-                if (result.success && !state.currentConversationId) {
+
+                setState((prev) => ({
+                  ...prev,
+                  messages: [...prev.messages, assistantMessage].slice(
+                    -maxMessages
+                  ),
+                  streamingContent: "",
+                  isLoading: false,
+                  isStreaming: false,
+                }));
+
+                // Save both messages to database after streaming is complete
+                try {
+                  const result = await saveChatToDatabase(
+                    userMessage,
+                    assistantMessage,
+                    state.currentConversationId || undefined,
+                    state.selectedModel // Pass the selected AI model
+                  );
+                  // Update conversation ID if this was the first message
+                  if (result.success && !state.currentConversationId) {
                   const newConversationId = result.data.conversationId;
+                  const conversationTitle = result.data.title;
                   setState((prev) => ({
                     ...prev,
                     currentConversationId: newConversationId,
                   }));
 
-                  // Notify parent component that a conversation was created
+                  // Notify parent component that a conversation was created with title
                   if (onConversationCreated) {
-                    onConversationCreated(newConversationId);
+                    onConversationCreated({
+                      id: newConversationId,
+                      title: conversationTitle || null,
+                    });
                   }
                 }
               } catch (error) {
@@ -363,14 +526,18 @@ export function useAiChat(options: UseAiChatOptions = {}) {
             // Update conversation ID if this was the first message
             if (result.success && !state.currentConversationId) {
               const newConversationId = result.data.conversationId;
+              const conversationTitle = result.data.title;
               setState((prev) => ({
                 ...prev,
                 currentConversationId: newConversationId,
               }));
 
-              // Notify parent component that a conversation was created
+              // Notify parent component that a conversation was created with title
               if (onConversationCreated) {
-                onConversationCreated(newConversationId);
+                onConversationCreated({
+                  id: newConversationId,
+                  title: conversationTitle || null,
+                });
               }
             }
           } catch (error) {
@@ -391,15 +558,17 @@ export function useAiChat(options: UseAiChatOptions = {}) {
       }
     },
     [
-      state.messages, 
-      state.selectedModel, 
+      state.messages,
+      state.selectedModel,
       state.systemInstruction,
       state.extendedThinking,
       state.thinkingMode,
       state.reasoningEffort,
       state.currentConversationId,
-      maxMessages, 
-      onConversationCreated
+      maxMessages,
+      onConversationCreated,
+      buildConversationFileContext,
+      isFileAlreadyProcessed,
     ]
   );
 
@@ -568,6 +737,14 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     }));
   }, []);
 
+  // Set conversation ID (for loading existing conversations)
+  const setConversationId = useCallback((conversationId: string | null) => {
+    setState((prev) => ({
+      ...prev,
+      currentConversationId: conversationId,
+    }));
+  }, []);
+
   // Set system instruction
   const setSystemInstruction = useCallback((instruction: string) => {
     setState((prev) => ({
@@ -619,6 +796,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     loadModels,
     setMessages,
     startNewConversation,
+    setConversationId,
     toggleExtendedThinking,
     toggleThinkingMode,
     setReasoningEffort,

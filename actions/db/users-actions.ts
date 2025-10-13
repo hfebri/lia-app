@@ -11,31 +11,15 @@ export async function getUsersWithCountsAction(): Promise<
   ActionState<(User & { messageCount: number; fileCount: number })[]>
 > {
   try {
-    console.log(
-      "🔍 [getUsersWithCountsAction] Starting users with counts retrieval"
-    );
-
     const currentUser = await getCurrentUser();
-    console.log(
-      "🔍 [getUsersWithCountsAction] Current user:",
-      currentUser?.id,
-      currentUser?.role
-    );
 
     if (!currentUser) {
-      console.log("❌ [getUsersWithCountsAction] No current user found");
       return { isSuccess: false, message: "Unauthorized" };
     }
 
     if (currentUser.role !== "admin") {
-      console.log(
-        "❌ [getUsersWithCountsAction] User is not admin:",
-        currentUser.role
-      );
       return { isSuccess: false, message: "Admin access required" };
     }
-
-    console.log("✅ [getUsersWithCountsAction] User authorization passed");
 
     // Get all users first
     const allUsers = await db
@@ -43,14 +27,14 @@ export async function getUsersWithCountsAction(): Promise<
       .from(users)
       .orderBy(desc(users.createdAt));
 
-    // Get message counts for each user
+    // Get message counts for each user from conversations JSONB
     const messageCounts = await db
       .select({
-        userId: messages.userId,
-        count: sql<number>`COUNT(${messages.id})`.as("messageCount"),
+        userId: conversations.userId,
+        count: sql<number>`SUM(jsonb_array_length(${conversations.messages}))`.as("messageCount"),
       })
-      .from(messages)
-      .groupBy(messages.userId);
+      .from(conversations)
+      .groupBy(conversations.userId);
 
     // Get file counts for each user
     const fileCounts = await db
@@ -220,42 +204,19 @@ export async function getUserStatsAction(): Promise<
   }>
 > {
   try {
-    console.log("🔍 [getUserStatsAction] Starting user stats retrieval");
-
     const currentUser = await getCurrentUser();
-    console.log(
-      "🔍 [getUserStatsAction] Current user:",
-      currentUser?.id,
-      currentUser?.role
-    );
 
     if (!currentUser) {
-      console.log("❌ [getUserStatsAction] No current user found");
       return { isSuccess: false, message: "Unauthorized - Please sign in" };
     }
 
     if (currentUser.role !== "admin") {
-      console.log(
-        "❌ [getUserStatsAction] User is not admin:",
-        currentUser.role
-      );
       return { isSuccess: false, message: "Admin access required" };
     }
-
-    console.log("✅ [getUserStatsAction] User authorization passed");
-
-    // Get user statistics with simplified queries first
-    console.log(
-      "🔍 [getUserStatsAction] About to execute basic user count query"
-    );
 
     let totalUsersResult;
     try {
       totalUsersResult = await db.select({ count: count() }).from(users);
-      console.log(
-        "✅ [getUserStatsAction] Total users query successful:",
-        totalUsersResult[0]?.count
-      );
     } catch (error) {
       console.error("❌ [getUserStatsAction] Total users query failed:", error);
       throw new Error(
@@ -272,10 +233,6 @@ export async function getUserStatsAction(): Promise<
         .select({ count: count() })
         .from(users)
         .where(eq(users.role, "admin"));
-      console.log(
-        "✅ [getUserStatsAction] Admin users query successful:",
-        adminUsersResult[0]?.count
-      );
     } catch (error) {
       console.error("❌ [getUserStatsAction] Admin users query failed:", error);
       adminUsersResult = [{ count: 0 }];
@@ -294,10 +251,6 @@ export async function getUserStatsAction(): Promise<
         .select({ count: count() })
         .from(users)
         .where(sql`${users.updatedAt} >= ${oneDayAgo.toISOString()}`);
-      console.log(
-        "✅ [getUserStatsAction] Active users query successful:",
-        activeUsersResult[0]?.count
-      );
     } catch (error) {
       console.error(
         "❌ [getUserStatsAction] Active users query failed:",
@@ -310,10 +263,6 @@ export async function getUserStatsAction(): Promise<
         .select({ count: count() })
         .from(users)
         .where(sql`${users.createdAt} >= ${oneWeekAgo.toISOString()}`);
-      console.log(
-        "✅ [getUserStatsAction] New registrations query successful:",
-        newRegistrationsResult[0]?.count
-      );
     } catch (error) {
       console.error(
         "❌ [getUserStatsAction] New registrations query failed:",
@@ -330,10 +279,6 @@ export async function getUserStatsAction(): Promise<
       conversationCountResult = await db
         .select({ count: count() })
         .from(conversations);
-      console.log(
-        "✅ [getUserStatsAction] Conversations query successful:",
-        conversationCountResult[0]?.count
-      );
     } catch (error) {
       console.error(
         "❌ [getUserStatsAction] Conversations query failed:",
@@ -342,11 +287,9 @@ export async function getUserStatsAction(): Promise<
     }
 
     try {
-      messageCountResult = await db.select({ count: count() }).from(messages);
-      console.log(
-        "✅ [getUserStatsAction] Messages query successful:",
-        messageCountResult[0]?.count
-      );
+      messageCountResult = await db.select({
+        count: sql<number>`COALESCE(SUM(jsonb_array_length(${conversations.messages})), 0)`,
+      }).from(conversations);
     } catch (error) {
       console.error("❌ [getUserStatsAction] Messages query failed:", error);
     }
@@ -356,10 +299,6 @@ export async function getUserStatsAction(): Promise<
         .select({ count: count() })
         .from(files)
         .where(eq(files.isActive, true));
-      console.log(
-        "✅ [getUserStatsAction] Files query successful:",
-        fileCountResult[0]?.count
-      );
     } catch (error) {
       console.error("❌ [getUserStatsAction] Files query failed:", error);
     }
@@ -373,8 +312,6 @@ export async function getUserStatsAction(): Promise<
       totalMessages: Number(messageCountResult[0]?.count) || 0,
       totalFiles: Number(fileCountResult[0]?.count) || 0,
     };
-
-    console.log("✅ [getUserStatsAction] Final stats compiled:", stats);
 
     return {
       isSuccess: true,

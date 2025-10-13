@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { getCurrentSession } from "@/lib/auth/session";
 import { getUsageMetrics } from "@/lib/services/analytics";
 

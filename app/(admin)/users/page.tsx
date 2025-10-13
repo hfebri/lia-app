@@ -34,8 +34,6 @@ const convertToUserTableFormat = (
 };
 
 export default function AdminUsersPage() {
-  console.log("🔍 [ADMIN USERS PAGE] Component rendered");
-
   const [users, setUsers] = useState<
     (User & { messageCount: number; fileCount: number })[]
   >([]);
@@ -45,31 +43,22 @@ export default function AdminUsersPage() {
     try {
       setLoading(true);
 
-      console.log("🔍 [FRONTEND] Fetching admin users...");
       const response = await fetch("/api/admin/users", {
         cache: "no-cache",
         headers: {
           "Cache-Control": "no-cache",
         },
       });
-      console.log("🔍 [FRONTEND] Response status:", response.status);
       const usersResult = await response.json();
-      console.log("🔍 [FRONTEND] API response:", usersResult);
 
       if (usersResult.isSuccess && usersResult.data) {
-        console.log(
-          "✅ [FRONTEND] Setting users data:",
-          usersResult.data.length,
-          "users"
-        );
-        console.log("🔍 [FRONTEND] Sample user data:", usersResult.data[0]);
         setUsers(usersResult.data);
       } else {
-        console.log("❌ [FRONTEND] API failed:", usersResult.message);
+        console.error("[ADMIN USERS PAGE] API failed:", usersResult.message);
         toast.error(usersResult.message);
       }
     } catch (error) {
-      console.log("❌ [FRONTEND] Fetch error:", error);
+      console.error("[ADMIN USERS PAGE] Fetch error:", error);
       toast.error("Failed to load user data");
     } finally {
       setLoading(false);

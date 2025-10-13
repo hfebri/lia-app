@@ -9,7 +9,6 @@ import { Badge } from "@/components/ui/badge";
 import { AdminStats, defaultAdminStats } from "@/components/admin/admin-stats";
 import {
   Users,
-  MessageSquare,
   FileText,
   BarChart3,
   Clock,

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { getCurrentSession } from "@/lib/auth/session";
 import { getPopularTopics } from "@/lib/services/analytics";
 

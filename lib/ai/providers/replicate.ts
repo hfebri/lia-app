@@ -42,11 +42,29 @@ export class ReplicateProvider implements AIProvider {
         reasoning_effort = "medium",
       } = options;
 
+      console.log('🔍 [REPLICATE] generateResponse called with:', {
+        messageCount: messages.length,
+        model,
+        messagesWithFiles: messages.filter(m => m.files && m.files.length > 0).length
+      });
+
+      messages.forEach((msg, idx) => {
+        if (msg.files && msg.files.length > 0) {
+          console.log(`📎 [REPLICATE] Message ${idx} has files:`, msg.files.map(f => ({
+            name: (f as any).name,
+            type: (f as any).type,
+            hasUrl: !!(f as any).url,
+            hasData: !!(f as any).data,
+            dataLength: (f as any).data?.length || 0
+          })));
+        }
+      });
+
       // Build input based on model type
       let input: any;
 
       if (this.isClaudeModel(model)) {
-        // For Claude models, use the format from the user's example
+        // For Claude models, use single prompt format (no conversation history)
         const userMessage = messages[messages.length - 1];
         const hasImage = userMessage?.files && userMessage.files.length > 0;
 
@@ -69,45 +87,63 @@ export class ReplicateProvider implements AIProvider {
         // Extract model variant: "openai/gpt-5-nano" → "gpt-5-nano"
         const modelVariant = model.split("/")[1] || "gpt-5";
 
-        // For OpenAI models, use structured API format
-        const userMessage = messages[messages.length - 1];
-        const hasImage = userMessage?.files && userMessage.files.length > 0;
+        // For OpenAI models, use messages array format (supports conversation history)
+        // Include system prompt as first message if provided
+        const formattedMessages = [];
 
-        if (hasImage) {
-          // Use structured API with images
-          const imageUrls =
-            userMessage.files?.map((file) => (file as any).url || file.data) ||
-            [];
-
-          input = {
-            model: modelVariant,
-            prompt: userMessage?.content || "",
-            instructions: system_prompt || "",
-            verbosity: options.verbosity || "medium",
-            reasoning_effort: reasoning_effort || "medium",
-            enable_web_search: options.enable_web_search !== false,
-            image_input: imageUrls,
-            tools: [],
-            json_schema: {},
-            simple_schema: [],
-            input_item_list: [],
-          };
-        } else {
-          // Use structured API for text-only
-          input = {
-            model: modelVariant,
-            prompt: userMessage?.content || "",
-            instructions: system_prompt || "",
-            verbosity: options.verbosity || "medium",
-            reasoning_effort: reasoning_effort || "medium",
-            enable_web_search: options.enable_web_search !== false,
-            tools: [],
-            image_input: [],
-            json_schema: {},
-            simple_schema: [],
-            input_item_list: [],
-          };
+        // Add system message first if system_prompt is provided
+        if (system_prompt) {
+          formattedMessages.push({
+            role: "system",
+            content: system_prompt,
+          });
         }
+
+        // Add conversation messages
+        messages.forEach((msg) => {
+          formattedMessages.push({
+            role: msg.role,
+            content: msg.content,
+          });
+        });
+
+        // Get images ONLY from the LATEST user message (not from conversation history)
+        // This prevents sending base64 data from old messages
+        const latestUserMessage = messages.filter(m => m.role === 'user').pop();
+        const hasImages = latestUserMessage?.files && latestUserMessage.files.length > 0;
+        const imageUrls = hasImages && latestUserMessage.files
+          ? latestUserMessage.files
+              .map((file) => {
+                const fileUrl = (file as any).url;
+                console.log('🖼️ Processing file for image_input (latest message only):', {
+                  name: (file as any).name,
+                  hasUrl: !!fileUrl,
+                  url: fileUrl?.substring(0, 100)
+                });
+                // Only return URL, ignore base64 data (Replicate requires URLs)
+                return fileUrl;
+              })
+              .filter(Boolean)
+          : [];
+
+        console.log('📦 Final image_input array:', {
+          count: imageUrls.length,
+          urls: imageUrls.map(url => url.substring(0, 150))
+        });
+
+        input = {
+          model: modelVariant,
+          prompt: "", // Empty when using messages array
+          messages: formattedMessages, // Full conversation history with system message
+          verbosity: options.verbosity || "medium",
+          reasoning_effort: reasoning_effort || "medium",
+          enable_web_search: options.enable_web_search !== false,
+          image_input: imageUrls,
+          tools: [],
+          json_schema: {},
+          simple_schema: [],
+          input_item_list: [],
+        };
       } else {
         // For other models, use the original format
         const formattedMessages = this.formatMessages(messages, system_prompt);
@@ -118,6 +154,14 @@ export class ReplicateProvider implements AIProvider {
           top_p,
         };
       }
+
+      console.log('🚀 [REPLICATE] About to call Replicate API with input:', {
+        model,
+        hasImageInput: !!input.image_input,
+        imageInputCount: input.image_input?.length || 0,
+        imageInputSample: input.image_input?.[0]?.substring(0, 100),
+        inputKeys: Object.keys(input)
+      });
 
       const output = await this.client.run(model as any, { input });
 
@@ -156,6 +200,24 @@ export class ReplicateProvider implements AIProvider {
         reasoning_effort = "medium",
       } = options;
 
+      console.log('🔍 [REPLICATE] generateStream called with:', {
+        messageCount: messages.length,
+        model,
+        messagesWithFiles: messages.filter(m => m.files && m.files.length > 0).length
+      });
+
+      messages.forEach((msg, idx) => {
+        if (msg.files && msg.files.length > 0) {
+          console.log(`📎 [REPLICATE] Message ${idx} has files:`, msg.files.map(f => ({
+            name: (f as any).name,
+            type: (f as any).type,
+            hasUrl: !!(f as any).url,
+            hasData: !!(f as any).data,
+            dataLength: (f as any).data?.length || 0
+          })));
+        }
+      });
+
       // Build input based on model type
       let input: any;
 
@@ -183,45 +245,63 @@ export class ReplicateProvider implements AIProvider {
         // Extract model variant: "openai/gpt-5-nano" → "gpt-5-nano"
         const modelVariant = model.split("/")[1] || "gpt-5";
 
-        // For OpenAI models, use structured API format
-        const userMessage = messages[messages.length - 1];
-        const hasImage = userMessage?.files && userMessage.files.length > 0;
+        // For OpenAI models, use messages array format (supports conversation history)
+        // Include system prompt as first message if provided
+        const formattedMessages = [];
 
-        if (hasImage) {
-          // Use structured API with images
-          const imageUrls =
-            userMessage.files?.map((file) => (file as any).url || file.data) ||
-            [];
-
-          input = {
-            model: modelVariant,
-            prompt: userMessage?.content || "",
-            instructions: system_prompt || "",
-            verbosity: options.verbosity || "medium",
-            reasoning_effort: reasoning_effort || "medium",
-            enable_web_search: options.enable_web_search !== false,
-            image_input: imageUrls,
-            tools: [],
-            json_schema: {},
-            simple_schema: [],
-            input_item_list: [],
-          };
-        } else {
-          // Use structured API for text-only
-          input = {
-            model: modelVariant,
-            prompt: userMessage?.content || "",
-            instructions: system_prompt || "",
-            verbosity: options.verbosity || "medium",
-            reasoning_effort: reasoning_effort || "medium",
-            enable_web_search: options.enable_web_search !== false,
-            tools: [],
-            image_input: [],
-            json_schema: {},
-            simple_schema: [],
-            input_item_list: [],
-          };
+        // Add system message first if system_prompt is provided
+        if (system_prompt) {
+          formattedMessages.push({
+            role: "system",
+            content: system_prompt,
+          });
         }
+
+        // Add conversation messages
+        messages.forEach((msg) => {
+          formattedMessages.push({
+            role: msg.role,
+            content: msg.content,
+          });
+        });
+
+        // Get images ONLY from the LATEST user message (not from conversation history)
+        // This prevents sending base64 data from old messages
+        const latestUserMessage = messages.filter(m => m.role === 'user').pop();
+        const hasImages = latestUserMessage?.files && latestUserMessage.files.length > 0;
+        const imageUrls = hasImages && latestUserMessage.files
+          ? latestUserMessage.files
+              .map((file) => {
+                const fileUrl = (file as any).url;
+                console.log('🖼️ Processing file for image_input (latest message only):', {
+                  name: (file as any).name,
+                  hasUrl: !!fileUrl,
+                  url: fileUrl?.substring(0, 100)
+                });
+                // Only return URL, ignore base64 data (Replicate requires URLs)
+                return fileUrl;
+              })
+              .filter(Boolean)
+          : [];
+
+        console.log('📦 Final image_input array:', {
+          count: imageUrls.length,
+          urls: imageUrls.map(url => url.substring(0, 150))
+        });
+
+        input = {
+          model: modelVariant,
+          prompt: "", // Empty when using messages array
+          messages: formattedMessages, // Full conversation history with system message
+          verbosity: options.verbosity || "medium",
+          reasoning_effort: reasoning_effort || "medium",
+          enable_web_search: options.enable_web_search !== false,
+          image_input: imageUrls,
+          tools: [],
+          json_schema: {},
+          simple_schema: [],
+          input_item_list: [],
+        };
       } else {
         // For other models, use the original format
         const formattedMessages = this.formatMessages(messages, system_prompt);
@@ -232,6 +312,15 @@ export class ReplicateProvider implements AIProvider {
           top_p,
         };
       }
+
+      console.log('🚀 [REPLICATE] About to call Replicate stream API with input:', {
+        model,
+        hasImageInput: !!input.image_input,
+        imageInputCount: input.image_input?.length || 0,
+        imageInputSample: input.image_input?.[0]?.substring(0, 150),
+        inputKeys: Object.keys(input),
+        fullInput: JSON.stringify(input, null, 2).substring(0, 500)
+      });
 
       // For streaming, we use the stream method
       const stream = await this.client.stream(model as any, { input });

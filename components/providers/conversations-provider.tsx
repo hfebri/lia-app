@@ -70,7 +70,6 @@ export function ConversationsProvider({
 
       // Cancel any pending request only if one is actually in progress
       if (isRequestInProgressRef.current && abortControllerRef.current) {
-        console.log('🚫 Aborting previous request');
         abortControllerRef.current.abort();
       }
 
@@ -90,13 +89,9 @@ export function ConversationsProvider({
           params.append("search", search);
         }
 
-        console.log(`📡 Fetching conversations: page ${page}${search ? ` search="${search}"` : ''}`);
-
         const response = await fetch(`/api/conversations?${params}`, {
           signal: abortControllerRef.current.signal,
         });
-
-        console.log(`✅ Conversations fetch successful: page ${page}`);
 
         if (!response.ok) throw new Error("Failed to load conversations");
 
@@ -119,7 +114,6 @@ export function ConversationsProvider({
       } catch (error: any) {
         // Ignore abort errors
         if (error.name === "AbortError") {
-          console.log('⚠️ Request aborted (this is normal in dev mode)');
           isRequestInProgressRef.current = false;
           return;
         }
@@ -309,11 +303,8 @@ export function ConversationsProvider({
 
   // Load conversations ONCE when user is available
   useEffect(() => {
-    console.log('🔄 Effect running - user:', user?.email, 'hasFetched:', hasFetchedRef.current);
-
     if (user && !hasFetchedRef.current) {
       hasFetchedRef.current = true;
-      console.log('🎯 Initial conversations load triggered for:', user.email);
       loadConversations();
     }
 

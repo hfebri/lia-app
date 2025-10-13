@@ -97,11 +97,11 @@ export function AppLayout({
   return (
     <NavigationLoaderProvider value={navigationContextValue}>
       <ErrorBoundary>
-        <div className="min-h-screen bg-background">
-          <div className="flex">
+        <div className="h-screen bg-background overflow-hidden">
+          <div className="flex h-full w-full overflow-hidden">
           {/* Desktop Sidebar */}
           {showSidebar && (
-            <aside className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 md:top-0 md:z-50 md:border-r">
+            <aside className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 md:top-0 md:z-50 md:border-r md:bg-background">
               {memoizedSidebar}
             </aside>
           )}
@@ -143,14 +143,14 @@ export function AppLayout({
           {/* Main Content */}
           <main
             className={cn(
-              "relative flex-1 flex flex-col h-screen overflow-hidden",
+              "relative flex-1 flex flex-col h-screen min-w-0",
               showSidebar
-                ? "h-screen md:pl-64 md:pr-6 pt-14 md:pt-0"
-                : "h-screen px-6",
+                ? "pt-14 md:pt-0 md:pl-64"
+                : "px-6",
               className
             )}
           >
-            <div className="flex-1 h-full">
+            <div className="flex-1 h-full overflow-hidden w-full">
               <ErrorBoundary>{children}</ErrorBoundary>
             </div>
           </main>

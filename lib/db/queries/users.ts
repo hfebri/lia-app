@@ -1,6 +1,6 @@
-import { eq, desc, asc, count, and, isNull } from "drizzle-orm";
+import { eq, desc, asc, count, and, isNull, sql } from "drizzle-orm";
 import { db } from "../../../db/db";
-import { users, conversations, messages } from "../../../db/schema";
+import { users, conversations } from "../../../db/schema";
 import type {
   User,
   NewUser,
@@ -118,19 +118,24 @@ export async function getUserWithStats(
   const user = await getUserById(id);
   if (!user) return null;
 
-  const [conversationCount, messageCount] = await Promise.all([
-    db
-      .select({ count: count() })
-      .from(conversations)
-      .where(eq(conversations.userId, id)),
-    db.select({ count: count() }).from(messages).where(eq(messages.userId, id)),
-  ]);
+  const conversationCount = await db
+    .select({ count: count() })
+    .from(conversations)
+    .where(eq(conversations.userId, id));
+
+  // Count messages from JSONB array in conversations table
+  const messageCountResult = await db
+    .select({
+      count: sql<number>`SUM(jsonb_array_length(${conversations.messages}))`,
+    })
+    .from(conversations)
+    .where(eq(conversations.userId, id));
 
   return {
     ...user,
     conversationCount: conversationCount[0].count,
-    messageCount: messageCount[0].count,
-    totalTokensUsed: 0, // Will be calculated from tokens field in messages
+    messageCount: messageCountResult[0]?.count || 0,
+    totalTokensUsed: 0, // Will be calculated from tokens field in messages metadata
   };
 }
 

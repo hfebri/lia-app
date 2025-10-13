@@ -1,5 +1,12 @@
 // Use dynamic imports to avoid module load-time errors
 
+const isDev = process.env.NODE_ENV !== "production";
+const debugLog = (...args: unknown[]) => {
+  if (isDev) {
+    console.log(...args);
+  }
+};
+
 export interface TextExtractionResult {
   success: boolean;
   text?: string;
@@ -84,7 +91,7 @@ async function extractFromPDF(buffer: Buffer): Promise<TextExtractionResult> {
 
     // If we have substantial text content, return it
     if (wordCount > 10) {
-      console.log(
+      debugLog(
         `📄 [PDF] Successfully extracted ${wordCount} words from text-based PDF`
       );
       return {
@@ -104,7 +111,7 @@ async function extractFromPDF(buffer: Buffer): Promise<TextExtractionResult> {
     }
 
     // If we got little or no text, this might be a scanned PDF - try OCR fallback
-    console.log(
+    debugLog(
       `📄 [PDF] Got only ${wordCount} words, attempting OCR fallback for scanned PDF`
     );
 
@@ -123,7 +130,7 @@ async function extractFromPDF(buffer: Buffer): Promise<TextExtractionResult> {
         ocrResult.text &&
         ocrResult.text.length > text.length
       ) {
-        console.log(
+        debugLog(
           `✅ [PDF OCR] Successfully extracted text from scanned PDF using OCR`
         );
         return {
@@ -142,7 +149,7 @@ async function extractFromPDF(buffer: Buffer): Promise<TextExtractionResult> {
         };
       }
     } catch (ocrError) {
-      console.log(`❌ [PDF OCR] OCR fallback failed:`, ocrError);
+      debugLog(`❌ [PDF OCR] OCR fallback failed:`, ocrError);
     }
 
     // Return the regular extraction result even if minimal
@@ -345,7 +352,7 @@ async function extractFromImage(
   filename: string
 ): Promise<TextExtractionResult> {
   try {
-    console.log(`🚀 [OCR] Starting Tesseract OCR for image: ${filename}`);
+    debugLog(`🚀 [OCR] Starting Tesseract OCR for image: ${filename}`);
     const startTime = Date.now();
 
     // Dynamically import Tesseract to avoid SSR issues
@@ -356,7 +363,7 @@ async function extractFromImage(
     } = await Tesseract.recognize(buffer, "eng", {
       logger: (m) => {
         const elapsed = Date.now() - startTime;
-        console.log(
+        debugLog(
           `🔧 [OCR] [${filename}] ${m.status} (${Math.round(
             (m.progress || 0) * 100
           )}%) - ${elapsed}ms`
@@ -367,8 +374,8 @@ async function extractFromImage(
     const cleanText = text.trim();
     const processingTime = Date.now() - startTime;
 
-    console.log(`✅ [OCR] Completed OCR for: ${filename}`);
-    console.log(
+    debugLog(`✅ [OCR] Completed OCR for: ${filename}`);
+    debugLog(
       `📊 [OCR] Extracted ${cleanText.length} characters in ${processingTime}ms`
     );
 

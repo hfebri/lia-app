@@ -1,6 +1,14 @@
 "use client";
 
 import Tesseract from "tesseract.js";
+import * as XLSX from "xlsx";
+
+const isDev = process.env.NODE_ENV !== "production";
+const debugLog = (...args: unknown[]) => {
+  if (isDev) {
+    console.log(...args);
+  }
+};
 
 // Dynamic import for PDF.js to avoid SSR issues
 let pdfjsLib: any = null;
@@ -9,13 +17,13 @@ async function loadPDFJS() {
   if (typeof window === "undefined") {
     throw new Error("PDF.js can only be loaded in the browser");
   }
-  
+
   if (!pdfjsLib) {
     pdfjsLib = await import("pdfjs-dist");
     // Use the local worker file served from public directory
     pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
   }
-  
+
   return pdfjsLib;
 }
 
@@ -23,15 +31,31 @@ export interface ProcessedFile {
   name: string;
   type: string;
   size: number;
+  url?: string;
+  data?: string;
   extractedText?: string;
   isImage: boolean;
   isDocument: boolean;
+  isText: boolean;
+  isSpreadsheet: boolean;
   processingTime?: number;
   error?: string;
-  // For display purposes
-  displayContent?: string; // What to show in the chat bubble (just file info, no extracted text)
-  // For prompt purposes  
-  promptContent?: string; // What to include in the AI prompt (full extracted text)
+  displayContent?: string;
+  promptContent?: string;
+}
+
+// Metadata structure for storing in database
+export interface FileMetadata {
+  name: string;
+  type: string;
+  size: number;
+  extractedText?: string;
+  processedAt: string;
+  isImage: boolean;
+  isDocument: boolean;
+  isText: boolean;
+  isSpreadsheet: boolean;
+  error?: string;
 }
 
 export interface FileProcessingProgress {
@@ -57,35 +81,39 @@ export class ClientFileProcessor {
     selectedModel: string,
     onProgress?: (fileName: string, progress: FileProcessingProgress) => void
   ): Promise<ProcessedFile[]> {
-    console.log(`🚀 [CLIENT OCR] Starting client-side file processing for ${files.length} files`);
+    debugLog(`🚀 [CLIENT OCR] Starting client-side file processing for ${files.length} files`);
     
     const processedFiles: ProcessedFile[] = [];
 
     for (const file of files) {
-      console.log(`\n📁 [CLIENT OCR] Processing: ${file.name} (${file.type})`);
+      debugLog(`\n📁 [CLIENT OCR] Processing: ${file.name} (${file.type})`);
       
       const startTime = Date.now();
       const isImage = this.isImageFile(file);
       const isDocument = this.isDocumentFile(file);
-      
+      const isText = this.isTextFile(file);
+      const isSpreadsheet = this.isSpreadsheetFile(file);
+
       const baseProcessedFile: ProcessedFile = {
         name: file.name,
         type: file.type,
         size: file.size,
         isImage,
         isDocument,
+        isText,
+        isSpreadsheet,
       };
 
       // Report initial progress immediately
       onProgress?.(file.name, {
-        stage: isDocument ? "Preparing for OCR processing" : "Processing file",
+        stage: isDocument ? "Preparing document analysis" : "Processing file",
         progress: 1,
         timeElapsed: 0,
       });
 
       try {
         if (isImage) {
-          console.log(`📸 [CLIENT OCR] Image file detected - no OCR needed`);
+          debugLog(`📸 [CLIENT OCR] Image file detected - no OCR needed`);
           const fileInfo = `📷 Image: ${file.name} (${Math.round(file.size/1024)}KB)`;
           
           processedFiles.push({
@@ -105,7 +133,7 @@ export class ClientFileProcessor {
 
           if (isGeminiModel) {
             // Gemini supports documents natively - no OCR needed
-            console.log(`📄 [CLIENT] Document file detected - Gemini native support (no OCR needed)`);
+            debugLog(`📄 [CLIENT] Document file detected - Gemini native support (no OCR needed)`);
 
             const fileInfo = `📄 Document: ${file.name} (${Math.round(file.size/1024)}KB) - Native processing`;
 
@@ -123,11 +151,11 @@ export class ClientFileProcessor {
             });
           } else {
             // Claude/GPT models need OCR for documents
-            console.log(`📄 [CLIENT OCR] Document file detected - running OCR for ${selectedModel}`);
+            debugLog(`📄 [CLIENT OCR] Document file detected - running OCR for ${selectedModel}`);
 
             // Show immediate progress for document processing
             onProgress?.(file.name, {
-              stage: "Starting OCR analysis",
+              stage: "Analyzing document",
               progress: 5,
               timeElapsed: Date.now() - startTime,
             });
@@ -135,12 +163,12 @@ export class ClientFileProcessor {
             const extractedText = await this.runTesseractOCR(file, (progress) => {
               onProgress?.(file.name, {
                 stage: progress.status,
-                progress: Math.round((progress.progress || 0) * 100),
+                progress: Math.min(100, Math.round((progress.progress || 0) * 100)),
                 timeElapsed: Date.now() - startTime,
               });
             });
 
-            const fileInfo = `📄 Document: ${file.name} (${Math.round(file.size/1024)}KB) - Text extracted with OCR`;
+            const fileInfo = `📄 Document: ${file.name} (${Math.round(file.size/1024)}KB) - Text extracted`;
             const promptInfo = extractedText ? `📄 Document: ${file.name}\n\nExtracted Content:\n${extractedText}` : fileInfo;
 
             processedFiles.push({
@@ -157,10 +185,62 @@ export class ClientFileProcessor {
               timeElapsed: Date.now() - startTime,
             });
           }
+        } else if (isText) {
+          debugLog(`📝 [CLIENT] Text file detected - reading content`);
+
+          onProgress?.(file.name, {
+            stage: "Reading text file",
+            progress: 10,
+            timeElapsed: Date.now() - startTime,
+          });
+
+          const textContent = await this.readTextFile(file);
+          const fileInfo = `📝 Text File: ${file.name} (${Math.round(file.size/1024)}KB)`;
+          const promptInfo = textContent ? `${fileInfo}\n\nContent:\n${textContent}` : fileInfo;
+
+          processedFiles.push({
+            ...baseProcessedFile,
+            extractedText: textContent,
+            processingTime: Date.now() - startTime,
+            displayContent: fileInfo,
+            promptContent: promptInfo,
+          });
+
+          onProgress?.(file.name, {
+            stage: "Complete (Text)",
+            progress: 100,
+            timeElapsed: Date.now() - startTime,
+          });
+        } else if (isSpreadsheet) {
+          debugLog(`📊 [CLIENT] Spreadsheet detected - parsing content`);
+
+          onProgress?.(file.name, {
+            stage: "Parsing spreadsheet",
+            progress: 10,
+            timeElapsed: Date.now() - startTime,
+          });
+
+          const spreadsheetContent = await this.parseSpreadsheet(file);
+          const fileInfo = `📊 Spreadsheet: ${file.name} (${Math.round(file.size/1024)}KB)`;
+          const promptInfo = spreadsheetContent ? `${fileInfo}\n\n${spreadsheetContent}` : fileInfo;
+
+          processedFiles.push({
+            ...baseProcessedFile,
+            extractedText: spreadsheetContent,
+            processingTime: Date.now() - startTime,
+            displayContent: fileInfo,
+            promptContent: promptInfo,
+          });
+
+          onProgress?.(file.name, {
+            stage: "Complete (Spreadsheet)",
+            progress: 100,
+            timeElapsed: Date.now() - startTime,
+          });
         } else {
-          console.log(`❓ [CLIENT OCR] Unsupported file type: ${file.type}`);
+          debugLog(`❓ [CLIENT] Unsupported file type: ${file.type}`);
           const errorInfo = `❌ Unsupported file: ${file.name} (${file.type})`;
-          
+
           processedFiles.push({
             ...baseProcessedFile,
             error: `Unsupported file type: ${file.type}`,
@@ -195,7 +275,7 @@ export class ClientFileProcessor {
       }
     }
 
-    console.log(`✅ [CLIENT OCR] Completed processing ${files.length} files`);
+    debugLog(`✅ [CLIENT OCR] Completed processing ${files.length} files`);
     return processedFiles;
   }
 
@@ -206,7 +286,7 @@ export class ClientFileProcessor {
     file: File,
     onProgress: (progress: { status: string; progress?: number }) => void
   ): Promise<string> {
-    console.log(`🚀 [TESSERACT] Starting OCR for: ${file.name}`);
+    debugLog(`🚀 [TESSERACT] Starting OCR for: ${file.name}`);
     
     const startTime = Date.now();
     
@@ -215,7 +295,7 @@ export class ClientFileProcessor {
 
       // Handle PDF files by converting to images first
       if (file.type === "application/pdf") {
-        console.log(`📄 [PDF CONVERT] Converting PDF to images: ${file.name}`);
+        debugLog(`📄 [PDF CONVERT] Converting PDF to images: ${file.name}`);
         onProgress({ status: "Converting PDF to images", progress: 10 });
         
         imagesToProcess = await this.convertPDFToImages(file, (progress) => {
@@ -224,7 +304,7 @@ export class ClientFileProcessor {
           onProgress({ status: "Converting PDF to images", progress: mappedProgress });
         });
         
-        console.log(`✅ [PDF CONVERT] Converted PDF to ${imagesToProcess.length} images`);
+        debugLog(`✅ [PDF CONVERT] Converted PDF to ${imagesToProcess.length} images`);
         onProgress({ status: "PDF converted, starting OCR", progress: 40 });
       } else {
         // For image files, process directly
@@ -238,7 +318,7 @@ export class ClientFileProcessor {
         const image = imagesToProcess[i];
         const pageNumber = imagesToProcess.length > 1 ? ` (page ${i + 1}/${imagesToProcess.length})` : "";
         
-        console.log(`🔍 [TESSERACT] Processing image${pageNumber}...`);
+        debugLog(`🔍 [TESSERACT] Processing image${pageNumber}...`);
         onProgress({ 
           status: `OCR processing${pageNumber}`, 
           progress: (i / imagesToProcess.length) * 100 
@@ -249,7 +329,7 @@ export class ClientFileProcessor {
         } = await Tesseract.recognize(image, "eng", {
           logger: (m) => {
             const elapsed = Date.now() - startTime;
-            console.log(
+            debugLog(
               `🔧 [TESSERACT] [${file.name}${pageNumber}] ${m.status} (${Math.round((m.progress || 0) * 100)}%) - ${elapsed}ms`
             );
             
@@ -277,9 +357,9 @@ export class ClientFileProcessor {
       const combinedText = allTexts.join("\n\n--- Page Break ---\n\n");
       const processingTime = Date.now() - startTime;
       
-      console.log(`✅ [TESSERACT] OCR completed for: ${file.name}`);
-      console.log(`📊 [TESSERACT] Extracted ${combinedText.length} characters from ${imagesToProcess.length} page(s) in ${processingTime}ms`);
-      console.log(`📄 [TESSERACT] Text preview: "${combinedText.substring(0, 100)}..."`);
+      debugLog(`✅ [TESSERACT] OCR completed for: ${file.name}`);
+      debugLog(`📊 [TESSERACT] Extracted ${combinedText.length} characters from ${imagesToProcess.length} page(s) in ${processingTime}ms`);
+      debugLog(`📄 [TESSERACT] Text preview: "${combinedText.substring(0, 100)}..."`);
 
       onProgress({ status: "Complete", progress: 100 });
       return combinedText;
@@ -302,11 +382,11 @@ export class ClientFileProcessor {
     const arrayBuffer = await pdfFile.arrayBuffer();
     const pdf = await pdfLib.getDocument({ data: arrayBuffer }).promise;
     
-    console.log(`📖 [PDF CONVERT] PDF has ${pdf.numPages} pages`);
+    debugLog(`📖 [PDF CONVERT] PDF has ${pdf.numPages} pages`);
     const images: Blob[] = [];
 
     for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-      console.log(`🖼️  [PDF CONVERT] Converting page ${pageNum}/${pdf.numPages}`);
+      debugLog(`🖼️  [PDF CONVERT] Converting page ${pageNum}/${pdf.numPages}`);
       
       const page = await pdf.getPage(pageNum);
       const scale = 2.0; // Higher scale for better OCR accuracy
@@ -377,6 +457,26 @@ export class ClientFileProcessor {
   }
 
   /**
+   * Convert processed files to metadata for database storage
+   */
+  static toMetadata(processedFiles: ProcessedFile[]): FileMetadata[] {
+    return processedFiles.map(file => ({
+      name: file.name,
+      type: file.type,
+      size: file.size,
+      url: file.url, // Include URL for images uploaded to Supabase
+      data: file.data, // Include base64 data if available
+      extractedText: file.extractedText,
+      processedAt: new Date().toISOString(),
+      isImage: file.isImage,
+      isDocument: file.isDocument,
+      isText: file.isText,
+      isSpreadsheet: file.isSpreadsheet,
+      error: file.error,
+    }));
+  }
+
+  /**
    * Check if file is an image
    */
   private static isImageFile(file: File): boolean {
@@ -404,5 +504,104 @@ export class ClientFileProcessor {
       "application/vnd.ms-powerpoint", // .ppt
     ];
     return documentTypes.includes(file.type.toLowerCase());
+  }
+
+  /**
+   * Check if file is a text file
+   */
+  private static isTextFile(file: File): boolean {
+    const textTypes = [
+      "text/plain",
+      "text/csv",
+      "text/rtf",
+      "application/rtf",
+      "text/markdown",
+      "text/x-markdown",
+    ];
+
+    // Also check file extension for files with generic mime types
+    const fileName = file.name.toLowerCase();
+    const textExtensions = ['.txt', '.csv', '.rtf', '.md', '.markdown'];
+
+    return textTypes.includes(file.type.toLowerCase()) ||
+           textExtensions.some(ext => fileName.endsWith(ext));
+  }
+
+  /**
+   * Check if file is a spreadsheet
+   */
+  private static isSpreadsheetFile(file: File): boolean {
+    const spreadsheetTypes = [
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // .xlsx
+      "application/vnd.ms-excel", // .xls
+      "application/vnd.ms-excel.sheet.macroEnabled.12", // .xlsm
+    ];
+
+    // Also check file extension
+    const fileName = file.name.toLowerCase();
+    const spreadsheetExtensions = ['.xlsx', '.xls', '.xlsm'];
+
+    return spreadsheetTypes.includes(file.type.toLowerCase()) ||
+           spreadsheetExtensions.some(ext => fileName.endsWith(ext));
+  }
+
+  /**
+   * Read text file content
+   */
+  private static async readTextFile(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+
+      reader.onload = (e) => {
+        const content = e.target?.result as string;
+        resolve(content || "");
+      };
+
+      reader.onerror = () => {
+        reject(new Error(`Failed to read file: ${file.name}`));
+      };
+
+      reader.readAsText(file);
+    });
+  }
+
+  /**
+   * Parse spreadsheet file and convert to formatted text
+   */
+  private static async parseSpreadsheet(file: File): Promise<string> {
+    try {
+      // Read file as array buffer
+      const buffer = await file.arrayBuffer();
+
+      // Parse workbook
+      const workbook = XLSX.read(buffer, { type: 'array' });
+
+      // Convert all sheets to formatted text
+      let result = '';
+
+      workbook.SheetNames.forEach((sheetName, index) => {
+        const sheet = workbook.Sheets[sheetName];
+
+        // Add sheet header
+        if (workbook.SheetNames.length > 1) {
+          result += `\n${'='.repeat(60)}\n`;
+          result += `Sheet ${index + 1}: ${sheetName}\n`;
+          result += `${'='.repeat(60)}\n\n`;
+        }
+
+        // Convert to CSV format (easier to read than JSON)
+        const csv = XLSX.utils.sheet_to_csv(sheet);
+        result += csv;
+
+        if (index < workbook.SheetNames.length - 1) {
+          result += '\n';
+        }
+      });
+
+      return result;
+    } catch (error) {
+      console.error('Error parsing spreadsheet:', error);
+      throw new Error(`Failed to parse spreadsheet: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 }
