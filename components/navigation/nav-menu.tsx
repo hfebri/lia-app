@@ -148,9 +148,9 @@ export const defaultNavSections: NavMenuSection[] = [
         description: "Learn how to use the platform",
       },
       {
-        title: "API Reference",
+        title: "Developer Resources",
         href: "/api-docs",
-        description: "Developer API documentation",
+        description: "Developer documentation and resources",
         external: true,
       },
       {

@@ -122,7 +122,7 @@ export default function AdminDashboardPage() {
           <CardContent className="space-y-4">
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">API Response Time</span>
+                <span className="text-sm font-medium">Response Time</span>
                 <Badge variant="default">145ms</Badge>
               </div>
               <div className="flex items-center justify-between">
