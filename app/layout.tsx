@@ -22,6 +22,9 @@ export const metadata: Metadata = {
   description: "AI Platform powered by AI Model API",
 };
 
+// Force dynamic rendering for all pages since many use useSearchParams
+export const dynamic = "force-dynamic";
+
 export default function RootLayout({
   children,
 }: Readonly<{

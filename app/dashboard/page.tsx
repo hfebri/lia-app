@@ -5,6 +5,9 @@ import { DashboardOverview } from "../(dashboard)/_components/dashboard-overview
 import { DashboardSkeleton } from "../admin/_components/dashboard-skeleton";
 import { DashboardLayout } from "@/components/layout/app-layout";
 
+// Force dynamic rendering since we use useSearchParams in the layout
+export const dynamic = "force-dynamic";
+
 export default function DashboardPage() {
   return (
     <DashboardLayout>
