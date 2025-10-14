@@ -188,31 +188,33 @@ function SidebarComponent({ className }: SidebarProps) {
 
   return (
     <div className={cn("h-full w-64 flex flex-col", className)}>
+      {/* Sticky Logo and Theme Toggle */}
+      <div className="sticky top-0 z-10 bg-background border-b px-3 py-4">
+        <div className="flex items-center justify-between pl-3">
+          <Link
+            href="/"
+            className="flex items-center gap-2"
+            onClick={(event) => handleLinkNavigation(event, "/")}
+            prefetch={false}
+          >
+            <Image
+              src="/logo.png"
+              alt="LIA Logo"
+              width={32}
+              height={32}
+              className="rounded"
+            />
+            <h1 className="text-xl font-bold">LIA</h1>
+            <Badge variant="secondary" className="text-xs">Beta</Badge>
+          </Link>
+          <div className="flex items-center gap-2">
+            <SimpleThemeToggle />
+          </div>
+        </div>
+      </div>
+
       <div className="flex-1 overflow-y-auto overflow-x-hidden">
         <div className="space-y-4 py-4">
-          {/* Logo and Theme Toggle */}
-          <div className="px-3 py-2">
-            <div className="flex items-center justify-between pl-3 mb-14">
-              <Link
-                href="/"
-                className="flex items-center gap-2"
-                onClick={(event) => handleLinkNavigation(event, "/")}
-                prefetch={false}
-              >
-                <Image
-                  src="/logo.png"
-                  alt="LIA Logo"
-                  width={32}
-                  height={32}
-                  className="rounded"
-                />
-                <h1 className="text-xl font-bold">LIA</h1>
-              </Link>
-              <div className="flex items-center gap-2">
-                <SimpleThemeToggle />
-              </div>
-            </div>
-          </div>
 
           {/* Navigation */}
           <div className="px-3 py-2">
