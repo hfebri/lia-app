@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Bot } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 export function Footer() {
   return (
@@ -9,6 +10,7 @@ export function Footer() {
           <div className="flex items-center space-x-2">
             <Bot className="h-4 w-4" />
             <span className="font-bold">LIA</span>
+            <Badge variant="secondary" className="ml-2">Beta</Badge>
           </div>
           <p className="text-center text-sm leading-loose text-muted-foreground md:text-left">
             Powered by Leverate Group.
