@@ -2,6 +2,7 @@
 
 import React, { memo, useCallback, useMemo } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
@@ -191,11 +192,17 @@ function SidebarComponent({ className }: SidebarProps) {
             <div className="flex items-center justify-between pl-3 mb-14">
               <Link
                 href="/"
-                className="flex items-center"
+                className="flex items-center gap-2"
                 onClick={(event) => handleLinkNavigation(event, "/")}
                 prefetch={false}
               >
-                <Bot className="h-6 w-6 mr-2" />
+                <Image
+                  src="/logo.png"
+                  alt="LIA Logo"
+                  width={32}
+                  height={32}
+                  className="rounded"
+                />
                 <h1 className="text-xl font-bold">LIA App</h1>
               </Link>
               <div className="flex items-center gap-2">
