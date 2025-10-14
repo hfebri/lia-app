@@ -21,12 +21,12 @@ import {
   AlertCircle,
   BarChart3,
 } from "lucide-react";
-import { ActivityChart } from "../../(admin)/_components/activity-chart";
+import { ActivityChart } from "../../admin/_components/activity-chart";
 // removed unused RecentConversations import
-import { FileAnalytics } from "../../(admin)/_components/file-analytics";
-import { PopularTopics } from "../../(admin)/_components/popular-topics";
+import { FileAnalytics } from "../../admin/_components/file-analytics";
+import { PopularTopics } from "../../admin/_components/popular-topics";
 import { useUserAnalytics } from "@/hooks/use-user-analytics";
-import { DashboardSkeleton } from "../../(admin)/_components/dashboard-skeleton";
+import { DashboardSkeleton } from "../../admin/_components/dashboard-skeleton";
 
 export function DashboardOverview() {
   const { data: analytics, isLoading, error, refetch } = useUserAnalytics();

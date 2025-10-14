@@ -2,7 +2,7 @@
 
 import { Suspense } from "react";
 import { DashboardOverview } from "../(dashboard)/_components/dashboard-overview";
-import { DashboardSkeleton } from "../(admin)/_components/dashboard-skeleton";
+import { DashboardSkeleton } from "../admin/_components/dashboard-skeleton";
 import { DashboardLayout } from "@/components/layout/app-layout";
 
 export default function DashboardPage() {

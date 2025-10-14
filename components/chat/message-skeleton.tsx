@@ -9,7 +9,10 @@ interface MessageSkeletonProps {
   className?: string;
 }
 
-export function MessageSkeleton({ isUser = false, className }: MessageSkeletonProps) {
+export function MessageSkeleton({
+  isUser = false,
+  className,
+}: MessageSkeletonProps) {
   return (
     <div
       className={cn(
@@ -39,7 +42,7 @@ export function MessageSkeleton({ isUser = false, className }: MessageSkeletonPr
       {/* Message Content */}
       <div
         className={cn(
-          "flex flex-col gap-1 max-w-[75%] min-w-0",
+          "flex flex-col gap-1 min-w-0",
           isUser ? "items-end" : "items-start"
         )}
       >
@@ -64,23 +67,14 @@ export function MessageSkeleton({ isUser = false, className }: MessageSkeletonPr
           />
 
           <div className="relative space-y-2">
-            <Skeleton 
-              className={cn(
-                "h-4 w-48",
-                isUser ? "bg-white/20" : "bg-muted"
-              )} 
+            <Skeleton
+              className={cn("h-4 w-48", isUser ? "bg-white/20" : "bg-muted")}
             />
-            <Skeleton 
-              className={cn(
-                "h-4 w-32",
-                isUser ? "bg-white/20" : "bg-muted"
-              )} 
+            <Skeleton
+              className={cn("h-4 w-32", isUser ? "bg-white/20" : "bg-muted")}
             />
-            <Skeleton 
-              className={cn(
-                "h-4 w-40",
-                isUser ? "bg-white/20" : "bg-muted"
-              )} 
+            <Skeleton
+              className={cn("h-4 w-40", isUser ? "bg-white/20" : "bg-muted")}
             />
           </div>
         </div>
@@ -89,9 +83,13 @@ export function MessageSkeleton({ isUser = false, className }: MessageSkeletonPr
   );
 }
 
-export function ChatHistorySkeleton({ messageCount = 3 }: { messageCount?: number }) {
+export function ChatHistorySkeleton({
+  messageCount = 3,
+}: {
+  messageCount?: number;
+}) {
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
+    <div className="space-y-6 mx-auto">
       {Array.from({ length: messageCount }).map((_, index) => (
         <div key={index}>
           {/* User message */}

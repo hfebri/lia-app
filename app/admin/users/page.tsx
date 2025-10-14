@@ -17,7 +17,7 @@ import {
   Activity,
   TrendingUp,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { getUserStatsAction } from "@/actions/db/users-actions";
 import { SelectUser } from "@/db/schema";
 import { toast } from "sonner";
@@ -35,8 +35,8 @@ const convertToUserTableFormat = (
     status: user.isActive ? ("active" as const) : ("inactive" as const),
     lastActive: user.updatedAt,
     createdAt: user.createdAt,
-    messageCount: user.conversationCount, // Map conversationCount to messageCount for display
-    fileCount: user.messageCount, // Map messageCount to fileCount for display
+    messageCount: user.conversationCount,
+    fileCount: user.messageCount,
   }));
 };
 
@@ -46,17 +46,19 @@ export default function AdminUsersPage() {
   >([]);
   const [userStats, setUserStats] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const hasFetchedRef = useRef(false);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
 
-      // Fetch users with counts from the API
-      const response = await fetch("/api/admin/users");
-      const usersResult = await response.json();
+      // Fetch both in parallel for faster loading
+      const [usersResponse, statsResult] = await Promise.all([
+        fetch("/api/admin/users"),
+        getUserStatsAction(),
+      ]);
 
-      // Fetch stats
-      const statsResult = await getUserStatsAction();
+      const usersResult = await usersResponse.json();
 
       if (usersResult.isSuccess && usersResult.data) {
         setUsers(usersResult.data);
@@ -115,11 +117,14 @@ export default function AdminUsersPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    loadData();
-  }, []);
+    if (!hasFetchedRef.current) {
+      hasFetchedRef.current = true;
+      loadData();
+    }
+  }, [loadData]);
 
   const handleUserAction = () => {
     // Handle view details or other actions here
