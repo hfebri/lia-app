@@ -92,6 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchUserProfile = useCallback(
     async (email: string) => {
+      console.log("[AUTH-PROVIDER] Fetching user profile for:", email);
       setIsFetchingUser(true);
 
       // Create AbortController only if it doesn't exist
@@ -113,6 +114,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (response.ok) {
           const userData = await response.json();
+          console.log("[AUTH-PROVIDER] User profile fetched successfully:", userData.email);
           setUser(userData);
 
           // Save to cache
@@ -123,18 +125,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               timestamp: Date.now(),
               sessionId: session.user.id,
             });
+            console.log("[AUTH-PROVIDER] User cached");
           }
         } else {
+          console.error("[AUTH-PROVIDER] Failed to fetch user profile:", response.status, response.statusText);
           setUser(null);
           clearUserCache();
           // If user not found in DB, sign them out from Supabase too
           if (response.status === 404) {
+            console.warn("[AUTH-PROVIDER] User not found in DB (404) - signing out");
             await supabase.auth.signOut();
           }
         }
       } catch (error: any) {
         // Ignore abort errors
         if (error.name !== "AbortError") {
+          console.error("[AUTH-PROVIDER] Error fetching user profile:", error);
           setUser(null);
         }
       } finally {
@@ -151,8 +157,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Try cache first for instant load
         const cachedUser = loadUserFromCache();
         if (cachedUser) {
+          console.log("[AUTH-PROVIDER] Loaded cached user:", cachedUser.user.email);
           setUser(cachedUser.user);
           setIsLoading(false); // Immediate render with cached data
+        } else {
+          console.log("[AUTH-PROVIDER] No cached user found");
         }
 
         // Then validate session
@@ -162,25 +171,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } = await supabase.auth.getSession();
 
         if (error) {
+          console.error("[AUTH-PROVIDER] getSession error:", error.message);
           setSession(null);
           setUser(null);
           clearUserCache();
-        } else {
+        } else if (session?.user) {
+          console.log("[AUTH-PROVIDER] Session found for:", session.user.email);
+          console.log("[AUTH-PROVIDER] Session user ID:", session.user.id);
           setSession(session);
-          if (session?.user) {
-            // Check if cached user matches session
-            if (!cachedUser || cachedUser.sessionId !== session.user.id) {
-              // Fetch fresh user data if cache miss or different session
-              await fetchUserProfile(session.user.email!);
-            }
-            // else: use cached data, already set above
+
+          // Check if cached user matches session
+          if (!cachedUser || cachedUser.sessionId !== session.user.id) {
+            console.log("[AUTH-PROVIDER] Cache miss or different session - fetching fresh user data");
+            // Fetch fresh user data if cache miss or different session
+            await fetchUserProfile(session.user.email!);
           } else {
-            // No session, clear cache
-            clearUserCache();
-            setUser(null);
+            console.log("[AUTH-PROVIDER] Using cached user data");
           }
+          // else: use cached data, already set above
+        } else {
+          console.log("[AUTH-PROVIDER] No session found");
+          // No session, clear cache
+          clearUserCache();
+          setUser(null);
         }
       } catch (error) {
+        console.error("[AUTH-PROVIDER] Unexpected error in getInitialSession:", error);
         setSession(null);
         setUser(null);
         clearUserCache();
@@ -195,6 +211,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("[AUTH-PROVIDER] Auth state changed:", event, session?.user?.email || "no user");
       setSession(session);
 
       if (session?.user) {
@@ -237,24 +254,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = useCallback(async () => {
     try {
+      console.log("[AUTH-PROVIDER] Sign out initiated");
+
       // Clear local state first
       setUser(null);
       setSession(null);
+      clearUserCache();
 
-      // Then attempt to sign out from Supabase
-      const { error } = await supabase.auth.signOut({ scope: "local" });
+      // Then sign out from Supabase (remove scope to clear cookies properly)
+      const { error } = await supabase.auth.signOut();
       if (error) {
-        console.warn("Supabase signOut error (non-critical):", error);
+        console.warn("[AUTH-PROVIDER] Supabase signOut error (non-critical):", error);
         // Don't throw error for logout - we've already cleared local state
+      } else {
+        console.log("[AUTH-PROVIDER] Supabase signOut successful");
       }
 
       // Redirect to sign-in page after logout
       window.location.href = "/signin";
     } catch (error) {
-      console.error("SignOut error:", error);
+      console.error("[AUTH-PROVIDER] SignOut error:", error);
       // Even if logout fails, clear local state and redirect
       setUser(null);
       setSession(null);
+      clearUserCache();
       window.location.href = "/signin";
     }
   }, [supabase]);
@@ -262,16 +285,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Force logout if user is not authenticated
   const forceLogout = useCallback(async () => {
     try {
+      console.log("[AUTH-PROVIDER] Force logout initiated");
+
       // Clear local state first
       setUser(null);
       setSession(null);
+      clearUserCache();
 
-      // Attempt local logout (don't use global scope which might cause 403)
-      await supabase.auth.signOut({ scope: "local" });
+      // Sign out from Supabase (remove scope to clear cookies properly)
+      await supabase.auth.signOut();
+      console.log("[AUTH-PROVIDER] Force logout - Supabase signOut complete");
 
       window.location.href = "/signin";
     } catch (error) {
-      console.warn("Force logout error (non-critical):", error);
+      console.warn("[AUTH-PROVIDER] Force logout error (non-critical):", error);
       // Even if logout fails, redirect to signin
       window.location.href = "/signin";
     }
