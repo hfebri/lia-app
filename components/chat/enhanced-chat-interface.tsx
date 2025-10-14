@@ -5,11 +5,12 @@ import { useAuth } from "@/hooks/use-auth";
 import { useAiChat } from "@/hooks/use-ai-chat";
 import { useConversations } from "@/hooks/use-conversations";
 import { useFileUpload, type FileItem } from "@/hooks/use-file-upload";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { ModelSelector } from "./model-selector";
 import { StreamingMessage } from "./streaming-message";
 import { MessageItem } from "./message-item";
 import { FileProcessingMessage } from "./file-processing-message";
+import { TypingIndicator } from "./typing-indicator";
 import { FileAttachment } from "./file-attachment";
 import { ContextWarning } from "./context-warning";
 import { ExtendedThinkingToggle } from "./extended-thinking-toggle";
@@ -88,6 +89,7 @@ export function EnhancedChatInterface({
 
   // Get conversation ID from URL
   const searchParams = useSearchParams();
+  const router = useRouter();
 
   // Use real file upload hook
   const {
@@ -147,10 +149,8 @@ export function EnhancedChatInterface({
         setConversationTitle(conversationData.title);
       }
 
-      // Then update URL
-      const newUrl = new URL(window.location.href);
-      newUrl.searchParams.set("conversation", conversationData.id);
-      window.history.pushState({}, "", newUrl);
+      // Then update URL using Next.js router (this properly updates searchParams)
+      router.push(`/?conversation=${conversationData.id}`, { scroll: false });
     },
   });
 
@@ -203,10 +203,8 @@ export function EnhancedChatInterface({
           setConversationTitle("AI Assistant");
           setMessages([]);
 
-          // Remove conversation ID from URL
-          const url = new URL(window.location.href);
-          url.searchParams.delete("conversation");
-          window.history.replaceState({}, "", url);
+          // Remove conversation ID from URL using Next.js router
+          router.replace("/", { scroll: false });
 
           return;
         }
@@ -300,6 +298,7 @@ export function EnhancedChatInterface({
       setSystemInstruction,
       setConversationModel,
       preventModelOverride,
+      router,
     ]
   );
 
@@ -320,11 +319,15 @@ export function EnhancedChatInterface({
       setCurrentConversationId(conversationId);
       loadConversationData(conversationId);
     } else if (!conversationId && currentConversationId) {
+      // CRITICAL FIX: Don't clear if we just created a conversation and URL hasn't updated yet
+      if (justCreatedConversationRef.current === currentConversationId) {
+        return;
+      }
+
       // No conversation ID in URL but we have one set - clear everything
       setCurrentConversationId(null);
       setConversationTitle("AI Assistant");
       startNewConversation(); // Clear messages and reset conversation state
-    } else {
     }
   }, [
     searchParams,
@@ -1176,6 +1179,10 @@ export function EnhancedChatInterface({
 
                   {isProcessingFiles && (
                     <FileProcessingMessage progress={fileProcessingProgress} />
+                  )}
+
+                  {isLoading && !isStreaming && !isProcessingFiles && (
+                    <TypingIndicator />
                   )}
 
                   {isStreaming && streamingContent && (

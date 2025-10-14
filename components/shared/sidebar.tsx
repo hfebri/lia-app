@@ -193,6 +193,7 @@ function SidebarComponent({ className }: SidebarProps) {
                 href="/"
                 className="flex items-center"
                 onClick={(event) => handleLinkNavigation(event, "/")}
+                prefetch={false}
               >
                 <Bot className="h-6 w-6 mr-2" />
                 <h1 className="text-xl font-bold">LIA App</h1>
@@ -223,6 +224,7 @@ function SidebarComponent({ className }: SidebarProps) {
                     <Link
                       href={item.href}
                       onClick={(event) => handleLinkNavigation(event, item.href)}
+                      prefetch={false}
                     >
                       <Icon className="mr-2 h-4 w-4" />
                       {item.title}
@@ -286,6 +288,7 @@ function SidebarComponent({ className }: SidebarProps) {
                             onClick={(event) =>
                               handleLinkNavigation(event, conversationHref)
                             }
+                            prefetch={false}
                           >
                             <div className="flex items-start gap-2 w-full">
                               <Clock className="h-3 w-3 mt-1 text-muted-foreground flex-shrink-0" />
@@ -397,6 +400,7 @@ function SidebarComponent({ className }: SidebarProps) {
                           onClick={(event) =>
                             handleLinkNavigation(event, item.href)
                           }
+                          prefetch={false}
                         >
                           <Icon className="mr-2 h-4 w-4" />
                           {item.title}

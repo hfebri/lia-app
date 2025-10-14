@@ -390,7 +390,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
         isLoading: true,
         isProcessingFiles: false, // File processing is done
         fileProcessingProgress: {}, // Clear progress
-        isStreaming: stream,
+        isStreaming: false, // Don't set streaming true yet - wait for first chunk
         streamingContent: "",
         error: null,
       }));
