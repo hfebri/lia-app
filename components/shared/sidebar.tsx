@@ -70,9 +70,12 @@ const getModelDisplayName = (modelId: string): string => {
 
 // Helper function to get model color
 const getModelColor = (modelId: string): string => {
-  if (modelId.includes("gpt")) return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100";
-  if (modelId.includes("claude")) return "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-100";
-  if (modelId.includes("gemini")) return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100";
+  if (modelId.includes("gpt"))
+    return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100";
+  if (modelId.includes("claude"))
+    return "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-100";
+  if (modelId.includes("gemini"))
+    return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100";
   return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-100";
 };
 
@@ -203,7 +206,7 @@ function SidebarComponent({ className }: SidebarProps) {
                   height={32}
                   className="rounded"
                 />
-                <h1 className="text-xl font-bold">LIA App</h1>
+                <h1 className="text-xl font-bold">LIA</h1>
               </Link>
               <div className="flex items-center gap-2">
                 <SimpleThemeToggle />
@@ -230,7 +233,9 @@ function SidebarComponent({ className }: SidebarProps) {
                   >
                     <Link
                       href={item.href}
-                      onClick={(event) => handleLinkNavigation(event, item.href)}
+                      onClick={(event) =>
+                        handleLinkNavigation(event, item.href)
+                      }
                       prefetch={false}
                     >
                       <Icon className="mr-2 h-4 w-4" />
@@ -310,11 +315,15 @@ function SidebarComponent({ className }: SidebarProps) {
                                     ).toLocaleDateString()}
                                   </p>
                                   {conversation.aiModel && (
-                                    <span className={cn(
-                                      "inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium",
-                                      getModelColor(conversation.aiModel)
-                                    )}>
-                                      {getModelDisplayName(conversation.aiModel)}
+                                    <span
+                                      className={cn(
+                                        "inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium",
+                                        getModelColor(conversation.aiModel)
+                                      )}
+                                    >
+                                      {getModelDisplayName(
+                                        conversation.aiModel
+                                      )}
                                     </span>
                                   )}
                                 </div>
@@ -352,8 +361,8 @@ function SidebarComponent({ className }: SidebarProps) {
                                   </AlertDialogTitle>
                                   <AlertDialogDescription>
                                     Are you sure you want to delete &quot;
-                                    {conversation.title || "Untitled Chat"}&quot;?
-                                    This action cannot be undone.
+                                    {conversation.title || "Untitled Chat"}
+                                    &quot;? This action cannot be undone.
                                   </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>

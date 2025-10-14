@@ -18,8 +18,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "LIA App",
-  description: "AI Platform powered by AI Model API",
+  title: "LIA",
+  description: "Leverate Intelligent Assistant",
   icons: {
     icon: "/logo.png",
     shortcut: "/logo.png",

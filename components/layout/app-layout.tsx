@@ -99,61 +99,59 @@ export function AppLayout({
       <ErrorBoundary>
         <div className="h-screen bg-background overflow-hidden">
           <div className="flex h-full w-full overflow-hidden">
-          {/* Desktop Sidebar */}
-          {showSidebar && (
-            <aside className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 md:top-0 md:z-50 md:border-r md:bg-background">
-              {memoizedSidebar}
-            </aside>
-          )}
-
-          {/* Mobile Sidebar */}
-          {showSidebar && (
-            <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-              <SheetContent side="left" className="p-0 w-64">
-                <SheetHeader className="sr-only">
-                  <SheetTitle>Navigation Menu</SheetTitle>
-                  <SheetDescription>
-                    Mobile navigation sidebar for accessing different sections
-                    of the application.
-                  </SheetDescription>
-                </SheetHeader>
+            {/* Desktop Sidebar */}
+            {showSidebar && (
+              <aside className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 md:top-0 md:z-50 md:border-r md:bg-background">
                 {memoizedSidebar}
-              </SheetContent>
-            </Sheet>
-          )}
-
-          {/* Mobile Header for sidebar layouts */}
-          {showSidebar && (
-            <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-background border-b h-14 flex items-center px-4">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setSidebarOpen(true)}
-              >
-                <Menu className="h-4 w-4" />
-                <span className="sr-only">Toggle navigation menu</span>
-              </Button>
-              <div className="ml-2 flex items-center">
-                <Bot className="h-5 w-5 mr-2" />
-                <span className="font-bold">LIA App</span>
-              </div>
-            </div>
-          )}
-
-          {/* Main Content */}
-          <main
-            className={cn(
-              "relative flex-1 flex flex-col h-screen min-w-0",
-              showSidebar
-                ? "pt-14 md:pt-0 md:pl-64"
-                : "px-6",
-              className
+              </aside>
             )}
-          >
-            <div className="flex-1 h-full overflow-hidden w-full">
-              <ErrorBoundary>{children}</ErrorBoundary>
-            </div>
-          </main>
+
+            {/* Mobile Sidebar */}
+            {showSidebar && (
+              <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+                <SheetContent side="left" className="p-0 w-64">
+                  <SheetHeader className="sr-only">
+                    <SheetTitle>Navigation Menu</SheetTitle>
+                    <SheetDescription>
+                      Mobile navigation sidebar for accessing different sections
+                      of the application.
+                    </SheetDescription>
+                  </SheetHeader>
+                  {memoizedSidebar}
+                </SheetContent>
+              </Sheet>
+            )}
+
+            {/* Mobile Header for sidebar layouts */}
+            {showSidebar && (
+              <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-background border-b h-14 flex items-center px-4">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setSidebarOpen(true)}
+                >
+                  <Menu className="h-4 w-4" />
+                  <span className="sr-only">Toggle navigation menu</span>
+                </Button>
+                <div className="ml-2 flex items-center">
+                  <Bot className="h-5 w-5 mr-2" />
+                  <span className="font-bold">LIA</span>
+                </div>
+              </div>
+            )}
+
+            {/* Main Content */}
+            <main
+              className={cn(
+                "relative flex-1 flex flex-col h-screen min-w-0",
+                showSidebar ? "pt-14 md:pt-0 md:pl-64" : "px-6",
+                className
+              )}
+            >
+              <div className="flex-1 h-full overflow-hidden w-full">
+                <ErrorBoundary>{children}</ErrorBoundary>
+              </div>
+            </main>
           </div>
 
           {/* Footer */}

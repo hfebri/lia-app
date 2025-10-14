@@ -80,7 +80,9 @@ export function MobileNav({ className, isAdmin = false }: MobileNavProps) {
   const searchParams = useSearchParams();
   const { startNavigation } = useNavigationLoader();
   const currentSearch = searchParams.toString();
-  const currentLocation = currentSearch ? `${pathname}?${currentSearch}` : pathname;
+  const currentLocation = currentSearch
+    ? `${pathname}?${currentSearch}`
+    : pathname;
 
   const filteredItems = navigationItems.filter(
     (item) => !item.adminOnly || isAdmin
@@ -118,8 +120,10 @@ export function MobileNav({ className, isAdmin = false }: MobileNavProps) {
                   <Activity className="h-4 w-4 text-primary-foreground" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-semibold">LIA App</h2>
-                  <p className="text-xs text-muted-foreground">AI Platform</p>
+                  <h2 className="text-lg font-semibold">LIA</h2>
+                  <p className="text-xs text-muted-foreground">
+                    Leverate Intelligence Assistant
+                  </p>
                 </div>
               </div>
               <SimpleThemeToggle />
@@ -203,7 +207,7 @@ export function MobileNav({ className, isAdmin = false }: MobileNavProps) {
             <div className="border-t p-4">
               <div className="text-xs text-muted-foreground text-center">
                 <p>AI Platform v1.0</p>
-                <p className="mt-1">© 2024 LIA App</p>
+                <p className="mt-1">© 2025 LIA</p>
               </div>
             </div>
           </div>
