@@ -15,6 +15,57 @@ import { AUTH_CONFIG } from "../../lib/auth/config";
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Cache configuration
+const USER_CACHE_KEY = "lia-user-cache";
+const USER_CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
+
+interface UserCache {
+  user: AuthUser;
+  timestamp: number;
+  sessionId: string;
+}
+
+// Cache utility functions
+function loadUserFromCache(): UserCache | null {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const cached = localStorage.getItem(USER_CACHE_KEY);
+    if (!cached) return null;
+
+    const data = JSON.parse(cached) as UserCache;
+
+    // Validate structure
+    if (!data.user || !data.timestamp) {
+      return null;
+    }
+
+    // Check if cache is too old
+    if (Date.now() - data.timestamp > USER_CACHE_DURATION) {
+      return null;
+    }
+
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+function saveUserToCache(data: UserCache): void {
+  if (typeof window === "undefined") return;
+
+  try {
+    localStorage.setItem(USER_CACHE_KEY, JSON.stringify(data));
+  } catch (error) {
+    console.warn("Failed to cache user:", error);
+  }
+}
+
+function clearUserCache(): void {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(USER_CACHE_KEY);
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -63,9 +114,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (response.ok) {
           const userData = await response.json();
           setUser(userData);
+
+          // Save to cache
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.user) {
+            saveUserToCache({
+              user: userData,
+              timestamp: Date.now(),
+              sessionId: session.user.id,
+            });
+          }
         } else {
-          const errorText = await response.text();
           setUser(null);
+          clearUserCache();
           // If user not found in DB, sign them out from Supabase too
           if (response.status === 404) {
             await supabase.auth.signOut();
@@ -87,23 +148,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Get initial session
     const getInitialSession = async () => {
       try {
+        // Try cache first for instant load
+        const cachedUser = loadUserFromCache();
+        if (cachedUser) {
+          setUser(cachedUser.user);
+          setIsLoading(false); // Immediate render with cached data
+        }
+
+        // Then validate session
         const {
           data: { session },
           error,
         } = await supabase.auth.getSession();
+
         if (error) {
           setSession(null);
           setUser(null);
+          clearUserCache();
         } else {
           setSession(session);
           if (session?.user) {
-            await fetchUserProfile(session.user.email!);
+            // Check if cached user matches session
+            if (!cachedUser || cachedUser.sessionId !== session.user.id) {
+              // Fetch fresh user data if cache miss or different session
+              await fetchUserProfile(session.user.email!);
+            }
+            // else: use cached data, already set above
           } else {
+            // No session, clear cache
+            clearUserCache();
+            setUser(null);
           }
         }
       } catch (error) {
         setSession(null);
         setUser(null);
+        clearUserCache();
       } finally {
         setIsLoading(false);
       }
@@ -121,6 +201,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await fetchUserProfile(session.user.email!);
       } else {
         setUser(null);
+        clearUserCache(); // Clear cache on logout
       }
 
       setIsLoading(false);

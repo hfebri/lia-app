@@ -12,6 +12,16 @@ import {
 import { Conversation } from "@/lib/types/chat";
 import { useAuth } from "@/hooks/use-auth";
 
+// Cache configuration
+const CACHE_KEY = "lia-conversations-cache";
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+interface ConversationCache {
+  conversations: Conversation[];
+  timestamp: number;
+  userId: string;
+}
+
 interface ConversationsState {
   conversations: Conversation[];
   isLoading: boolean;
@@ -41,6 +51,46 @@ interface ConversationsContextType extends ConversationsState {
 const ConversationsContext = createContext<
   ConversationsContextType | undefined
 >(undefined);
+
+// Cache utility functions
+function loadFromCache(): ConversationCache | null {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const cached = localStorage.getItem(CACHE_KEY);
+    if (!cached) return null;
+
+    const data = JSON.parse(cached) as ConversationCache;
+
+    // Validate structure
+    if (!data.conversations || !Array.isArray(data.conversations)) {
+      return null;
+    }
+
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+function saveToCache(data: ConversationCache): void {
+  if (typeof window === "undefined") return;
+
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+  } catch (error) {
+    console.warn("Failed to cache conversations:", error);
+  }
+}
+
+function isCacheStale(cached: ConversationCache): boolean {
+  return Date.now() - cached.timestamp > CACHE_DURATION;
+}
+
+function clearCache(): void {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(CACHE_KEY);
+}
 
 export function ConversationsProvider({
   children,
@@ -181,10 +231,23 @@ export function ConversationsProvider({
 
         const newConversation = result.data;
 
-        setState((prev) => ({
-          ...prev,
-          conversations: [newConversation, ...prev.conversations],
-        }));
+        setState((prev) => {
+          const updated = [newConversation, ...prev.conversations];
+
+          // Immediately save to cache
+          if (user) {
+            saveToCache({
+              conversations: updated,
+              timestamp: Date.now(),
+              userId: user.id,
+            });
+          }
+
+          return {
+            ...prev,
+            conversations: updated,
+          };
+        });
 
         return newConversation;
       } catch (error) {
@@ -265,12 +328,25 @@ export function ConversationsProvider({
         throw new Error(result.message || "Failed to delete conversation");
       }
 
-      setState((prev) => ({
-        ...prev,
-        conversations: prev.conversations.filter(
+      setState((prev) => {
+        const updated = prev.conversations.filter(
           (conv) => conv.id !== conversationId
-        ),
-      }));
+        );
+
+        // Immediately save to cache
+        if (user) {
+          saveToCache({
+            conversations: updated,
+            timestamp: Date.now(),
+            userId: user.id,
+          });
+        }
+
+        return {
+          ...prev,
+          conversations: updated,
+        };
+      });
 
       return true;
     } catch (error) {
@@ -283,7 +359,7 @@ export function ConversationsProvider({
       }));
       return false;
     }
-  }, []);
+  }, [user]);
 
   // Search conversations
   const searchConversations = useCallback(
@@ -301,16 +377,77 @@ export function ConversationsProvider({
     setState((prev) => ({ ...prev, error: null }));
   }, []);
 
-  // Load conversations ONCE when user is available
+  // Load conversations from cache first, then fetch fresh data
   useEffect(() => {
-    if (user && !hasFetchedRef.current) {
+    if (!user) {
+      // Clear cache if no user
+      clearCache();
+      return;
+    }
+
+    if (!hasFetchedRef.current) {
       hasFetchedRef.current = true;
-      loadConversations();
+
+      // Try to load from cache first (instant, non-blocking)
+      const cached = loadFromCache();
+
+      if (cached && cached.userId === user.id) {
+        // Load from cache immediately
+        setState((prev) => ({
+          ...prev,
+          conversations: cached.conversations,
+          isLoading: false,
+        }));
+
+        // If cache is stale, fetch fresh data in background
+        if (isCacheStale(cached)) {
+          loadConversations();
+        }
+      } else {
+        // No valid cache or different user, fetch from server
+        if (cached && cached.userId !== user.id) {
+          clearCache(); // Clear previous user's cache
+        }
+        loadConversations();
+      }
     }
 
     // Don't add cleanup that aborts - let requests complete
     // Only abort if component truly unmounts (user logs out)
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  // Save conversations to cache whenever they change
+  useEffect(() => {
+    if (state.conversations.length > 0 && user) {
+      saveToCache({
+        conversations: state.conversations,
+        timestamp: Date.now(),
+        userId: user.id,
+      });
+    }
+  }, [state.conversations, user]);
+
+  // Listen for storage events from other tabs
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === CACHE_KEY && e.newValue) {
+        try {
+          const updated = JSON.parse(e.newValue) as ConversationCache;
+          if (user && updated.userId === user.id) {
+            setState((prev) => ({
+              ...prev,
+              conversations: updated.conversations,
+            }));
+          }
+        } catch {
+          // Ignore invalid cache
+        }
+      }
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
   }, [user]);
 
   // Memoize the context value
