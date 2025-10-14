@@ -4,6 +4,7 @@ import React, { memo, useCallback, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useSearchParams } from "next/navigation";
+import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { useConversations } from "@/hooks/use-conversations";
@@ -119,6 +120,7 @@ function SidebarComponent({ className }: SidebarProps) {
   // Memoize navigation hooks to prevent unnecessary updates
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { theme } = useTheme();
 
   // Destructure hooks with stable references
   const auth = useAuth();
@@ -198,7 +200,7 @@ function SidebarComponent({ className }: SidebarProps) {
             prefetch={false}
           >
             <Image
-              src="/logo.png"
+              src={theme === "dark" ? "/logo-dark.svg" : "/logo-light.svg"}
               alt="LIA Logo"
               width={32}
               height={32}

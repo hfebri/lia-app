@@ -22,11 +22,13 @@ export const metadata: Metadata = {
   description: "Leverate Intelligent Assistant",
   icons: {
     icon: [
-      { url: "/logo.png", sizes: "32x32", type: "image/png" },
-      { url: "/logo.png", sizes: "16x16", type: "image/png" },
+      { url: "/logo-dark.svg", sizes: "32x32", type: "image/svg+xml", media: "(prefers-color-scheme: dark)" },
+      { url: "/logo-light.svg", sizes: "32x32", type: "image/svg+xml", media: "(prefers-color-scheme: light)" },
+      { url: "/logo-dark.svg", sizes: "16x16", type: "image/svg+xml", media: "(prefers-color-scheme: dark)" },
+      { url: "/logo-light.svg", sizes: "16x16", type: "image/svg+xml", media: "(prefers-color-scheme: light)" },
     ],
-    shortcut: "/logo.png",
-    apple: { url: "/logo.png", sizes: "180x180", type: "image/png" },
+    shortcut: "/logo-dark.svg",
+    apple: { url: "/logo-dark.svg", sizes: "180x180", type: "image/svg+xml" },
   },
 };
 
