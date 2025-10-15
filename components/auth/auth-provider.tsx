@@ -145,6 +145,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       } finally {
         setIsFetchingUser(false);
+        setIsLoading(false);
       }
     },
     [supabase]

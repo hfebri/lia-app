@@ -14,33 +14,26 @@ export default function HomePage() {
   const { isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
 
-  console.log("[HOME] render", {
-    isLoading,
-    isAuthenticated,
-  });
+  console.debug("[HOME] render", { isLoading, isAuthenticated });
 
   useEffect(() => {
-    console.log("[HOME] effect auth check", {
-      isLoading,
-      isAuthenticated,
-    });
     if (!isLoading && !isAuthenticated) {
-      console.log("[HOME] redirecting to /signin");
+      console.debug("[HOME] redirecting to /signin");
       router.push("/signin");
     }
   }, [isAuthenticated, isLoading, router]);
 
   if (isLoading) {
-    console.log("[HOME] showing loading page (checking auth)");
+    console.debug("[HOME] showing auth loading page");
     return <LoadingPage message="Checking authentication..." />;
   }
 
   if (!isAuthenticated) {
-    console.log("[HOME] showing redirect loading page");
+    console.debug("[HOME] showing redirect loader");
     return <LoadingPage message="Redirecting to sign in..." />;
   }
 
-  console.log("[HOME] rendering dashboard");
+  console.debug("[HOME] rendering dashboard");
 
   return (
     <DashboardLayout>

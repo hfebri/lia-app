@@ -91,7 +91,7 @@ export function AppLayout({
   );
 
   if (isLoading) {
-    console.log("[APP-LAYOUT] auth loading - showing initializing page");
+    console.debug("[APP-LAYOUT] waiting for auth");
     return <LoadingPage message="Initializing application..." />;
   }
 
