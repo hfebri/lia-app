@@ -1,17 +1,33 @@
 import type { AuthError } from "@supabase/supabase-js";
 
+// Get the base URL, forcing production URL for Netlify deploy previews
+const getBaseUrl = () => {
+  // If we have a site URL configured, use it
+  if (process.env.NEXT_PUBLIC_SITE_URL) {
+    return process.env.NEXT_PUBLIC_SITE_URL;
+  }
+
+  // In browser, check if we're on a Netlify deploy preview
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    // If it's a Netlify deploy preview (contains --), redirect to production
+    if (hostname.includes('--') && hostname.includes('netlify.app')) {
+      return 'https://lia-app.netlify.app';
+    }
+    return window.location.origin;
+  }
+
+  return "http://localhost:3000";
+};
+
 // Supabase Auth configuration
 export const AUTH_CONFIG = {
-  redirectTo: `${
-    process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
-  }/auth/callback`,
+  redirectTo: `${getBaseUrl()}/auth/callback`,
 
   // Provider-specific options
   google: {
     scopes: "email profile",
-    redirectTo: `${
-      process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
-    }/auth/callback`,
+    redirectTo: `${getBaseUrl()}/auth/callback`,
   },
 
   // Session options
