@@ -2,7 +2,9 @@
 
 import Image from "next/image";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
+import { useAuth } from "@/components/auth/auth-provider";
 import { LoginButton } from "@/components/auth/login-button";
 import {
   Card,
@@ -21,11 +23,21 @@ const floatingTransition = {
 
 export default function SignInPage() {
   const { resolvedTheme } = useTheme();
+  const { isAuthenticated, isLoading } = useAuth();
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Redirect to home if already authenticated
+  useEffect(() => {
+    if (!isLoading && isAuthenticated) {
+      console.log("[SIGNIN-PAGE] User already authenticated, redirecting to home");
+      router.push("/");
+    }
+  }, [isAuthenticated, isLoading, router]);
 
   const logoSrc = "/logo-light.svg";
 
