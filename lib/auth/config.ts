@@ -1,16 +1,4 @@
 import type { AuthError } from "@supabase/supabase-js";
-import { getPrimarySiteUrl, resolveRedirectOrigin } from "./url";
-
-const primarySiteUrl = getPrimarySiteUrl();
-
-export const getBaseUrl = () => {
-  if (typeof window !== "undefined") {
-    const { origin, hostname, protocol } = window.location;
-    return resolveRedirectOrigin(hostname, origin, protocol);
-  }
-
-  return primarySiteUrl.origin;
-};
 
 // Supabase Auth configuration
 // Note: redirectTo should be computed dynamically in client components

@@ -11,7 +11,7 @@ import {
 import { createClient } from "../../lib/supabase/client";
 import type { Session } from "@supabase/supabase-js";
 import type { AuthUser, AuthContextType } from "../../lib/auth/types";
-import { AUTH_CONFIG, getBaseUrl } from "../../lib/auth/config";
+import { AUTH_CONFIG } from "../../lib/auth/config";
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -251,7 +251,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInWithGoogle = useCallback(async () => {
     try {
-      const redirectTo = `${getBaseUrl()}/auth/callback`;
+      // Use current origin so OAuth callback works on any domain (production, preview, localhost)
+      const redirectTo = `${window.location.origin}/auth/callback`;
 
       console.log("[AUTH-PROVIDER] Sign in with Google, redirectTo:", redirectTo);
 
