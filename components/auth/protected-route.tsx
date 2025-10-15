@@ -24,6 +24,12 @@ export function ProtectedRoute({
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
+      console.log("[PROTECTED-ROUTE] redirect", {
+        redirectTo,
+        pathname,
+        target:
+          redirectTo && redirectTo !== "/" ? redirectTo : "/signin",
+      });
 
       const target =
         redirectTo && redirectTo !== "/" ? redirectTo : "/signin";
