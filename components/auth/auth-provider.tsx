@@ -72,6 +72,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isFetchingUser, setIsFetchingUser] = useState(false);
 
+  useEffect(() => {
+    if (!isLoading) {
+      return;
+    }
+
+    if (isFetchingUser) {
+      return;
+    }
+
+    if (user || (!session && !user)) {
+      setIsLoading(false);
+    }
+  }, [isLoading, isFetchingUser, session, user]);
+
   const supabase = useMemo(() => createClient(), []);
 
   const abortControllerRef = useCallback(() => {
