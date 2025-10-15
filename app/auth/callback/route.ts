@@ -7,10 +7,17 @@ export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
 
+  console.log("[AUTH-CALLBACK] ========================================");
+  console.log("[AUTH-CALLBACK] Full callback URL:", requestUrl.toString());
+  console.log("[AUTH-CALLBACK] Origin:", requestUrl.origin);
+  console.log("[AUTH-CALLBACK] Hostname:", requestUrl.hostname);
+  console.log("[AUTH-CALLBACK] Code:", code ? "present" : "missing");
+  console.log("[AUTH-CALLBACK] Referer:", request.headers.get("referer"));
+  console.log("[AUTH-CALLBACK] ========================================");
+
   // Always redirect to home - let the client handle further routing
   const redirectUrl = new URL("/", requestUrl.origin);
 
-  console.log("[AUTH-CALLBACK] Code:", code ? "present" : "missing");
   console.log("[AUTH-CALLBACK] Will redirect to:", redirectUrl.toString());
 
   if (code) {
