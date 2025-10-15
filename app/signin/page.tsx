@@ -4,7 +4,13 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { LoginButton } from "@/components/auth/login-button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { motion } from "motion/react";
 
 const floatingTransition = {
@@ -21,7 +27,7 @@ export default function SignInPage() {
     setMounted(true);
   }, []);
 
-  const logoSrc = mounted && resolvedTheme === "dark" ? "/logo-dark.svg" : "/logo-light.svg";
+  const logoSrc = "/logo-light.svg";
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-blue-50 via-white to-indigo-100 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950">
@@ -60,9 +66,19 @@ export default function SignInPage() {
               <motion.div
                 className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-white/70 shadow-[0_22px_40px_-18px_rgba(56,128,255,0.45)] dark:bg-white/15"
                 animate={{ rotate: [0, 6, -6, 0], y: [0, -4, 0] }}
-                transition={{ duration: 6, repeat: Number.POSITIVE_INFINITY, ease: "easeInOut" }}
+                transition={{
+                  duration: 6,
+                  repeat: Number.POSITIVE_INFINITY,
+                  ease: "easeInOut",
+                }}
               >
-                <Image alt="LIA logo" src={logoSrc} height={32} width={48} priority />
+                <Image
+                  alt="LIA logo"
+                  src={logoSrc}
+                  height={32}
+                  width={48}
+                  priority
+                />
               </motion.div>
 
               <div className="space-y-3">
@@ -72,7 +88,8 @@ export default function SignInPage() {
                   </span>
                 </CardTitle>
                 <CardDescription className="text-base text-slate-600 dark:text-slate-300">
-                  Your intelligent sidekick for calmer workflows, smarter conversations, and decisions you can trust.
+                  Your intelligent sidekick for calmer workflows, smarter
+                  conversations, and decisions you can trust.
                 </CardDescription>
               </div>
             </CardHeader>
@@ -99,11 +116,15 @@ export default function SignInPage() {
                   <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-sky-500/10 font-semibold text-sky-600 dark:bg-sky-500/20 dark:text-sky-200">
                     2
                   </span>
-                  Stay grounded with private-by-design controls and gentle guardrails.
+                  Stay grounded with private-by-design controls and gentle
+                  guardrails.
                 </motion.div>
               </div>
 
-              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+              <motion.div
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
                 <LoginButton
                   className="relative flex w-full items-center justify-center gap-3 overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-500 via-blue-500 to-purple-500 px-6 py-3 text-base font-semibold text-white shadow-[0_25px_55px_-25px_rgba(56,105,255,0.85)] transition-shadow duration-300 hover:shadow-[0_32px_70px_-28px_rgba(56,105,255,0.95)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-400"
                   size="lg"
@@ -141,7 +162,8 @@ export default function SignInPage() {
                   Trust & Transparency
                 </motion.span>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  By signing in, you agree to our Terms of Service and Privacy Policy.
+                  By signing in, you agree to our Terms of Service and Privacy
+                  Policy.
                 </p>
               </div>
             </CardContent>
