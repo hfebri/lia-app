@@ -14,35 +14,18 @@ export default function HomePage() {
   const { isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
 
-  if (process.env.NODE_ENV !== "production") {
-    console.debug("[HOME] render", { isLoading, isAuthenticated });
-  }
-
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      if (process.env.NODE_ENV !== "production") {
-        console.debug("[HOME] redirecting to /signin");
-      }
       router.push("/signin");
     }
   }, [isAuthenticated, isLoading, router]);
 
   if (isLoading) {
-    if (process.env.NODE_ENV !== "production") {
-      console.debug("[HOME] showing auth loading page");
-    }
     return <LoadingPage message="Checking authentication..." />;
   }
 
   if (!isAuthenticated) {
-    if (process.env.NODE_ENV !== "production") {
-      console.debug("[HOME] showing redirect loader");
-    }
     return <LoadingPage message="Redirecting to sign in..." />;
-  }
-
-  if (process.env.NODE_ENV !== "production") {
-    console.debug("[HOME] rendering dashboard");
   }
 
   return (

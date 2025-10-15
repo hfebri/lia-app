@@ -106,7 +106,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchUserProfile = useCallback(
     async (email: string) => {
-      console.log("[AUTH-PROVIDER] Fetching user profile for:", email);
       setIsFetchingUser(true);
 
       // Create AbortController only if it doesn't exist
@@ -128,7 +127,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (response.ok) {
           const userData = await response.json();
-          console.log("[AUTH-PROVIDER] User profile fetched successfully:", userData.email);
           setUser(userData);
 
           // Save to cache
@@ -139,7 +137,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               timestamp: Date.now(),
               sessionId: session.user.id,
             });
-            console.log("[AUTH-PROVIDER] User cached");
           }
         } else {
           console.error("[AUTH-PROVIDER] Failed to fetch user profile:", response.status, response.statusText);
@@ -172,11 +169,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Try cache first for instant load
         const cachedUser = loadUserFromCache();
         if (cachedUser) {
-          console.log("[AUTH-PROVIDER] Loaded cached user:", cachedUser.user.email);
           setUser(cachedUser.user);
           setIsLoading(false); // Immediate render with cached data
-        } else {
-          console.log("[AUTH-PROVIDER] No cached user found");
         }
 
         // Then validate session
@@ -191,21 +185,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(null);
           clearUserCache();
         } else if (session?.user) {
-          console.log("[AUTH-PROVIDER] Session found for:", session.user.email);
-          console.log("[AUTH-PROVIDER] Session user ID:", session.user.id);
           setSession(session);
 
           // Check if cached user matches session
           if (!cachedUser || cachedUser.sessionId !== session.user.id) {
-            console.log("[AUTH-PROVIDER] Cache miss or different session - fetching fresh user data");
             // Fetch fresh user data if cache miss or different session
             await fetchUserProfile(session.user.email!);
-          } else {
-            console.log("[AUTH-PROVIDER] Using cached user data");
           }
           // else: use cached data, already set above
         } else {
-          console.log("[AUTH-PROVIDER] No session found");
           // No session, clear cache
           clearUserCache();
           setUser(null);
@@ -226,16 +214,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("[AUTH-PROVIDER] Auth state changed:", event, session?.user?.email || "no user");
       setSession(session);
 
       if (session?.user) {
-        console.log("[AUTH-PROVIDER] Session exists, fetching user profile...");
         await fetchUserProfile(session.user.email!);
-        console.log("[AUTH-PROVIDER] ✅ User profile fetch complete, setting isLoading=false");
         setIsLoading(false);
       } else {
-        console.log("[AUTH-PROVIDER] No session, clearing user and setting isLoading=false");
         setUser(null);
         clearUserCache(); // Clear cache on logout
         setIsLoading(false);
@@ -251,18 +235,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInWithGoogle = useCallback(async () => {
     try {
-      // Force redirect to callback route (not signin page)
-      const redirectTo = `${window.location.origin}/auth/callback`;
+      const redirectTo = `${getBaseUrl()}/auth/callback`;
 
-      console.log("[AUTH-PROVIDER] Sign in with Google");
-      console.log("[AUTH-PROVIDER]   redirectTo:", redirectTo);
-      console.log("[AUTH-PROVIDER]   current URL:", window.location.href);
-
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
           redirectTo,
-          skipBrowserRedirect: false,
           queryParams: {
             access_type: "offline",
             prompt: "consent",
@@ -270,8 +248,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           ...AUTH_CONFIG.google,
         },
       });
-
-      console.log("[AUTH-PROVIDER] OAuth response:", { data, error });
 
       if (error) {
         throw error;
@@ -283,37 +259,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = useCallback(async () => {
     try {
-      console.log("[AUTH-PROVIDER] Sign out initiated");
-
       // Clear local state first
       setUser(null);
       setSession(null);
       clearUserCache();
 
-      // Then sign out from Supabase
+      // Then sign out from Supabase (remove scope to clear cookies properly)
       const { error } = await supabase.auth.signOut();
       if (error) {
         console.warn("[AUTH-PROVIDER] Supabase signOut error (non-critical):", error);
-      } else {
-        console.log("[AUTH-PROVIDER] Supabase signOut successful");
       }
 
-      // Always redirect to /signin after logout
-      console.log("[AUTH-PROVIDER] Redirecting to /signin");
-      window.location.href = "/signin";
+      const redirectUrl = `${getBaseUrl()}/signin`;
+      window.location.href = redirectUrl;
     } catch (error) {
       console.error("[AUTH-PROVIDER] SignOut error:", error);
       // Even if logout fails, clear local state and redirect
       setUser(null);
       setSession(null);
       clearUserCache();
-      window.location.href = "/signin";
+      const redirectUrl = `${getBaseUrl()}/signin`;
+      window.location.href = redirectUrl;
     }
   }, [supabase]);
 
   // Force logout - used internally when session exists but user data is invalid
   const forceLogout = useCallback(async () => {
-    console.log("[AUTH-PROVIDER] Force logout - session exists but no user data");
     setUser(null);
     setSession(null);
     clearUserCache();
@@ -324,7 +295,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.warn("[AUTH-PROVIDER] Force logout signOut error:", error);
     }
 
-    window.location.href = "/signin";
+    const redirectUrl = `${getBaseUrl()}/signin`;
+    window.location.href = redirectUrl;
   }, [supabase]);
 
   const refreshSession = useCallback(async () => {
