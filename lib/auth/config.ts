@@ -2,13 +2,18 @@ import type { AuthError } from "@supabase/supabase-js";
 
 // Get the base URL, forcing production URL for Netlify deploy previews
 export const getBaseUrl = () => {
-  // In browser, check if we're on a Netlify deploy preview
+  // In browser, check if we're on a Netlify deploy preview or branch deploy
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
-    // If it's a Netlify deploy preview (contains --), force production URL
-    if (hostname.includes('--') && hostname.includes('netlify.app')) {
+
+    // If it's a Netlify deploy that's NOT the production URL, force production URL
+    // This handles:
+    // - Deploy previews: 68ef11e1a1adaa00075bb599--lia-app.netlify.app
+    // - Branch deploys: main--lia-app.netlify.app, develop--lia-app.netlify.app
+    if (hostname.includes('netlify.app') && hostname !== 'lia-app.netlify.app') {
       return 'https://lia-app.netlify.app';
     }
+
     return window.location.origin;
   }
 
