@@ -2,7 +2,7 @@
 
 import { useAuth } from "../../hooks/use-auth";
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { LoginButton } from "./login-button";
 
 interface ProtectedRouteProps {
@@ -18,15 +18,20 @@ export function ProtectedRoute({
   redirectTo = "/",
   requireActive = true,
 }: ProtectedRouteProps) {
-  const { isAuthenticated, isLoading, user, forceLogout } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
 
-      forceLogout();
+      const target =
+        redirectTo && redirectTo !== "/" ? redirectTo : "/signin";
+      if (pathname !== target) {
+        router.replace(target);
+      }
     }
-  }, [isAuthenticated, isLoading, forceLogout]);
+  }, [isAuthenticated, isLoading, redirectTo, router, pathname]);
 
   // Show loading state
   if (isLoading) {
