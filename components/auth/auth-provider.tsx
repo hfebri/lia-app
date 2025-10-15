@@ -11,7 +11,7 @@ import {
 import { createClient } from "../../lib/supabase/client";
 import type { Session } from "@supabase/supabase-js";
 import type { AuthUser, AuthContextType } from "../../lib/auth/types";
-import { AUTH_CONFIG } from "../../lib/auth/config";
+import { AUTH_CONFIG, getBaseUrl } from "../../lib/auth/config";
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -233,8 +233,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInWithGoogle = useCallback(async () => {
     try {
-      // Import getBaseUrl dynamically to ensure it uses current window.location
-      const { getBaseUrl } = await import("../../lib/auth/config");
       const redirectTo = `${getBaseUrl()}/auth/callback`;
 
       console.log("[AUTH-PROVIDER] Sign in with Google, redirectTo:", redirectTo);
@@ -279,16 +277,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Redirect to sign-in page after logout
       // Use production URL to avoid getting stuck on deploy previews
-      const productionUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
-      window.location.href = `${productionUrl}/signin`;
+      const redirectUrl = `${getBaseUrl()}/signin`;
+      window.location.href = redirectUrl;
     } catch (error) {
       console.error("[AUTH-PROVIDER] SignOut error:", error);
       // Even if logout fails, clear local state and redirect
       setUser(null);
       setSession(null);
       clearUserCache();
-      const productionUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
-      window.location.href = `${productionUrl}/signin`;
+      const redirectUrl = `${getBaseUrl()}/signin`;
+      window.location.href = redirectUrl;
     }
   }, [supabase]);
 
@@ -306,13 +304,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await supabase.auth.signOut();
       console.log("[AUTH-PROVIDER] Force logout - Supabase signOut complete");
 
-      const productionUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
-      window.location.href = `${productionUrl}/signin`;
+      const redirectUrl = `${getBaseUrl()}/signin`;
+      window.location.href = redirectUrl;
     } catch (error) {
       console.warn("[AUTH-PROVIDER] Force logout error (non-critical):", error);
       // Even if logout fails, redirect to signin
-      const productionUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
-      window.location.href = `${productionUrl}/signin`;
+      const redirectUrl = `${getBaseUrl()}/signin`;
+      window.location.href = redirectUrl;
     }
   }, [supabase]);
 

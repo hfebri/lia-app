@@ -1,25 +1,15 @@
 import { createServerClient } from "@supabase/ssr";
-import { createOrUpdateUser } from "../../../lib/auth";
+import { createOrUpdateUser } from "@/lib/auth";
+import { resolveRequestRedirectOrigin } from "@/lib/auth/url";
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
-  const requestOrigin = requestUrl.origin;
+  const redirectOrigin = resolveRequestRedirectOrigin(requestUrl);
 
-  // Force production URL for Netlify deploy previews
-  // If callback is received on a deploy preview (contains hash or branch prefix),
-  // redirect to production URL instead
-  let redirectOrigin = requestOrigin;
-  const hostname = requestUrl.hostname;
-  if (hostname.includes('netlify.app') && hostname !== 'lia-app.netlify.app') {
-    console.log("[AUTH-CALLBACK] Detected non-production Netlify URL:", hostname);
-    console.log("[AUTH-CALLBACK] Forcing redirect to production URL");
-    redirectOrigin = 'https://lia-app.netlify.app';
-  }
-
-  console.log("[AUTH-CALLBACK] Request origin:", requestOrigin);
+  console.log("[AUTH-CALLBACK] Request origin:", requestUrl.origin);
   console.log("[AUTH-CALLBACK] Redirect origin:", redirectOrigin);
 
   if (code) {
@@ -38,9 +28,9 @@ export async function GET(request: NextRequest) {
             cookiesToSet.forEach(({ name, value, options }) =>
               response.cookies.set(name, value, {
                 ...options,
-                path: '/',
-                sameSite: 'lax',
-                secure: process.env.NODE_ENV === 'production',
+                path: "/",
+                sameSite: "lax",
+                secure: process.env.NODE_ENV === "production",
               })
             );
           },
