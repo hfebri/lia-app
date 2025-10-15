@@ -216,12 +216,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (session?.user) {
         await fetchUserProfile(session.user.email!);
+        setIsLoading(false);
       } else {
         setUser(null);
         clearUserCache(); // Clear cache on logout
+        setIsLoading(false);
       }
-
-      setIsLoading(false);
     });
 
     return () => {
