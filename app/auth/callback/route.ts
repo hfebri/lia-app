@@ -6,11 +6,25 @@ import { cookies } from "next/headers";
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
-  const origin = requestUrl.origin;
+  const requestOrigin = requestUrl.origin;
+
+  // Force production URL for Netlify deploy previews
+  // If callback is received on a deploy preview (contains hash or branch prefix),
+  // redirect to production URL instead
+  let redirectOrigin = requestOrigin;
+  const hostname = requestUrl.hostname;
+  if (hostname.includes('netlify.app') && hostname !== 'lia-app.netlify.app') {
+    console.log("[AUTH-CALLBACK] Detected non-production Netlify URL:", hostname);
+    console.log("[AUTH-CALLBACK] Forcing redirect to production URL");
+    redirectOrigin = 'https://lia-app.netlify.app';
+  }
+
+  console.log("[AUTH-CALLBACK] Request origin:", requestOrigin);
+  console.log("[AUTH-CALLBACK] Redirect origin:", redirectOrigin);
 
   if (code) {
     const cookieStore = await cookies();
-    const response = NextResponse.redirect(`${origin}/`);
+    const response = NextResponse.redirect(`${redirectOrigin}/`);
 
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -42,7 +56,7 @@ export async function GET(request: NextRequest) {
 
       if (error) {
         console.error("[AUTH-CALLBACK] Exchange failed:", error.message);
-        return NextResponse.redirect(`${origin}/?error=callback_error`);
+        return NextResponse.redirect(`${redirectOrigin}/?error=callback_error`);
       }
 
       if (data.session?.user) {
@@ -57,14 +71,14 @@ export async function GET(request: NextRequest) {
 
         if (!authUser) {
           console.error("[AUTH-CALLBACK] Failed to create/update user in database");
-          return NextResponse.redirect(`${origin}/?error=database_error`);
+          return NextResponse.redirect(`${redirectOrigin}/?error=database_error`);
         }
 
         console.log("[AUTH-CALLBACK] User created/updated:", authUser.email, "Active:", authUser.isActive);
 
         if (!authUser.isActive) {
           console.warn("[AUTH-CALLBACK] Account inactive:", authUser.email);
-          return NextResponse.redirect(`${origin}/?error=account_inactive`);
+          return NextResponse.redirect(`${redirectOrigin}/?error=account_inactive`);
         }
 
         // Successful authentication - redirect to home page with cookies set
@@ -73,13 +87,13 @@ export async function GET(request: NextRequest) {
       }
 
       console.error("[AUTH-CALLBACK] No session or user in exchange response");
-      return NextResponse.redirect(`${origin}/?error=no_session`);
+      return NextResponse.redirect(`${redirectOrigin}/?error=no_session`);
     } catch (error) {
       console.error("[AUTH-CALLBACK] Unexpected error:", error);
-      return NextResponse.redirect(`${origin}/?error=unexpected_error`);
+      return NextResponse.redirect(`${redirectOrigin}/?error=unexpected_error`);
     }
   }
 
   // No code parameter or other error
-  return NextResponse.redirect(`${origin}/?error=missing_code`);
+  return NextResponse.redirect(`${redirectOrigin}/?error=missing_code`);
 }
