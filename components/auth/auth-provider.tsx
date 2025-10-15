@@ -233,14 +233,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInWithGoogle = useCallback(async () => {
     try {
+      // Import getBaseUrl dynamically to ensure it uses current window.location
+      const { getBaseUrl } = await import("../../lib/auth/config");
+      const redirectTo = `${getBaseUrl()}/auth/callback`;
+
+      console.log("[AUTH-PROVIDER] Sign in with Google, redirectTo:", redirectTo);
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: AUTH_CONFIG.google.redirectTo,
+          redirectTo,
           queryParams: {
             access_type: "offline",
             prompt: "consent",
           },
+          ...AUTH_CONFIG.google,
         },
       });
 
