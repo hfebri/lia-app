@@ -1,20 +1,21 @@
 import { createServerClient } from "@supabase/ssr";
 import { createOrUpdateUser } from "@/lib/auth";
-import { resolveRequestRedirectOrigin } from "@/lib/auth/url";
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
-  const redirectOrigin = resolveRequestRedirectOrigin(requestUrl);
 
-  console.log("[AUTH-CALLBACK] Request origin:", requestUrl.origin);
-  console.log("[AUTH-CALLBACK] Redirect origin:", redirectOrigin);
+  // Always redirect to home - let the client handle further routing
+  const redirectUrl = new URL("/", requestUrl.origin);
+
+  console.log("[AUTH-CALLBACK] Code:", code ? "present" : "missing");
+  console.log("[AUTH-CALLBACK] Will redirect to:", redirectUrl.toString());
 
   if (code) {
     const cookieStore = await cookies();
-    const response = NextResponse.redirect(`${redirectOrigin}/`);
+    const response = NextResponse.redirect(redirectUrl);
 
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -46,12 +47,12 @@ export async function GET(request: NextRequest) {
 
       if (error) {
         console.error("[AUTH-CALLBACK] Exchange failed:", error.message);
-        return NextResponse.redirect(`${redirectOrigin}/?error=callback_error`);
+        redirectUrl.searchParams.set("error", "callback_error");
+        return NextResponse.redirect(redirectUrl);
       }
 
       if (data.session?.user) {
         console.log("[AUTH-CALLBACK] Session obtained for:", data.session.user.email);
-        console.log("[AUTH-CALLBACK] Session ID:", data.session.access_token.substring(0, 20) + "...");
 
         // Create or update user in our database
         const authUser = await createOrUpdateUser({
@@ -61,29 +62,35 @@ export async function GET(request: NextRequest) {
 
         if (!authUser) {
           console.error("[AUTH-CALLBACK] Failed to create/update user in database");
-          return NextResponse.redirect(`${redirectOrigin}/?error=database_error`);
+          redirectUrl.searchParams.set("error", "database_error");
+          return NextResponse.redirect(redirectUrl);
         }
 
         console.log("[AUTH-CALLBACK] User created/updated:", authUser.email, "Active:", authUser.isActive);
 
         if (!authUser.isActive) {
           console.warn("[AUTH-CALLBACK] Account inactive:", authUser.email);
-          return NextResponse.redirect(`${redirectOrigin}/?error=account_inactive`);
+          redirectUrl.searchParams.set("error", "account_inactive");
+          return NextResponse.redirect(redirectUrl);
         }
 
-        // Successful authentication - redirect to home page with cookies set
-        console.log("[AUTH-CALLBACK] Success! Redirecting to home with new session");
+        // Successful authentication - redirect to home
+        console.log("[AUTH-CALLBACK] ✅ Success! Redirecting to home");
         return response;
       }
 
       console.error("[AUTH-CALLBACK] No session or user in exchange response");
-      return NextResponse.redirect(`${redirectOrigin}/?error=no_session`);
+      redirectUrl.searchParams.set("error", "no_session");
+      return NextResponse.redirect(redirectUrl);
     } catch (error) {
       console.error("[AUTH-CALLBACK] Unexpected error:", error);
-      return NextResponse.redirect(`${redirectOrigin}/?error=unexpected_error`);
+      redirectUrl.searchParams.set("error", "unexpected_error");
+      return NextResponse.redirect(redirectUrl);
     }
   }
 
   // No code parameter or other error
-  return NextResponse.redirect(`${redirectOrigin}/?error=missing_code`);
+  console.error("[AUTH-CALLBACK] No code parameter");
+  redirectUrl.searchParams.set("error", "missing_code");
+  return NextResponse.redirect(redirectUrl);
 }

@@ -29,7 +29,6 @@ export interface AuthContextType {
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
   refreshSession: () => Promise<void>;
-  forceLogout: () => Promise<void>;
 }
 
 // Sign in result

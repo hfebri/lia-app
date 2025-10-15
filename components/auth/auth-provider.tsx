@@ -284,54 +284,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(null);
       clearUserCache();
 
-      // Then sign out from Supabase (remove scope to clear cookies properly)
+      // Then sign out from Supabase
       const { error } = await supabase.auth.signOut();
       if (error) {
         console.warn("[AUTH-PROVIDER] Supabase signOut error (non-critical):", error);
-        // Don't throw error for logout - we've already cleared local state
       } else {
         console.log("[AUTH-PROVIDER] Supabase signOut successful");
       }
 
-      // Redirect to sign-in page after logout
-      // Use production URL to avoid getting stuck on deploy previews
-      const redirectUrl = `${getBaseUrl()}/signin`;
-      console.log("[AUTH-PROVIDER] Redirecting to:", redirectUrl);
-      window.location.href = redirectUrl;
+      // Always redirect to /signin after logout
+      console.log("[AUTH-PROVIDER] Redirecting to /signin");
+      window.location.href = "/signin";
     } catch (error) {
       console.error("[AUTH-PROVIDER] SignOut error:", error);
       // Even if logout fails, clear local state and redirect
       setUser(null);
       setSession(null);
       clearUserCache();
-      const redirectUrl = `${getBaseUrl()}/signin`;
-      console.log("[AUTH-PROVIDER] Error fallback, redirecting to:", redirectUrl);
-      window.location.href = redirectUrl;
+      window.location.href = "/signin";
     }
   }, [supabase]);
 
-  // Force logout if user is not authenticated
+  // Force logout - used internally when session exists but user data is invalid
   const forceLogout = useCallback(async () => {
+    console.log("[AUTH-PROVIDER] Force logout - session exists but no user data");
+    setUser(null);
+    setSession(null);
+    clearUserCache();
+
     try {
-      console.log("[AUTH-PROVIDER] Force logout initiated");
-
-      // Clear local state first
-      setUser(null);
-      setSession(null);
-      clearUserCache();
-
-      // Sign out from Supabase (remove scope to clear cookies properly)
       await supabase.auth.signOut();
-      console.log("[AUTH-PROVIDER] Force logout - Supabase signOut complete");
-
-      const redirectUrl = `${getBaseUrl()}/signin`;
-      window.location.href = redirectUrl;
     } catch (error) {
-      console.warn("[AUTH-PROVIDER] Force logout error (non-critical):", error);
-      // Even if logout fails, redirect to signin
-      const redirectUrl = `${getBaseUrl()}/signin`;
-      window.location.href = redirectUrl;
+      console.warn("[AUTH-PROVIDER] Force logout signOut error:", error);
     }
+
+    window.location.href = "/signin";
   }, [supabase]);
 
   const refreshSession = useCallback(async () => {
@@ -371,7 +358,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signInWithGoogle,
       signOut,
       refreshSession,
-      forceLogout,
     }),
     [
       user,
@@ -380,7 +366,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signInWithGoogle,
       signOut,
       refreshSession,
-      forceLogout,
     ]
   );
 
