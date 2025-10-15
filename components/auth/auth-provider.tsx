@@ -271,14 +271,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Redirect to sign-in page after logout
-      window.location.href = "/signin";
+      // Use production URL to avoid getting stuck on deploy previews
+      const productionUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
+      window.location.href = `${productionUrl}/signin`;
     } catch (error) {
       console.error("[AUTH-PROVIDER] SignOut error:", error);
       // Even if logout fails, clear local state and redirect
       setUser(null);
       setSession(null);
       clearUserCache();
-      window.location.href = "/signin";
+      const productionUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
+      window.location.href = `${productionUrl}/signin`;
     }
   }, [supabase]);
 
@@ -296,11 +299,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await supabase.auth.signOut();
       console.log("[AUTH-PROVIDER] Force logout - Supabase signOut complete");
 
-      window.location.href = "/signin";
+      const productionUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
+      window.location.href = `${productionUrl}/signin`;
     } catch (error) {
       console.warn("[AUTH-PROVIDER] Force logout error (non-critical):", error);
       // Even if logout fails, redirect to signin
-      window.location.href = "/signin";
+      const productionUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
+      window.location.href = `${productionUrl}/signin`;
     }
   }, [supabase]);
 
