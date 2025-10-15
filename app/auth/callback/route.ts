@@ -13,10 +13,23 @@ export async function GET(request: NextRequest) {
   console.log("[AUTH-CALLBACK] Hostname:", requestUrl.hostname);
   console.log("[AUTH-CALLBACK] Code:", code ? "present" : "missing");
   console.log("[AUTH-CALLBACK] Referer:", request.headers.get("referer"));
+  console.log("[AUTH-CALLBACK] Host header:", request.headers.get("host"));
+  console.log("[AUTH-CALLBACK] X-Forwarded-Host:", request.headers.get("x-forwarded-host"));
+  console.log("[AUTH-CALLBACK] X-Forwarded-Proto:", request.headers.get("x-forwarded-proto"));
+  console.log("[AUTH-CALLBACK] All headers:", JSON.stringify(Object.fromEntries(request.headers.entries())));
   console.log("[AUTH-CALLBACK] ========================================");
 
+  // Determine the correct redirect origin
+  // Priority: production domain > current origin
+  const productionDomain = "https://lia.leverategroup.asia";
+  const isNetlifyPreview = requestUrl.hostname.includes("--lia-app.netlify.app");
+  const redirectOrigin = isNetlifyPreview ? productionDomain : requestUrl.origin;
+
+  console.log("[AUTH-CALLBACK] Is Netlify preview/branch deploy:", isNetlifyPreview);
+  console.log("[AUTH-CALLBACK] Redirect origin:", redirectOrigin);
+
   // Always redirect to home - let the client handle further routing
-  const redirectUrl = new URL("/", requestUrl.origin);
+  const redirectUrl = new URL("/", redirectOrigin);
 
   console.log("[AUTH-CALLBACK] Will redirect to:", redirectUrl.toString());
 
