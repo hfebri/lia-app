@@ -61,11 +61,21 @@ export function resolveRedirectOrigin(
   origin: string,
   protocol?: string
 ): string {
+  console.log('[AUTH-URL] resolveRedirectOrigin called');
+  console.log('[AUTH-URL]   - hostname:', hostname);
+  console.log('[AUTH-URL]   - origin:', origin);
+  console.log('[AUTH-URL]   - protocol:', protocol);
+  console.log('[AUTH-URL]   - primarySiteUrl:', primarySiteUrl.origin);
+  console.log('[AUTH-URL]   - isPreviewHost:', isPreviewHost(hostname));
+
   if (protocol === "http:" && primarySiteUrl.protocol === "https:") {
+    console.log('[AUTH-URL]   - ✅ Forcing HTTPS, returning:', primarySiteUrl.origin);
     return primarySiteUrl.origin;
   }
 
-  return isPreviewHost(hostname) ? primarySiteUrl.origin : origin;
+  const resolved = isPreviewHost(hostname) ? primarySiteUrl.origin : origin;
+  console.log('[AUTH-URL]   - ✅ Resolved to:', resolved);
+  return resolved;
 }
 
 export function resolveRequestRedirectOrigin(requestUrl: URL): string {

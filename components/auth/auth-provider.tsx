@@ -230,9 +230,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(session);
 
       if (session?.user) {
+        console.log("[AUTH-PROVIDER] Session exists, fetching user profile...");
         await fetchUserProfile(session.user.email!);
+        console.log("[AUTH-PROVIDER] ✅ User profile fetch complete, setting isLoading=false");
         setIsLoading(false);
       } else {
+        console.log("[AUTH-PROVIDER] No session, clearing user and setting isLoading=false");
         setUser(null);
         clearUserCache(); // Clear cache on logout
         setIsLoading(false);
@@ -293,6 +296,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Redirect to sign-in page after logout
       // Use production URL to avoid getting stuck on deploy previews
       const redirectUrl = `${getBaseUrl()}/signin`;
+      console.log("[AUTH-PROVIDER] Redirecting to:", redirectUrl);
       window.location.href = redirectUrl;
     } catch (error) {
       console.error("[AUTH-PROVIDER] SignOut error:", error);
@@ -301,6 +305,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(null);
       clearUserCache();
       const redirectUrl = `${getBaseUrl()}/signin`;
+      console.log("[AUTH-PROVIDER] Error fallback, redirecting to:", redirectUrl);
       window.location.href = redirectUrl;
     }
   }, [supabase]);
