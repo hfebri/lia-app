@@ -235,7 +235,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInWithGoogle = useCallback(async () => {
     try {
-      const redirectTo = `${getBaseUrl()}/auth/callback`;
+      const redirectTo = `${window.location.origin}/auth/callback`;
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
@@ -270,16 +270,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.warn("[AUTH-PROVIDER] Supabase signOut error (non-critical):", error);
       }
 
-      const redirectUrl = `${getBaseUrl()}/signin`;
-      window.location.href = redirectUrl;
+      window.location.href = "/signin";
     } catch (error) {
       console.error("[AUTH-PROVIDER] SignOut error:", error);
       // Even if logout fails, clear local state and redirect
       setUser(null);
       setSession(null);
       clearUserCache();
-      const redirectUrl = `${getBaseUrl()}/signin`;
-      window.location.href = redirectUrl;
+      window.location.href = "/signin";
     }
   }, [supabase]);
 
@@ -295,8 +293,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.warn("[AUTH-PROVIDER] Force logout signOut error:", error);
     }
 
-    const redirectUrl = `${getBaseUrl()}/signin`;
-    window.location.href = redirectUrl;
+    window.location.href = "/signin";
   }, [supabase]);
 
   const refreshSession = useCallback(async () => {

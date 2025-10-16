@@ -27,12 +27,15 @@ export function LoginButton({
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSignIn = async () => {
-    if (authLoading || isLoading || !!user) return;
+    if (authLoading || isLoading || !!user) {
+      return;
+    }
 
     try {
       setIsLoading(true);
       await signInWithGoogle();
     } catch (error) {
+      console.error("[LOGIN-BUTTON] Sign in error:", error);
       // You might want to show a toast notification here
     } finally {
       setIsLoading(false);
