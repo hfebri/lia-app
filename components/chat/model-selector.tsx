@@ -46,6 +46,9 @@ interface ModelSelectorProps {
 }
 
 const getModelIcon = (modelId: string) => {
+  if (modelId.includes("gpt-5-pro")) {
+    return <Sparkles className="h-4 w-4 text-purple-600" />;
+  }
   if (modelId.includes("gpt-5")) return <Sparkles className="h-4 w-4" />;
   if (modelId.includes("claude")) return <Brain className="h-4 w-4" />;
   if (modelId.includes("deepseek")) return <Zap className="h-4 w-4" />;
@@ -53,6 +56,7 @@ const getModelIcon = (modelId: string) => {
 };
 
 const getModelSpeed = (modelId: string) => {
+  if (modelId.includes("gpt-5-pro")) return "Expert";
   if (modelId.includes("gpt-5-nano")) return "Fastest";
   if (modelId.includes("gpt-5-mini")) return "Fast";
   if (modelId.includes("gpt-5")) return "Smart";
@@ -63,6 +67,8 @@ const getModelSpeed = (modelId: string) => {
 
 const getSpeedColor = (speed: string) => {
   switch (speed) {
+    case "Expert":
+      return "text-purple-700";
     case "Fastest":
       return "text-emerald-600";
     case "Fast":

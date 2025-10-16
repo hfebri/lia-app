@@ -100,6 +100,8 @@ export function EnhancedChatInterface({
     error: fileError,
   } = useFileUpload();
 
+  const { refreshConversations, createConversation } = useConversations();
+
   const {
     messages,
     isLoading,
@@ -134,6 +136,21 @@ export function EnhancedChatInterface({
     isOpenAIModel,
     setConversationModel,
   } = useAiChat({
+    preCreateConversation: async ({ title, aiModel }) => {
+      const created = await createConversation({
+        title,
+        aiModel,
+      });
+
+      if (!created) {
+        return null;
+      }
+
+      return {
+        id: created.id,
+        title: created.title,
+      };
+    },
     onConversationCreated: (conversationData: {
       id: string;
       title: string | null;
@@ -151,10 +168,17 @@ export function EnhancedChatInterface({
 
       // Then update URL using Next.js router (this properly updates searchParams)
       router.push(`/?conversation=${conversationData.id}`, { scroll: false });
+
+      // Ensure the chat history/sidebar reflects the newly saved conversation
+      refreshConversations()
+        .catch((refreshError) => {
+          console.warn(
+            "Failed to refresh conversations after creation:",
+            refreshError
+          );
+        });
     },
   });
-
-  const { createConversation } = useConversations();
 
   // We'll just save conversations to database, not display them
 

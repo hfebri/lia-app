@@ -23,7 +23,12 @@ export class AIService {
       providers: {
         replicate: {
           apiKey: process.env.REPLICATE_API_TOKEN || "",
-          models: ["openai/gpt-5"],
+          models: [
+            "openai/gpt-5",
+            "openai/gpt-5-pro",
+            "openai/gpt-5-mini",
+            "openai/gpt-5-nano",
+          ],
           defaultModel: "openai/gpt-5",
         },
         gemini: {

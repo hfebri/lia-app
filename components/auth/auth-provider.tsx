@@ -72,20 +72,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isFetchingUser, setIsFetchingUser] = useState(false);
 
-  useEffect(() => {
-    if (!isLoading) {
-      return;
-    }
-
-    if (isFetchingUser) {
-      return;
-    }
-
-    if (user || (!session && !user)) {
-      setIsLoading(false);
-    }
-  }, [isLoading, isFetchingUser, session, user]);
-
   const supabase = useMemo(() => createClient(), []);
 
   const abortControllerRef = useCallback(() => {
@@ -106,6 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchUserProfile = useCallback(
     async (email: string) => {
+      console.log("[AUTH-PROVIDER] 🔄 Fetching user profile for:", email);
       setIsFetchingUser(true);
 
       // Create AbortController only if it doesn't exist
@@ -127,11 +114,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (response.ok) {
           const userData = await response.json();
+          console.log("[AUTH-PROVIDER] ✅ User profile fetched:", {
+            email: userData.email,
+            hasCompletedOnboarding: userData.hasCompletedOnboarding,
+          });
           setUser(userData);
 
           // Save to cache
           const { data: { session } } = await supabase.auth.getSession();
           if (session?.user) {
+            console.log("[AUTH-PROVIDER] 💾 Saving user to cache");
             saveUserToCache({
               user: userData,
               timestamp: Date.now(),
@@ -139,24 +131,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             });
           }
         } else {
-          console.error("[AUTH-PROVIDER] Failed to fetch user profile:", response.status, response.statusText);
+          console.error("[AUTH-PROVIDER] ❌ Failed to fetch user profile:", response.status, response.statusText);
           setUser(null);
           clearUserCache();
           // If user not found in DB, sign them out from Supabase too
           if (response.status === 404) {
-            console.warn("[AUTH-PROVIDER] User not found in DB (404) - signing out");
+            console.warn("[AUTH-PROVIDER] ⚠️ User not found in DB (404) - signing out");
             await supabase.auth.signOut();
           }
         }
       } catch (error: any) {
         // Ignore abort errors
         if (error.name !== "AbortError") {
-          console.error("[AUTH-PROVIDER] Error fetching user profile:", error);
+          console.error("[AUTH-PROVIDER] ❌ Error fetching user profile:", error);
           setUser(null);
         }
       } finally {
         setIsFetchingUser(false);
         setIsLoading(false);
+        console.log("[AUTH-PROVIDER] ✅ Fetch user profile complete");
       }
     },
     [supabase]
@@ -165,12 +158,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Get initial session
     const getInitialSession = async () => {
+      console.log("[AUTH-PROVIDER] 🚀 Getting initial session...");
       try {
         // Try cache first for instant load
         const cachedUser = loadUserFromCache();
         if (cachedUser) {
+          console.log("[AUTH-PROVIDER] 📦 Cached user found:", cachedUser.user.email);
           setUser(cachedUser.user);
           setIsLoading(false); // Immediate render with cached data
+        } else {
+          console.log("[AUTH-PROVIDER] 📦 No cached user found");
         }
 
         // Then validate session
@@ -180,31 +177,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } = await supabase.auth.getSession();
 
         if (error) {
-          console.error("[AUTH-PROVIDER] getSession error:", error.message);
+          console.error("[AUTH-PROVIDER] ❌ getSession error:", error.message);
           setSession(null);
           setUser(null);
           clearUserCache();
         } else if (session?.user) {
+          console.log("[AUTH-PROVIDER] ✅ Supabase session found for:", session.user.email);
           setSession(session);
 
           // Check if cached user matches session
           if (!cachedUser || cachedUser.sessionId !== session.user.id) {
+            console.log("[AUTH-PROVIDER] 🔄 Cache miss or different session - fetching fresh data");
             // Fetch fresh user data if cache miss or different session
             await fetchUserProfile(session.user.email!);
+          } else {
+            console.log("[AUTH-PROVIDER] ✅ Using cached user data");
           }
           // else: use cached data, already set above
         } else {
+          console.log("[AUTH-PROVIDER] ❌ No Supabase session found");
           // No session, clear cache
           clearUserCache();
           setUser(null);
         }
       } catch (error) {
-        console.error("[AUTH-PROVIDER] Unexpected error in getInitialSession:", error);
+        console.error("[AUTH-PROVIDER] ❌ Unexpected error in getInitialSession:", error);
         setSession(null);
         setUser(null);
         clearUserCache();
       } finally {
         setIsLoading(false);
+        console.log("[AUTH-PROVIDER] ✅ Initial session check complete");
       }
     };
 
@@ -214,12 +217,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("[AUTH-PROVIDER] 🔔 Auth state changed:", event, session?.user?.email);
       setSession(session);
 
       if (session?.user) {
+        console.log("[AUTH-PROVIDER] ✅ Session exists - fetching user profile");
         await fetchUserProfile(session.user.email!);
         setIsLoading(false);
       } else {
+        console.log("[AUTH-PROVIDER] ❌ No session - clearing user data");
         setUser(null);
         clearUserCache(); // Clear cache on logout
         setIsLoading(false);
@@ -329,6 +335,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user,
       session,
       isLoading,
+      isFetchingUser,
       isAuthenticated: !!user && user.isActive,
       signInWithGoogle,
       signOut,
@@ -338,6 +345,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user,
       session,
       isLoading,
+      isFetchingUser,
       signInWithGoogle,
       signOut,
       refreshSession,

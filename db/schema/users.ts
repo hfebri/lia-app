@@ -19,7 +19,9 @@ export const users = pgTable("users", {
   name: varchar("name", { length: 100 }),
   image: text("image"),
   role: userRoleEnum("role").default("user").notNull(),
+  professionalRole: varchar("professional_role", { length: 200 }), // User's job title/role for personalized AI responses
   isActive: boolean("is_active").default(true).notNull(),
+  hasCompletedOnboarding: boolean("has_completed_onboarding").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

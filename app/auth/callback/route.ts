@@ -4,8 +4,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
 export async function GET(request: NextRequest) {
+  console.log("[AUTH-CALLBACK] 🚀 Starting OAuth callback");
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
+  console.log("[AUTH-CALLBACK] 📍 Request URL:", requestUrl.href);
+  console.log("[AUTH-CALLBACK] 🔑 Auth code present:", !!code);
 
   // Determine the correct redirect origin
   // Priority: production domain > current origin (but allow localhost for development)
@@ -16,13 +19,16 @@ export async function GET(request: NextRequest) {
   const redirectOrigin = isNetlifyPreview
     ? productionDomain
     : requestUrl.origin;
-
-  // Always redirect to home - let the client handle further routing
-  const redirectUrl = new URL("/", redirectOrigin);
+  console.log("[AUTH-CALLBACK] 🌐 Redirect origin:", redirectOrigin);
+  console.log("[AUTH-CALLBACK] 🔍 Is Netlify preview:", isNetlifyPreview);
 
   if (code) {
     const cookieStore = await cookies();
-    const response = NextResponse.redirect(redirectUrl);
+    console.log("[AUTH-CALLBACK] 🍪 Cookie store initialized");
+
+    // We'll create the response AFTER checking onboarding status
+    let finalResponse: NextResponse;
+    const cookiesToSet: Array<{ name: string; value: string; options?: any }> = [];
 
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -32,32 +38,44 @@ export async function GET(request: NextRequest) {
           getAll() {
             return cookieStore.getAll();
           },
-          setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              response.cookies.set(name, value, {
-                ...options,
-                path: "/",
-                sameSite: "lax",
-                secure: process.env.NODE_ENV === "production",
-              })
-            );
+          setAll(cookiesToSetParam) {
+            // Store cookies to set them later on the final response
+            console.log("[AUTH-CALLBACK] 🍪 Storing", cookiesToSetParam.length, "cookies for later");
+            cookiesToSet.push(...cookiesToSetParam);
           },
         },
       }
     );
 
     try {
+      console.log("[AUTH-CALLBACK] 🔄 Exchanging auth code for session...");
       // Exchange the auth code for a session
       const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
       if (error) {
         console.error("[AUTH-CALLBACK] Exchange failed:", error.message);
-        redirectUrl.searchParams.set("error", "callback_error");
-        return NextResponse.redirect(redirectUrl);
+        const errorUrl = new URL("/", redirectOrigin);
+        errorUrl.searchParams.set("error", "callback_error");
+        finalResponse = NextResponse.redirect(errorUrl);
+
+        // Set cookies on error response
+        cookiesToSet.forEach(({ name, value, options }) => {
+          finalResponse.cookies.set(name, value, {
+            ...options,
+            path: "/",
+            sameSite: "lax",
+            secure: process.env.NODE_ENV === "production",
+          });
+        });
+
+        return finalResponse;
       }
 
       if (data.session?.user) {
+        console.log("[AUTH-CALLBACK] ✅ Session obtained for:", data.session.user.email);
+
         // Create or update user in our database
+        console.log("[AUTH-CALLBACK] 💾 Creating/updating user in database...");
         const authUser = await createOrUpdateUser({
           email: data.session.user.email!,
           user_metadata: data.session.user.user_metadata,
@@ -65,33 +83,119 @@ export async function GET(request: NextRequest) {
 
         if (!authUser) {
           console.error(
-            "[AUTH-CALLBACK] Failed to create/update user in database"
+            "[AUTH-CALLBACK] ❌ Failed to create/update user in database"
           );
-          redirectUrl.searchParams.set("error", "database_error");
-          return NextResponse.redirect(redirectUrl);
+          const errorUrl = new URL("/", redirectOrigin);
+          errorUrl.searchParams.set("error", "database_error");
+          finalResponse = NextResponse.redirect(errorUrl);
+
+          // Set cookies on error response
+          cookiesToSet.forEach(({ name, value, options }) => {
+            finalResponse.cookies.set(name, value, {
+              ...options,
+              path: "/",
+              sameSite: "lax",
+              secure: process.env.NODE_ENV === "production",
+            });
+          });
+
+          return finalResponse;
         }
+
+        console.log("[AUTH-CALLBACK] ✅ User record obtained:", {
+          email: authUser.email,
+          hasCompletedOnboarding: authUser.hasCompletedOnboarding,
+          isActive: authUser.isActive,
+        });
 
         if (!authUser.isActive) {
-          console.warn("[AUTH-CALLBACK] Account inactive:", authUser.email);
-          redirectUrl.searchParams.set("error", "account_inactive");
-          return NextResponse.redirect(redirectUrl);
+          console.warn("[AUTH-CALLBACK] ⚠️ Account inactive:", authUser.email);
+          const errorUrl = new URL("/", redirectOrigin);
+          errorUrl.searchParams.set("error", "account_inactive");
+          finalResponse = NextResponse.redirect(errorUrl);
+
+          // Set cookies on error response
+          cookiesToSet.forEach(({ name, value, options }) => {
+            finalResponse.cookies.set(name, value, {
+              ...options,
+              path: "/",
+              sameSite: "lax",
+              secure: process.env.NODE_ENV === "production",
+            });
+          });
+
+          return finalResponse;
         }
 
-        return response;
+        // Determine final redirect based on onboarding status
+        let redirectPath = "/";
+        if (!authUser.hasCompletedOnboarding) {
+          redirectPath = "/onboarding";
+          console.log("[AUTH-CALLBACK] 🆕 New user - redirecting to /onboarding");
+        } else {
+          redirectPath = "/";
+          console.log("[AUTH-CALLBACK] 👤 Existing user - redirecting to /");
+        }
+
+        const successUrl = new URL(redirectPath, redirectOrigin);
+        console.log("[AUTH-CALLBACK] 🎯 Final redirect URL:", successUrl.href);
+        finalResponse = NextResponse.redirect(successUrl);
+
+        // Set all cookies on the final response
+        console.log("[AUTH-CALLBACK] 🍪 Setting", cookiesToSet.length, "cookies on final response");
+        cookiesToSet.forEach(({ name, value, options }) => {
+          console.log("[AUTH-CALLBACK] 🍪 Setting cookie:", name);
+          finalResponse.cookies.set(name, value, {
+            ...options,
+            path: "/",
+            sameSite: "lax",
+            secure: process.env.NODE_ENV === "production",
+          });
+        });
+
+        console.log("[AUTH-CALLBACK] ✅ Redirecting to:", redirectPath);
+        return finalResponse;
       }
 
       console.error("[AUTH-CALLBACK] No session or user in exchange response");
-      redirectUrl.searchParams.set("error", "no_session");
-      return NextResponse.redirect(redirectUrl);
+      const errorUrl = new URL("/", redirectOrigin);
+      errorUrl.searchParams.set("error", "no_session");
+      finalResponse = NextResponse.redirect(errorUrl);
+
+      // Set cookies on error response
+      cookiesToSet.forEach(({ name, value, options }) => {
+        finalResponse.cookies.set(name, value, {
+          ...options,
+          path: "/",
+          sameSite: "lax",
+          secure: process.env.NODE_ENV === "production",
+        });
+      });
+
+      return finalResponse;
     } catch (error) {
       console.error("[AUTH-CALLBACK] Unexpected error:", error);
-      redirectUrl.searchParams.set("error", "unexpected_error");
-      return NextResponse.redirect(redirectUrl);
+      const errorUrl = new URL("/", redirectOrigin);
+      errorUrl.searchParams.set("error", "unexpected_error");
+      finalResponse = NextResponse.redirect(errorUrl);
+
+      // Set cookies on error response
+      cookiesToSet.forEach(({ name, value, options }) => {
+        finalResponse.cookies.set(name, value, {
+          ...options,
+          path: "/",
+          sameSite: "lax",
+          secure: process.env.NODE_ENV === "production",
+        });
+      });
+
+      return finalResponse;
     }
   }
 
   // No code parameter or other error
   console.error("[AUTH-CALLBACK] No code parameter");
-  redirectUrl.searchParams.set("error", "missing_code");
-  return NextResponse.redirect(redirectUrl);
+  const errorUrl = new URL("/", redirectOrigin);
+  errorUrl.searchParams.set("error", "missing_code");
+  return NextResponse.redirect(errorUrl);
 }

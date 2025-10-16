@@ -4,6 +4,29 @@ import { NextResponse } from "next/server";
 // Available AI models and their configurations
 const AVAILABLE_MODELS = [
   {
+    id: "openai/gpt-5-pro",
+    name: "GPT-5 Pro",
+    provider: "replicate",
+    description:
+      "Premium GPT-5 tier tuned for complex strategy, long-form synthesis, and high-stakes analysis with expanded reliability controls.",
+    maxTokens: 8192,
+    contextWindow: 32768,
+    isDefault: false,
+    capabilities: [
+      "advanced-reasoning",
+      "long-form",
+      "strategy",
+      "code-generation",
+      "analysis",
+      "tool-use",
+    ],
+    pricing: {
+      input: 0.02,
+      output: 0.06,
+      unit: "1K tokens",
+    },
+  },
+  {
     id: "openai/gpt-5",
     name: "GPT-5",
     provider: "replicate",

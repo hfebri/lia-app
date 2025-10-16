@@ -41,6 +41,8 @@ interface AIResponseProps {
 
 const getModelIcon = (modelId?: string) => {
   if (!modelId) return <Bot className="h-4 w-4" />;
+  if (modelId.includes("gpt-5-pro"))
+    return <Sparkles className="h-4 w-4 text-purple-600" />;
   if (modelId.includes("gpt-5"))
     return <Sparkles className="h-4 w-4 text-purple-500" />;
   if (modelId.includes("gpt-4"))
@@ -50,6 +52,7 @@ const getModelIcon = (modelId?: string) => {
 
 const getModelName = (modelId?: string) => {
   if (!modelId) return "AI Assistant";
+  if (modelId.includes("gpt-5-pro")) return "GPT-5 Pro";
   if (modelId.includes("gpt-5")) return "GPT-5";
   if (modelId.includes("gpt-4")) return "GPT-4";
   if (modelId.includes("gpt-3.5")) return "GPT-3.5";

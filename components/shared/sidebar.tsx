@@ -62,6 +62,7 @@ interface SidebarProps {
 
 // Helper function to get friendly model names
 const getModelDisplayName = (modelId: string): string => {
+  if (modelId.includes("gpt-5-pro")) return "GPT-5 Pro";
   if (modelId.includes("gpt-5")) return "GPT-5";
   if (modelId.includes("gpt-4")) return "GPT-4";
   if (modelId.includes("gemini")) return "Gemini";
@@ -204,7 +205,7 @@ function SidebarComponent({ className }: SidebarProps) {
               alt="LIA Logo"
               width={32}
               height={32}
-              className="rounded"
+              className="h-8 w-auto rounded"
             />
             <h1 className="text-xl font-bold">LIA</h1>
             <Badge variant="secondary" className="text-xs">Beta</Badge>

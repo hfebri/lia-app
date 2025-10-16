@@ -12,6 +12,7 @@ export class ReplicateProvider implements AIProvider {
   public readonly name = "replicate";
   public readonly models = [
     "openai/gpt-5",
+    "openai/gpt-5-pro",
     "openai/gpt-5-mini",
     "openai/gpt-5-nano",
     "anthropic/claude-4-sonnet",
@@ -64,23 +65,23 @@ export class ReplicateProvider implements AIProvider {
       let input: any;
 
       if (this.isClaudeModel(model)) {
-        // For Claude models, use single prompt format (no conversation history)
-        const userMessage = messages[messages.length - 1];
-        const hasImage = userMessage?.files && userMessage.files.length > 0;
+        const latestUserMessage = messages.filter(
+          (msg) => msg.role === "user"
+        ).pop();
+        const hasImage =
+          latestUserMessage?.files && latestUserMessage.files.length > 0;
 
         input = {
-          prompt: userMessage?.content || "",
+          prompt: this.buildClaudePrompt(messages),
           max_tokens,
           system_prompt: system_prompt || "You are a helpful assistant",
           extended_thinking,
           thinking_budget_tokens,
         };
 
-        // Add image if present
-        if (hasImage && userMessage.files?.[0]) {
-          const file = userMessage.files[0];
-          // For Claude, check if file has URL (uploaded to Supabase) or base64 data
-          input.image = (file as any).url || file.data; // Use URL first, fallback to base64
+        if (hasImage && latestUserMessage?.files?.[0]) {
+          const file = latestUserMessage.files[0];
+          input.image = (file as any).url || file.data;
           input.max_image_resolution = max_image_resolution;
         }
       } else if (this.isOpenAIModel(model)) {
@@ -222,23 +223,23 @@ export class ReplicateProvider implements AIProvider {
       let input: any;
 
       if (this.isClaudeModel(model)) {
-        // For Claude models, use the format from the user's example
-        const userMessage = messages[messages.length - 1];
-        const hasImage = userMessage?.files && userMessage.files.length > 0;
+        const latestUserMessage = messages.filter(
+          (msg) => msg.role === "user"
+        ).pop();
+        const hasImage =
+          latestUserMessage?.files && latestUserMessage.files.length > 0;
 
         input = {
-          prompt: userMessage?.content || "",
+          prompt: this.buildClaudePrompt(messages),
           max_tokens,
           system_prompt: system_prompt || "You are a helpful assistant",
           extended_thinking,
           thinking_budget_tokens,
         };
 
-        // Add image if present
-        if (hasImage && userMessage.files?.[0]) {
-          const file = userMessage.files[0];
-          // For Claude, check if file has URL (uploaded to Supabase) or base64 data
-          input.image = (file as any).url || file.data; // Use URL first, fallback to base64
+        if (hasImage && latestUserMessage?.files?.[0]) {
+          const file = latestUserMessage.files[0];
+          input.image = (file as any).url || file.data;
           input.max_image_resolution = max_image_resolution;
         }
       } else if (this.isOpenAIModel(model)) {
@@ -372,6 +373,23 @@ export class ReplicateProvider implements AIProvider {
 
   private isOpenAIModel(model: string): boolean {
     return model.includes("openai");
+  }
+
+  private buildClaudePrompt(messages: AIMessage[]) {
+    const segments: string[] = [];
+
+    messages.forEach((message) => {
+      if (message.role === "system") {
+        return;
+      }
+
+      const roleLabel = message.role === "assistant" ? "Assistant" : "Human";
+      segments.push(`${roleLabel}: ${message.content}`);
+    });
+
+    segments.push("Assistant:");
+
+    return segments.join("\n\n");
   }
 
   private formatMessages(messages: AIMessage[], systemPrompt?: string) {

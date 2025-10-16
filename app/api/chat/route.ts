@@ -6,8 +6,8 @@ import { LIA_SYSTEM_INSTRUCTION } from "@/lib/constants/ai-models";
 
 export async function POST(request: NextRequest) {
   try {
-    // Require authentication for all chat requests
-    await requireAuthenticatedUser();
+    // Require authentication for all chat requests and get user info
+    const authenticatedUser = await requireAuthenticatedUser(request);
     let messages,
       model = "openai/gpt-5",
       stream = false,
@@ -142,8 +142,14 @@ export async function POST(request: NextRequest) {
           try {
             // Combine default LIA system instruction with user's custom instruction
             let combinedSystemPrompt = LIA_SYSTEM_INSTRUCTION;
+
+            // Add user's professional role to system instruction if available
+            if (authenticatedUser.user.professionalRole) {
+              combinedSystemPrompt += `\n\nUSER CONTEXT:\n- Professional Role: ${authenticatedUser.user.professionalRole}\n- Tailor your responses to be relevant for someone in this role`;
+            }
+
             if (systemInstruction && systemInstruction.trim()) {
-              combinedSystemPrompt = `${LIA_SYSTEM_INSTRUCTION}\n\nAdditional Instructions: ${systemInstruction.trim()}`;
+              combinedSystemPrompt = `${combinedSystemPrompt}\n\nAdditional Instructions: ${systemInstruction.trim()}`;
             }
 
             const stream = aiService.generateStream(aiMessages, {
@@ -205,8 +211,14 @@ export async function POST(request: NextRequest) {
       // Generate non-streaming response
       // Combine default LIA system instruction with user's custom instruction
       let combinedSystemPrompt = LIA_SYSTEM_INSTRUCTION;
+
+      // Add user's professional role to system instruction if available
+      if (authenticatedUser.user.professionalRole) {
+        combinedSystemPrompt += `\n\nUSER CONTEXT:\n- Professional Role: ${authenticatedUser.user.professionalRole}\n- Tailor your responses to be relevant for someone in this role`;
+      }
+
       if (systemInstruction && systemInstruction.trim()) {
-        combinedSystemPrompt = `${LIA_SYSTEM_INSTRUCTION}\n\nAdditional Instructions: ${systemInstruction.trim()}`;
+        combinedSystemPrompt = `${combinedSystemPrompt}\n\nAdditional Instructions: ${systemInstruction.trim()}`;
       }
 
       const response = await aiService.generateResponse(aiMessages, {

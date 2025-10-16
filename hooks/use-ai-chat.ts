@@ -32,6 +32,7 @@ interface UseAiChatOptions {
   maxMessages?: number;
   autoScroll?: boolean;
   onConversationCreated?: (conversationData: { id: string; title: string | null }) => void;
+  preCreateConversation?: (params: { title: string; aiModel: string }) => Promise<{ id: string; title?: string | null } | null>;
 }
 
 // Helper function to save chat messages to database
@@ -65,6 +66,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     maxMessages = 100,
     autoScroll = true,
     onConversationCreated,
+    preCreateConversation,
   } = options;
 
   // Get saved model from localStorage or use initial model
@@ -95,6 +97,16 @@ export function useAiChat(options: UseAiChatOptions = {}) {
 
   const chatService = useRef(ChatService.getInstance());
   const abortController = useRef<AbortController | null>(null);
+
+  const createConversationTitle = useCallback((message: string) => {
+    const normalized = message.trim().replace(/\s+/g, " ");
+    if (!normalized) {
+      return "New Chat";
+    }
+    return normalized.length > 50
+      ? `${normalized.slice(0, 47)}...`
+      : normalized;
+  }, []);
 
   // Load available models
   const loadModels = useCallback(async () => {
@@ -170,6 +182,34 @@ export function useAiChat(options: UseAiChatOptions = {}) {
       // Process files client-side FIRST before creating message
       let finalContent = content;
       let processedFiles: ProcessedFile[] = [];
+      let conversationId = state.currentConversationId;
+      let conversationPreCreated = false;
+      let conversationTitle: string | null = null;
+
+      if (!conversationId && preCreateConversation) {
+        const draftTitle = createConversationTitle(content);
+        try {
+          const newConversation = await preCreateConversation({
+            title: draftTitle,
+            aiModel: state.selectedModel,
+          });
+
+          if (newConversation?.id) {
+            conversationId = newConversation.id;
+            conversationTitle = newConversation.title ?? draftTitle;
+            conversationPreCreated = true;
+
+            if (onConversationCreated) {
+              onConversationCreated({
+                id: newConversation.id,
+                title: conversationTitle,
+              });
+            }
+          }
+        } catch (error) {
+          console.warn("Failed to pre-create conversation:", error);
+        }
+      }
 
       // ALWAYS include file context if conversation has files (even without new uploads)
       const fileContext = buildConversationFileContext();
@@ -385,6 +425,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
       setState((prev) => ({
         ...prev,
         messages: [...prev.messages, userMessage].slice(-maxMessages), // Display content in UI
+        currentConversationId: conversationId || prev.currentConversationId,
         currentConversationModel:
           prev.currentConversationModel || prev.selectedModel, // Set conversation model on first message
         isLoading: true,
@@ -461,27 +502,31 @@ export function useAiChat(options: UseAiChatOptions = {}) {
                   const result = await saveChatToDatabase(
                     userMessage,
                     assistantMessage,
-                    state.currentConversationId || undefined,
+                    conversationId || undefined,
                     state.selectedModel // Pass the selected AI model
                   );
                   // Update conversation ID if this was the first message
-                  if (result.success && !state.currentConversationId) {
-                  const newConversationId = result.data.conversationId;
-                  const conversationTitle = result.data.title;
-                  setState((prev) => ({
-                    ...prev,
-                    currentConversationId: newConversationId,
-                  }));
+                  if (
+                    result.success &&
+                    !conversationId &&
+                    result.data?.conversationId
+                  ) {
+                    conversationId = result.data.conversationId;
+                    const persistedTitle = result.data.title || null;
 
-                  // Notify parent component that a conversation was created with title
-                  if (onConversationCreated) {
-                    onConversationCreated({
-                      id: newConversationId,
-                      title: conversationTitle || null,
-                    });
+                    setState((prev) => ({
+                      ...prev,
+                      currentConversationId: conversationId,
+                    }));
+
+                    if (onConversationCreated && !conversationPreCreated) {
+                      onConversationCreated({
+                        id: conversationId,
+                        title: persistedTitle,
+                      });
+                    }
                   }
-                }
-              } catch (error) {
+                } catch (error) {
                 console.warn(
                   "Failed to save streaming chat to database:",
                   error
@@ -520,23 +565,27 @@ export function useAiChat(options: UseAiChatOptions = {}) {
             const result = await saveChatToDatabase(
               userMessage,
               assistantMessage,
-              state.currentConversationId || undefined,
+              conversationId || undefined,
               state.selectedModel // Pass the selected AI model
             );
             // Update conversation ID if this was the first message
-            if (result.success && !state.currentConversationId) {
-              const newConversationId = result.data.conversationId;
-              const conversationTitle = result.data.title;
+            if (
+              result.success &&
+              !conversationId &&
+              result.data?.conversationId
+            ) {
+              conversationId = result.data.conversationId;
+              const persistedTitle = result.data.title || null;
+
               setState((prev) => ({
                 ...prev,
-                currentConversationId: newConversationId,
+                currentConversationId: conversationId,
               }));
 
-              // Notify parent component that a conversation was created with title
-              if (onConversationCreated) {
+              if (onConversationCreated && !conversationPreCreated) {
                 onConversationCreated({
-                  id: newConversationId,
-                  title: conversationTitle || null,
+                  id: conversationId,
+                  title: persistedTitle,
                 });
               }
             }
@@ -567,6 +616,8 @@ export function useAiChat(options: UseAiChatOptions = {}) {
       state.currentConversationId,
       maxMessages,
       onConversationCreated,
+      preCreateConversation,
+      createConversationTitle,
       buildConversationFileContext,
       isFileAlreadyProcessed,
     ]

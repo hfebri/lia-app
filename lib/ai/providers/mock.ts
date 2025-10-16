@@ -10,6 +10,7 @@ export class MockProvider implements AIProvider {
   public readonly name = "replicate";
   public readonly models = [
     "openai/gpt-5",
+    "openai/gpt-5-pro",
     "openai/gpt-5-mini",
     "openai/gpt-5-nano",
     "anthropic/claude-4-sonnet",
@@ -87,7 +88,9 @@ export class MockProvider implements AIProvider {
     const lowerMessage = userMessage.toLowerCase();
 
     // Model-specific response styles
-    if (model.includes("gpt-5-nano")) {
+    if (model.includes("gpt-5-pro")) {
+      return this.generateProResponse(lowerMessage);
+    } else if (model.includes("gpt-5-nano")) {
       return this.generateNanoResponse(lowerMessage);
     } else if (model.includes("gpt-5-mini")) {
       return this.generateMiniResponse(lowerMessage);
@@ -116,6 +119,17 @@ export class MockProvider implements AIProvider {
       return "I can help with coding! This is GPT-5 Mini providing a balanced response with medium-difficulty reasoning. What specific programming task would you like assistance with?";
     }
     return "Hello! I'm GPT-5 Mini, offering a great balance between speed and capability. I'm designed for chat and medium-difficulty reasoning tasks. How can I assist you today?";
+  }
+
+  private generateProResponse(message: string): string {
+    if (message.includes("strategy") || message.includes("plan")) {
+      return "Greetings, this is GPT-5 Pro. I'll break down your strategic question into sequenced actions, evaluate the risks, and surface the highest-leverage moves. Let's outline the objective, constraints, and success metrics first.";
+    } else if (message.includes("analysis") || message.includes("report")) {
+      return "You're speaking with GPT-5 Pro—optimized for deep analysis. I'll assemble a structured synthesis with executive-level insights, data callouts, and clear recommendations. Share any specific inputs I should prioritise.";
+    } else if (message.includes("code") || message.includes("debug")) {
+      return "GPT-5 Pro here. I can audit complex codebases, reason through failure modes, and propose resilient solutions. Point me at the module or stack trace you'd like assessed.";
+    }
+    return "Hello, I'm GPT-5 Pro—the premium reasoning tier. I'm crafted for high-stakes decision making, nuanced synthesis, and thorough problem solving. Let me know the context and the outcome you need, and I'll get to work.";
   }
 
   private generateClaudeResponse(message: string): string {
