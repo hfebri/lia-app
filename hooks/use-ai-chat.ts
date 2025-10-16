@@ -211,6 +211,30 @@ export function useAiChat(options: UseAiChatOptions = {}) {
         }
       }
 
+      const placeholderMessage = chatService.current.createMessage(
+        "user",
+        content,
+        {
+          metadata: {
+            status: "uploading",
+            hasPendingFiles: !!(files && files.length > 0),
+          },
+        }
+      );
+
+      setState((prev) => ({
+        ...prev,
+        messages: [...prev.messages, placeholderMessage].slice(-maxMessages),
+        currentConversationModel:
+          prev.currentConversationModel || prev.selectedModel,
+        isLoading: true,
+        isProcessingFiles: files && files.length > 0,
+        fileProcessingProgress: {},
+        isStreaming: false,
+        streamingContent: "",
+        error: null,
+      }));
+
       // ALWAYS include file context if conversation has files (even without new uploads)
       const fileContext = buildConversationFileContext();
       if (fileContext && (!files || files.length === 0)) {
@@ -424,16 +448,14 @@ export function useAiChat(options: UseAiChatOptions = {}) {
 
       setState((prev) => ({
         ...prev,
-        messages: [...prev.messages, userMessage].slice(-maxMessages), // Display content in UI
+        messages: prev.messages
+          .map((msg) => (msg.id === placeholderMessage.id ? userMessage : msg))
+          .slice(-maxMessages),
         currentConversationId: conversationId || prev.currentConversationId,
         currentConversationModel:
-          prev.currentConversationModel || prev.selectedModel, // Set conversation model on first message
-        isLoading: true,
-        isProcessingFiles: false, // File processing is done
-        fileProcessingProgress: {}, // Clear progress
-        isStreaming: false, // Don't set streaming true yet - wait for first chunk
-        streamingContent: "",
-        error: null,
+          prev.currentConversationModel || prev.selectedModel,
+        isProcessingFiles: false,
+        fileProcessingProgress: {},
       }));
 
       // Abort any ongoing request

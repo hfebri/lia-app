@@ -170,13 +170,12 @@ export function EnhancedChatInterface({
       router.push(`/?conversation=${conversationData.id}`, { scroll: false });
 
       // Ensure the chat history/sidebar reflects the newly saved conversation
-      refreshConversations()
-        .catch((refreshError) => {
-          console.warn(
-            "Failed to refresh conversations after creation:",
-            refreshError
-          );
-        });
+      refreshConversations().catch((refreshError) => {
+        console.warn(
+          "Failed to refresh conversations after creation:",
+          refreshError
+        );
+      });
     },
   });
 
@@ -488,11 +487,21 @@ export function EnhancedChatInterface({
 
     const messageContent = inputValue.trim();
     let messageFiles = [...attachedFiles];
+    const filesToProcess = [...selectedFiles]; // Save selected files BEFORE clearing
+
+    console.log("[CHAT] Preparing to send message", {
+      model: selectedModel,
+      filesQueued: filesToProcess.map((file) => ({
+        name: file.name,
+        type: file.type,
+        size: file.size,
+      })),
+    });
 
     // Clear input immediately to show user the message was received
     setInputValue("");
     setAttachedFiles([]);
-    setSelectedFiles([]); // Also clear selected files
+    setSelectedFiles([]); // Clear selected files from UI
 
     // Reset textarea height
     if (textareaRef.current) {
@@ -503,56 +512,160 @@ export function EnhancedChatInterface({
     const isGeminiModel = selectedModel.startsWith("gemini");
     const isClaudeModelForUpload = selectedModel.includes("claude");
 
-    if (selectedFiles.length > 0) {
-      if (isClaudeModelForUpload) {
-        // For Claude models: Upload images to Supabase and use URLs
+    if (filesToProcess.length > 0) {
+      if (isGeminiModel) {
         try {
           const processedFiles = [];
 
-          for (const file of selectedFiles) {
-            // Validate file before processing
+          for (const file of filesToProcess) {
             const validation = validateFileForAI(file);
             if (!validation.isValid) {
-              // You could show a toast/error message here
+              console.warn("[CHAT] Gemini validation failed", {
+                name: file.name,
+                type: file.type,
+                reason: validation.error,
+              });
               continue;
             }
 
-            // For Claude: Upload image files to Supabase, use base64 for non-images
-            if (file.type.startsWith("image/")) {
-              // Upload image to Supabase using direct API call
-              const formData = new FormData();
-              formData.append("files", file);
-              formData.append("extractText", "false"); // Don't extract text from images
-              formData.append("analyzeWithAI", "false"); // Don't analyze with AI
+            const fileData = await processFileForAI(file);
+            console.log("[CHAT] Prepared file for Gemini", {
+              name: file.name,
+              type: file.type,
+              size: file.size,
+            });
+            processedFiles.push({
+              id: `temp-${Date.now()}-${Math.random()}`,
+              filename: file.name,
+              originalName: file.name,
+              mimeType: file.type,
+              size: file.size,
+              url: undefined,
+              uploadStatus: "completed" as const,
+              analysisStatus: "completed" as const,
+              uploadedAt: new Date(),
+              metadata: {
+                data: fileData.data,
+                type: file.type,
+                isBase64: true,
+              },
+            });
+          }
 
-              const uploadResponse = await fetch("/api/files/upload", {
-                method: "POST",
-                body: formData,
+          if (processedFiles.length > 0) {
+            messageFiles = [...messageFiles, ...processedFiles];
+          }
+        } catch (error) {
+          return;
+        }
+      } else if (isClaudeModelForUpload) {
+        let imageFiles = filesToProcess.filter((file) =>
+          file.type.startsWith("image/")
+        );
+        const nonImageFiles = filesToProcess.filter(
+          (file) => !file.type.startsWith("image/")
+        );
+
+        if (imageFiles.length > 1) {
+          console.warn(
+            "Claude currently supports a single image per request. Using the first image."
+          );
+          imageFiles = imageFiles.slice(0, 1);
+        }
+
+        if (imageFiles.length === 1) {
+          const file = imageFiles[0];
+          const validation = validateFileForAI(file);
+          if (!validation.isValid) {
+            console.warn("[CHAT] Claude image validation failed", {
+              name: file.name,
+              type: file.type,
+              reason: validation.error,
+            });
+            return;
+          }
+
+          try {
+            const formData = new FormData();
+            formData.append("file", file);
+
+            console.log("[CHAT] Uploading Claude image via /api/upload-image", {
+              name: file.name,
+              size: file.size,
+            });
+
+            const uploadResponse = await fetch("/api/upload-image", {
+              method: "POST",
+              body: formData,
+            });
+
+            const uploadResult = await uploadResponse.json();
+
+            if (uploadResult.success && uploadResult.url) {
+              const accessible = await ensureImageAccessible(uploadResult.url);
+              if (!accessible) {
+                console.error("[CHAT] Uploaded image not yet accessible", {
+                  url: uploadResult.url,
+                });
+                return;
+              }
+
+              console.log("[CHAT] Claude image upload successful", {
+                name: file.name,
+                url: uploadResult.url,
               });
-
-              const uploadResult = await uploadResponse.json();
-
-              if (uploadResult.success && uploadResult.data.file) {
-                const uploadedFile = uploadResult.data.file;
-                processedFiles.push({
-                  id: uploadedFile.id,
-                  filename: uploadedFile.filename,
-                  originalName: uploadedFile.originalName,
-                  mimeType: uploadedFile.mimeType,
-                  size: uploadedFile.size,
-                  url: uploadedFile.url, // Supabase URL for Claude
-                  uploadStatus: uploadedFile.uploadStatus,
-                  analysisStatus: uploadedFile.analysisStatus,
-                  uploadedAt: new Date(uploadedFile.createdAt),
+              messageFiles = [
+                ...messageFiles,
+                {
+                  id: `temp-${Date.now()}-${Math.random()}`,
+                  filename: file.name,
+                  originalName: file.name,
+                  mimeType: file.type,
+                  size: file.size,
+                  url: uploadResult.url,
+                  uploadStatus: "completed" as const,
+                  analysisStatus: "completed" as const,
+                  uploadedAt: new Date(),
                   metadata: {
                     type: file.type,
-                    isUrl: true, // Flag to indicate this is a URL
+                    isUrl: true,
                   },
-                });
-              }
+                },
+              ];
             } else {
-              // For non-image files, use base64
+              console.error(
+                "Image upload failed for Claude:",
+                uploadResult.error || "Unknown error"
+              );
+              return;
+            }
+          } catch (error) {
+            console.error("Image upload threw for Claude:", error);
+            return;
+          }
+        }
+
+        if (nonImageFiles.length > 0) {
+          try {
+            const processedFiles = [];
+
+            for (const file of nonImageFiles) {
+              const validation = validateFileForAI(file);
+              if (!validation.isValid) {
+                console.warn("[CHAT] Non-image validation failed (Claude)", {
+                  name: file.name,
+                  type: file.type,
+                  reason: validation.error,
+                });
+                continue;
+              }
+
               const fileData = await processFileForAI(file);
+              console.log("[CHAT] Prepared non-image file for Claude", {
+                name: file.name,
+                type: file.type,
+                size: file.size,
+              });
               processedFiles.push({
                 id: `temp-${Date.now()}-${Math.random()}`,
                 filename: file.name,
@@ -570,88 +683,156 @@ export function EnhancedChatInterface({
                 },
               });
             }
-          }
 
-          // Add processed files to message
-          messageFiles = [...messageFiles, ...processedFiles];
-        } catch (error) {
-          return;
-        }
-      } else if (isGeminiModel) {
-        // For Gemini models: Process files directly to base64 (no Supabase upload)
-        try {
-          const processedFiles = [];
-
-          for (const file of selectedFiles) {
-            // Validate file before processing
-            const validation = validateFileForAI(file);
-            if (!validation.isValid) {
-              // You could show a toast/error message here
-              continue;
+            if (processedFiles.length > 0) {
+              messageFiles = [...messageFiles, ...processedFiles];
             }
-
-            // Convert file to base64 for Gemini
-            const fileData = await processFileForAI(file);
-            processedFiles.push({
-              id: `temp-${Date.now()}-${Math.random()}`, // Temporary ID
-              filename: file.name, // For FileItem compatibility
-              originalName: file.name,
-              mimeType: file.type,
-              size: file.size,
-              url: undefined, // No URL for base64 files
-              uploadStatus: "completed" as const, // For FileItem compatibility
-              analysisStatus: "completed" as const, // For FileItem compatibility
-              uploadedAt: new Date(), // For FileItem compatibility
-              metadata: {
-                data: fileData.data, // Base64 data for AI processing
-                type: file.type, // For compatibility with AI message format
-                isBase64: true, // Flag to indicate this is base64 data
-              },
-            });
+          } catch (error) {
+            console.error(
+              "Failed to process non-image files for Claude:",
+              error
+            );
+            return;
           }
-
-          // Add processed files to message
-          messageFiles = [...messageFiles, ...processedFiles];
-        } catch (error) {
-          return;
         }
       } else {
-        // For other non-Gemini, non-Claude models: Process files to base64 for AI analysis
+        const imageFiles = filesToProcess.filter((file) =>
+          file.type.startsWith("image/")
+        );
+        const nonImageFiles = filesToProcess.filter(
+          (file) => !file.type.startsWith("image/")
+        );
+
+        if (!isClaudeModelForUpload && imageFiles.length > 1) {
+          console.warn(
+            "OpenAI models currently support a single image attachment per message. Using the first image only."
+          );
+          imageFiles.splice(1);
+        }
+
+        if (imageFiles.length > 0) {
+          const uploadedImages = await Promise.all(
+            imageFiles.map(async (file) => {
+              const validation = validateFileForAI(file);
+              if (!validation.isValid) {
+                console.warn("[CHAT] Image validation failed", {
+                  name: file.name,
+                  type: file.type,
+                  reason: validation.error,
+                });
+                return null;
+              }
+
+              try {
+                const formData = new FormData();
+                formData.append("file", file);
+
+                const uploadResponse = await fetch("/api/upload-image", {
+                  method: "POST",
+                  body: formData,
+                });
+
+                const uploadResult = await uploadResponse.json();
+
+                if (uploadResult.success && uploadResult.url) {
+                  const accessible = await ensureImageAccessible(
+                    uploadResult.url
+                  );
+                  if (!accessible) {
+                    console.error("[CHAT] Uploaded image not yet accessible", {
+                      url: uploadResult.url,
+                    });
+                    return null;
+                  }
+
+                  console.log("[CHAT] OpenAI image upload successful", {
+                    name: file.name,
+                    url: uploadResult.url,
+                  });
+
+                  return {
+                    id: `temp-${Date.now()}-${Math.random()}`,
+                    filename: file.name,
+                    originalName: file.name,
+                    mimeType: file.type,
+                    size: file.size,
+                    url: uploadResult.url,
+                    uploadStatus: "completed" as const,
+                    analysisStatus: "completed" as const,
+                    uploadedAt: new Date(),
+                    metadata: {
+                      type: file.type,
+                      isUrl: true,
+                    },
+                  } as FileItem;
+                }
+
+                console.error(
+                  "Image upload failed:",
+                  uploadResult.error || "Unknown error"
+                );
+              } catch (uploadError) {
+                console.error("Image upload threw:", uploadError);
+              }
+
+              return null;
+            })
+          );
+
+          const successfulImages = uploadedImages.filter(
+            (file): file is NonNullable<(typeof uploadedImages)[number]> =>
+              Boolean(file)
+          );
+
+          if (successfulImages.length > 0) {
+            messageFiles = [...messageFiles, ...successfulImages];
+          }
+        }
+
         try {
           const processedFiles = [];
 
-          for (const file of selectedFiles) {
-            // Validate file before processing
+          for (const file of nonImageFiles) {
             const validation = validateFileForAI(file);
             if (!validation.isValid) {
-              // You could show a toast/error message here
+              console.warn("[CHAT] Non-image validation failed", {
+                name: file.name,
+                type: file.type,
+                reason: validation.error,
+              });
               continue;
             }
 
-            // Convert file to base64 for AI processing
             const fileData = await processFileForAI(file);
+            console.log("[CHAT] Prepared non-image file for OpenAI", {
+              name: file.name,
+              type: file.type,
+              size: file.size,
+            });
             processedFiles.push({
-              id: `temp-${Date.now()}-${Math.random()}`, // Temporary ID
-              filename: file.name, // For FileItem compatibility
+              id: `temp-${Date.now()}-${Math.random()}`,
+              filename: file.name,
               originalName: file.name,
               mimeType: file.type,
               size: file.size,
-              url: undefined, // No URL for base64 files
-              uploadStatus: "completed" as const, // For FileItem compatibility
-              analysisStatus: "completed" as const, // For FileItem compatibility
-              uploadedAt: new Date(), // For FileItem compatibility
+              url: undefined,
+              uploadStatus: "completed" as const,
+              analysisStatus: "completed" as const,
+              uploadedAt: new Date(),
               metadata: {
-                data: fileData.data, // Base64 data for AI processing
-                type: file.type, // For compatibility with AI message format
-                isBase64: true, // Flag to indicate this is base64 data
+                data: fileData.data,
+                type: file.type,
+                isBase64: true,
               },
             });
           }
 
-          // Add processed files to message
-          messageFiles = [...messageFiles, ...processedFiles];
+          if (processedFiles.length > 0) {
+            messageFiles = [...messageFiles, ...processedFiles];
+          }
         } catch (error) {
-          return; // Don't send message if file processing fails
+          console.error("Failed to process non-image files:", error);
+          return;
         }
       }
     }
@@ -796,7 +977,8 @@ export function EnhancedChatInterface({
     });
 
     if (files.length > 0) {
-      setSelectedFiles((prev) => [...prev, ...files]);
+      setAttachedFiles([]);
+      setSelectedFiles([files[0]]);
     }
   };
 
@@ -807,7 +989,8 @@ export function EnhancedChatInterface({
   const handleAttachExistingFile = (file: FileItem) => {
     // Check if file is already attached
     if (!attachedFiles.some((f) => f.id === file.id)) {
-      setAttachedFiles((prev) => [...prev, file]);
+      setSelectedFiles([]);
+      setAttachedFiles([file]);
     }
     setShowFilePicker(false);
   };
@@ -852,10 +1035,11 @@ export function EnhancedChatInterface({
           <div className="text-center">
             <Upload className="h-12 w-12 text-blue-500 mx-auto mb-4" />
             <p className="text-lg font-medium text-blue-700 dark:text-blue-300">
-              Drop files here to upload
+              Drop {selectedModel.startsWith("openai/") ? "files" : "a file"}{" "}
+              here to upload
             </p>
             <p className="text-sm text-blue-600 dark:text-blue-400">
-              Supports PDF, Word, Excel, and text files
+              Supports PDF, Word, Excel, and image files
             </p>
           </div>
         </div>
@@ -1340,13 +1524,15 @@ export function EnhancedChatInterface({
                         const target = e.target as HTMLInputElement;
                         if (target.files) {
                           const newFiles = Array.from(target.files);
-                          setSelectedFiles((prev) => [...prev, ...newFiles]);
+                          if (newFiles.length > 0) {
+                            setAttachedFiles([]);
+                            setSelectedFiles([newFiles[0]]);
+                          }
                           target.value = ""; // Reset input
                         }
                       };
                     }
                   }}
-                  multiple
                   accept=".pdf,.doc,.docx,.pptx,.ppt,.txt,.rtf,.csv,.md,.xls,.xlsx,.xlsm,.jpg,.jpeg,.png,.gif,.bmp,.webp,.svg"
                 />
                 <Button
