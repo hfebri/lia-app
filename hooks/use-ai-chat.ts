@@ -213,13 +213,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
 
       const placeholderMessage = chatService.current.createMessage(
         "user",
-        content,
-        {
-          metadata: {
-            status: "uploading",
-            hasPendingFiles: !!(files && files.length > 0),
-          },
-        }
+        content
       );
 
       setState((prev) => ({
@@ -228,7 +222,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
         currentConversationModel:
           prev.currentConversationModel || prev.selectedModel,
         isLoading: true,
-        isProcessingFiles: files && files.length > 0,
+        isProcessingFiles: !!(files && files.length > 0),
         fileProcessingProgress: {},
         isStreaming: false,
         streamingContent: "",
@@ -543,7 +537,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
 
                     if (onConversationCreated && !conversationPreCreated) {
                       onConversationCreated({
-                        id: conversationId,
+                        id: conversationId as string,
                         title: persistedTitle,
                       });
                     }
@@ -606,7 +600,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
 
               if (onConversationCreated && !conversationPreCreated) {
                 onConversationCreated({
-                  id: conversationId,
+                  id: conversationId as string,
                   title: persistedTitle,
                 });
               }

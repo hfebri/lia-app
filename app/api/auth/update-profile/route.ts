@@ -7,7 +7,7 @@ import { eq } from "drizzle-orm";
 export async function POST(request: NextRequest) {
   try {
     // Get authenticated user
-    const { user: authUser } = await requireAuthenticatedUser(request);
+    const { user: authUser } = await requireAuthenticatedUser();
 
     // Parse request body
     const body = await request.json();

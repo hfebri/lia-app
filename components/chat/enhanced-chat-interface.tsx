@@ -602,14 +602,6 @@ export function EnhancedChatInterface({
             const uploadResult = await uploadResponse.json();
 
             if (uploadResult.success && uploadResult.url) {
-              const accessible = await ensureImageAccessible(uploadResult.url);
-              if (!accessible) {
-                console.error("[CHAT] Uploaded image not yet accessible", {
-                  url: uploadResult.url,
-                });
-                return;
-              }
-
               console.log("[CHAT] Claude image upload successful", {
                 name: file.name,
                 url: uploadResult.url,
@@ -735,16 +727,6 @@ export function EnhancedChatInterface({
                 const uploadResult = await uploadResponse.json();
 
                 if (uploadResult.success && uploadResult.url) {
-                  const accessible = await ensureImageAccessible(
-                    uploadResult.url
-                  );
-                  if (!accessible) {
-                    console.error("[CHAT] Uploaded image not yet accessible", {
-                      url: uploadResult.url,
-                    });
-                    return null;
-                  }
-
                   console.log("[CHAT] OpenAI image upload successful", {
                     name: file.name,
                     url: uploadResult.url,
@@ -1035,8 +1017,7 @@ export function EnhancedChatInterface({
           <div className="text-center">
             <Upload className="h-12 w-12 text-blue-500 mx-auto mb-4" />
             <p className="text-lg font-medium text-blue-700 dark:text-blue-300">
-              Drop {selectedModel.startsWith("openai/") ? "files" : "a file"}{" "}
-              here to upload
+              Drop a file here to upload
             </p>
             <p className="text-sm text-blue-600 dark:text-blue-400">
               Supports PDF, Word, Excel, and image files

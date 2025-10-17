@@ -7,7 +7,7 @@ import { LIA_SYSTEM_INSTRUCTION } from "@/lib/constants/ai-models";
 export async function POST(request: NextRequest) {
   try {
     // Require authentication for all chat requests and get user info
-    const authenticatedUser = await requireAuthenticatedUser(request);
+    const authenticatedUser = await requireAuthenticatedUser();
     let messages,
       model = "openai/gpt-5",
       stream = false,
