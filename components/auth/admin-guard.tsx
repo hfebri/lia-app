@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "../../hooks/use-auth";
 import { ProtectedRoute } from "./protected-route";
 import type { Permission } from "../../lib/auth/permissions";
@@ -18,8 +20,15 @@ export function AdminGuard({
   redirectTo = "/unauthorized",
 }: AdminGuardProps) {
   return (
-    <ProtectedRoute redirectTo={redirectTo}>
-      <AdminCheck requiredPermission={requiredPermission} fallback={fallback}>
+    <ProtectedRoute
+      redirectTo={redirectTo}
+      unauthenticatedRedirectTo="/signin"
+    >
+      <AdminCheck
+        requiredPermission={requiredPermission}
+        fallback={fallback}
+        unauthorizedRedirectTo={redirectTo}
+      >
         {children}
       </AdminCheck>
     </ProtectedRoute>
@@ -30,14 +39,17 @@ interface AdminCheckProps {
   children: React.ReactNode;
   requiredPermission?: Permission;
   fallback?: React.ReactNode;
+  unauthorizedRedirectTo?: string;
 }
 
 function AdminCheck({
   children,
   requiredPermission,
   fallback,
+  unauthorizedRedirectTo,
 }: AdminCheckProps) {
-  const { user, checkPermission, checkAdmin } = useAuth();
+  const { user, checkPermission, checkAdmin, isAuthenticated } = useAuth();
+  const router = useRouter();
 
   // Check if user has admin role
   const hasAdminRole = checkAdmin();
@@ -49,6 +61,23 @@ function AdminCheck({
 
   // User must be admin and have the required permission
   const isAuthorized = hasAdminRole && hasRequiredPermission;
+
+  useEffect(() => {
+    if (user && isAuthenticated && !isAuthorized && unauthorizedRedirectTo) {
+      router.replace(unauthorizedRedirectTo);
+    }
+  }, [
+    user,
+    isAuthenticated,
+    isAuthorized,
+    unauthorizedRedirectTo,
+    router,
+  ]);
+
+  // While auth state is resolving or user signed out, let ProtectedRoute handle redirects
+  if (!user) {
+    return null;
+  }
 
   if (!isAuthorized) {
     if (fallback) {

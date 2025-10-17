@@ -12,6 +12,7 @@ import { createClient } from "../../lib/supabase/client";
 import type { Session } from "@supabase/supabase-js";
 import type { AuthUser, AuthContextType } from "../../lib/auth/types";
 import { AUTH_CONFIG } from "../../lib/auth/config";
+import { useRouter } from "next/navigation";
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -73,6 +74,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isFetchingUser, setIsFetchingUser] = useState(false);
 
   const supabase = useMemo(() => createClient(), []);
+  const router = useRouter();
 
   const abortControllerRef = useCallback(() => {
     let controller: AbortController | null = null;
@@ -270,16 +272,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         headers: {
           "Content-Type": "application/json",
         },
+        cache: "no-store",
       });
 
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
         console.warn("[AUTH-PROVIDER] Server signOut failed:", body);
+        return false;
       }
+
+      return true;
     } catch (error) {
       console.warn("[AUTH-PROVIDER] Server signOut request error:", error);
+      return false;
     }
   }, []);
+
+  const completeSignOutNavigation = useCallback(() => {
+    router.replace("/signin");
+  }, [router]);
 
   const signOut = useCallback(async () => {
     try {
@@ -295,8 +306,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       await callServerSignOut();
-
-      window.location.href = "/signin";
+      completeSignOutNavigation();
     } catch (error) {
       console.error("[AUTH-PROVIDER] SignOut error:", error);
       // Even if logout fails, clear local state and redirect
@@ -304,9 +314,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(null);
       clearUserCache();
       await callServerSignOut();
-      window.location.href = "/signin";
+      completeSignOutNavigation();
     }
-  }, [supabase, callServerSignOut]);
+  }, [supabase, callServerSignOut, completeSignOutNavigation]);
 
   // Force logout - used internally when session exists but user data is invalid
   const forceLogout = useCallback(async () => {
@@ -322,8 +332,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await callServerSignOut();
     }
 
-    window.location.href = "/signin";
-  }, [supabase, callServerSignOut]);
+    completeSignOutNavigation();
+  }, [supabase, callServerSignOut, completeSignOutNavigation]);
 
   const refreshSession = useCallback(async () => {
     try {

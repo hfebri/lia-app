@@ -10,6 +10,7 @@ interface ProtectedRouteProps {
   fallback?: React.ReactNode;
   redirectTo?: string;
   requireActive?: boolean;
+  unauthenticatedRedirectTo?: string;
 }
 
 export function ProtectedRoute({
@@ -17,24 +18,37 @@ export function ProtectedRoute({
   fallback,
   redirectTo = "/",
   requireActive = true,
+  unauthenticatedRedirectTo,
 }: ProtectedRouteProps) {
   const { isAuthenticated, isLoading, user } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      console.debug("[PROTECTED-ROUTE] redirect", {
-        from: pathname,
-        redirectTo,
-      });
-      const target =
-        redirectTo && redirectTo !== "/" ? redirectTo : "/signin";
-      if (pathname !== target) {
-        router.replace(target);
-      }
+    if (isLoading || isAuthenticated) {
+      return;
     }
-  }, [isAuthenticated, isLoading, redirectTo, router, pathname]);
+
+    const resolvedTarget =
+      unauthenticatedRedirectTo ??
+      (redirectTo && redirectTo !== "/" ? redirectTo : "/signin");
+
+    console.debug("[PROTECTED-ROUTE] redirect", {
+      from: pathname,
+      redirectTo: resolvedTarget,
+    });
+
+    if (pathname !== resolvedTarget) {
+      router.replace(resolvedTarget);
+    }
+  }, [
+    isAuthenticated,
+    isLoading,
+    redirectTo,
+    router,
+    pathname,
+    unauthenticatedRedirectTo,
+  ]);
 
   // Show loading state
   if (isLoading) {
