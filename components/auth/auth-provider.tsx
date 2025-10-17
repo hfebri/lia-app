@@ -263,6 +263,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [supabase]);
 
+  const callServerSignOut = useCallback(async () => {
+    try {
+      const response = await fetch("/auth/signout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        console.warn("[AUTH-PROVIDER] Server signOut failed:", body);
+      }
+    } catch (error) {
+      console.warn("[AUTH-PROVIDER] Server signOut request error:", error);
+    }
+  }, []);
+
   const signOut = useCallback(async () => {
     try {
       // Clear local state first
@@ -271,10 +289,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       clearUserCache();
 
       // Then sign out from Supabase (remove scope to clear cookies properly)
-      const { error } = await supabase.auth.signOut();
+      const { error } = await supabase.auth.signOut({ scope: "local" });
       if (error) {
         console.warn("[AUTH-PROVIDER] Supabase signOut error (non-critical):", error);
       }
+
+      await callServerSignOut();
 
       window.location.href = "/signin";
     } catch (error) {
@@ -283,9 +303,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(null);
       setSession(null);
       clearUserCache();
+      await callServerSignOut();
       window.location.href = "/signin";
     }
-  }, [supabase]);
+  }, [supabase, callServerSignOut]);
 
   // Force logout - used internally when session exists but user data is invalid
   const forceLogout = useCallback(async () => {
@@ -294,13 +315,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     clearUserCache();
 
     try {
-      await supabase.auth.signOut();
+      await supabase.auth.signOut({ scope: "local" });
+      await callServerSignOut();
     } catch (error) {
       console.warn("[AUTH-PROVIDER] Force logout signOut error:", error);
+      await callServerSignOut();
     }
 
     window.location.href = "/signin";
-  }, [supabase]);
+  }, [supabase, callServerSignOut]);
 
   const refreshSession = useCallback(async () => {
     try {

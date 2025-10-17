@@ -103,12 +103,12 @@ export default function SignInPage() {
               <div className="space-y-3">
                 <CardTitle className="text-3xl font-semibold">
                   <span className="bg-gradient-to-r from-indigo-600 via-blue-600 to-purple-500 bg-clip-text text-transparent dark:from-indigo-200 dark:via-sky-200 dark:to-purple-200">
-                    Welcome to LIA
+                    LIA is ready when you are
                   </span>
                 </CardTitle>
                 <CardDescription className="text-base text-slate-600 dark:text-slate-300">
-                  Your intelligent sidekick for calmer workflows, smarter
-                  conversations, and decisions you can trust.
+                  Bring calm to busy deal days, spark sharper conversations, and
+                  move forward with confidence.
                 </CardDescription>
               </div>
             </CardHeader>
@@ -124,7 +124,7 @@ export default function SignInPage() {
                   <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-indigo-500/10 font-semibold text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-200">
                     1
                   </span>
-                  Transform deep document stacks into effortless dialogue.
+                  Turn long decks and document stacks into quick, human chats.
                 </motion.div>
                 <motion.div
                   className="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-200"
@@ -135,8 +135,19 @@ export default function SignInPage() {
                   <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-sky-500/10 font-semibold text-sky-600 dark:bg-sky-500/20 dark:text-sky-200">
                     2
                   </span>
-                  Stay grounded with private-by-design controls and gentle
-                  guardrails.
+                  Keep every insight private with controls that stay on your
+                  side.
+                </motion.div>
+                <motion.div
+                  className="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-200"
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.5, duration: 0.5, ease: "easeOut" }}
+                >
+                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-purple-500/10 font-semibold text-purple-600 dark:bg-purple-500/20 dark:text-purple-200">
+                    3
+                  </span>
+                  Stay in sync with a workspace shaped for Leverate teams.
                 </motion.div>
               </div>
 
@@ -172,17 +183,9 @@ export default function SignInPage() {
               </motion.div>
 
               <div className="space-y-2 text-center">
-                <motion.span
-                  className="block text-xs font-medium uppercase tracking-[0.3em] text-slate-400 dark:text-slate-500"
-                  initial={{ opacity: 0, letterSpacing: "0.8em" }}
-                  animate={{ opacity: 1, letterSpacing: "0.3em" }}
-                  transition={{ delay: 0.5, duration: 0.7, ease: "easeOut" }}
-                >
-                  Trust & Transparency
-                </motion.span>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  By signing in, you agree to our Terms of Service and Privacy
-                  Policy.
+                  We treat your work like our own. Signing in means you're good
+                  with our Terms of Service and Privacy Policy.
                 </p>
               </div>
             </CardContent>
