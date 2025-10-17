@@ -21,7 +21,7 @@ async function loadPDFJS() {
   if (!pdfjsLib) {
     pdfjsLib = await import("pdfjs-dist");
     // Use the local worker file served from public directory
-    pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
+    pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.js";
   }
 
   return pdfjsLib;
@@ -81,13 +81,15 @@ export class ClientFileProcessor {
     selectedModel: string,
     onProgress?: (fileName: string, progress: FileProcessingProgress) => void
   ): Promise<ProcessedFile[]> {
-    debugLog(`🚀 [CLIENT OCR] Starting client-side file processing for ${files.length} files`);
-    
+    debugLog(
+      `🚀 [CLIENT OCR] Starting client-side file processing for ${files.length} files`
+    );
+
     const processedFiles: ProcessedFile[] = [];
 
     for (const file of files) {
       debugLog(`\n📁 [CLIENT OCR] Processing: ${file.name} (${file.type})`);
-      
+
       const startTime = Date.now();
       const isImage = this.isImageFile(file);
       const isDocument = this.isDocumentFile(file);
@@ -114,28 +116,34 @@ export class ClientFileProcessor {
       try {
         if (isImage) {
           debugLog(`📸 [CLIENT OCR] Image file detected - no OCR needed`);
-          const fileInfo = `📷 Image: ${file.name} (${Math.round(file.size/1024)}KB)`;
-          
+          const fileInfo = `📷 Image: ${file.name} (${Math.round(
+            file.size / 1024
+          )}KB)`;
+
           processedFiles.push({
             ...baseProcessedFile,
             processingTime: Date.now() - startTime,
             displayContent: fileInfo,
             promptContent: fileInfo,
           });
-          
+
           onProgress?.(file.name, {
             stage: "Complete (Image)",
             progress: 100,
             timeElapsed: Date.now() - startTime,
           });
         } else if (isDocument) {
-          const isGeminiModel = selectedModel.toLowerCase().includes('gemini');
+          const isGeminiModel = selectedModel.toLowerCase().includes("gemini");
 
           if (isGeminiModel) {
             // Gemini supports documents natively - no OCR needed
-            debugLog(`📄 [CLIENT] Document file detected - Gemini native support (no OCR needed)`);
+            debugLog(
+              `📄 [CLIENT] Document file detected - Gemini native support (no OCR needed)`
+            );
 
-            const fileInfo = `📄 Document: ${file.name} (${Math.round(file.size/1024)}KB) - Native processing`;
+            const fileInfo = `📄 Document: ${file.name} (${Math.round(
+              file.size / 1024
+            )}KB) - Native processing`;
 
             processedFiles.push({
               ...baseProcessedFile,
@@ -151,7 +159,9 @@ export class ClientFileProcessor {
             });
           } else {
             // Claude/GPT models need OCR for documents
-            debugLog(`📄 [CLIENT OCR] Document file detected - running OCR for ${selectedModel}`);
+            debugLog(
+              `📄 [CLIENT OCR] Document file detected - running OCR for ${selectedModel}`
+            );
 
             // Show immediate progress for document processing
             onProgress?.(file.name, {
@@ -160,16 +170,26 @@ export class ClientFileProcessor {
               timeElapsed: Date.now() - startTime,
             });
 
-            const extractedText = await this.runTesseractOCR(file, (progress) => {
-              onProgress?.(file.name, {
-                stage: progress.status,
-                progress: Math.min(100, Math.round((progress.progress || 0) * 100)),
-                timeElapsed: Date.now() - startTime,
-              });
-            });
+            const extractedText = await this.runTesseractOCR(
+              file,
+              (progress) => {
+                onProgress?.(file.name, {
+                  stage: progress.status,
+                  progress: Math.min(
+                    100,
+                    Math.round((progress.progress || 0) * 100)
+                  ),
+                  timeElapsed: Date.now() - startTime,
+                });
+              }
+            );
 
-            const fileInfo = `📄 Document: ${file.name} (${Math.round(file.size/1024)}KB) - Text extracted`;
-            const promptInfo = extractedText ? `📄 Document: ${file.name}\n\nExtracted Content:\n${extractedText}` : fileInfo;
+            const fileInfo = `📄 Document: ${file.name} (${Math.round(
+              file.size / 1024
+            )}KB)`;
+            const promptInfo = extractedText
+              ? `📄 Document: ${file.name}\n\nExtracted Content:\n${extractedText}`
+              : fileInfo;
 
             processedFiles.push({
               ...baseProcessedFile,
@@ -195,8 +215,12 @@ export class ClientFileProcessor {
           });
 
           const textContent = await this.readTextFile(file);
-          const fileInfo = `📝 Text File: ${file.name} (${Math.round(file.size/1024)}KB)`;
-          const promptInfo = textContent ? `${fileInfo}\n\nContent:\n${textContent}` : fileInfo;
+          const fileInfo = `📝 Text File: ${file.name} (${Math.round(
+            file.size / 1024
+          )}KB)`;
+          const promptInfo = textContent
+            ? `${fileInfo}\n\nContent:\n${textContent}`
+            : fileInfo;
 
           processedFiles.push({
             ...baseProcessedFile,
@@ -221,8 +245,12 @@ export class ClientFileProcessor {
           });
 
           const spreadsheetContent = await this.parseSpreadsheet(file);
-          const fileInfo = `📊 Spreadsheet: ${file.name} (${Math.round(file.size/1024)}KB)`;
-          const promptInfo = spreadsheetContent ? `${fileInfo}\n\n${spreadsheetContent}` : fileInfo;
+          const fileInfo = `📊 Spreadsheet: ${file.name} (${Math.round(
+            file.size / 1024
+          )}KB)`;
+          const promptInfo = spreadsheetContent
+            ? `${fileInfo}\n\n${spreadsheetContent}`
+            : fileInfo;
 
           processedFiles.push({
             ...baseProcessedFile,
@@ -257,8 +285,10 @@ export class ClientFileProcessor {
         }
       } catch (error) {
         console.error(`❌ [CLIENT OCR] Error processing ${file.name}:`, error);
-        const errorInfo = `❌ Error processing: ${file.name} - ${error instanceof Error ? error.message : "Processing failed"}`;
-        
+        const errorInfo = `❌ Error processing: ${file.name} - ${
+          error instanceof Error ? error.message : "Processing failed"
+        }`;
+
         processedFiles.push({
           ...baseProcessedFile,
           error: error instanceof Error ? error.message : "Processing failed",
@@ -287,9 +317,9 @@ export class ClientFileProcessor {
     onProgress: (progress: { status: string; progress?: number }) => void
   ): Promise<string> {
     debugLog(`🚀 [TESSERACT] Starting OCR for: ${file.name}`);
-    
+
     const startTime = Date.now();
-    
+
     try {
       let imagesToProcess: (File | Blob)[] = [];
 
@@ -297,14 +327,19 @@ export class ClientFileProcessor {
       if (file.type === "application/pdf") {
         debugLog(`📄 [PDF CONVERT] Converting PDF to images: ${file.name}`);
         onProgress({ status: "Converting PDF to images", progress: 10 });
-        
+
         imagesToProcess = await this.convertPDFToImages(file, (progress) => {
           // Map PDF conversion progress to 10-40% of total progress
-          const mappedProgress = 10 + (progress * 0.3);
-          onProgress({ status: "Converting PDF to images", progress: mappedProgress });
+          const mappedProgress = 10 + progress * 0.3;
+          onProgress({
+            status: "Converting PDF to images",
+            progress: mappedProgress,
+          });
         });
-        
-        debugLog(`✅ [PDF CONVERT] Converted PDF to ${imagesToProcess.length} images`);
+
+        debugLog(
+          `✅ [PDF CONVERT] Converted PDF to ${imagesToProcess.length} images`
+        );
         onProgress({ status: "PDF converted, starting OCR", progress: 40 });
       } else {
         // For image files, process directly
@@ -313,15 +348,18 @@ export class ClientFileProcessor {
 
       // Process all images with OCR
       const allTexts: string[] = [];
-      
+
       for (let i = 0; i < imagesToProcess.length; i++) {
         const image = imagesToProcess[i];
-        const pageNumber = imagesToProcess.length > 1 ? ` (page ${i + 1}/${imagesToProcess.length})` : "";
-        
+        const pageNumber =
+          imagesToProcess.length > 1
+            ? ` (page ${i + 1}/${imagesToProcess.length})`
+            : "";
+
         debugLog(`🔍 [TESSERACT] Processing image${pageNumber}...`);
-        onProgress({ 
-          status: `OCR processing${pageNumber}`, 
-          progress: (i / imagesToProcess.length) * 100 
+        onProgress({
+          status: `OCR processing${pageNumber}`,
+          progress: (i / imagesToProcess.length) * 100,
         });
 
         const {
@@ -330,21 +368,26 @@ export class ClientFileProcessor {
           logger: (m) => {
             const elapsed = Date.now() - startTime;
             debugLog(
-              `🔧 [TESSERACT] [${file.name}${pageNumber}] ${m.status} (${Math.round((m.progress || 0) * 100)}%) - ${elapsed}ms`
+              `🔧 [TESSERACT] [${file.name}${pageNumber}] ${
+                m.status
+              } (${Math.round((m.progress || 0) * 100)}%) - ${elapsed}ms`
             );
-            
+
             // Forward Tesseract progress to our progress callback
             // Reserve 40-99% for OCR processing (60% total)
             const ocrStartProgress = 40;
             const ocrTotalRange = 59; // 99 - 40
             const baseProgress = (i / imagesToProcess.length) * ocrTotalRange;
-            const pageProgress = (m.progress || 0) * (ocrTotalRange / imagesToProcess.length);
-            const totalProgress = Math.min(99, ocrStartProgress + baseProgress + pageProgress);
-            
-            
-            onProgress({ 
-              status: `${m.status}${pageNumber}`, 
-              progress: totalProgress
+            const pageProgress =
+              (m.progress || 0) * (ocrTotalRange / imagesToProcess.length);
+            const totalProgress = Math.min(
+              99,
+              ocrStartProgress + baseProgress + pageProgress
+            );
+
+            onProgress({
+              status: `${m.status}${pageNumber}`,
+              progress: totalProgress,
             });
           },
         });
@@ -356,10 +399,14 @@ export class ClientFileProcessor {
 
       const combinedText = allTexts.join("\n\n--- Page Break ---\n\n");
       const processingTime = Date.now() - startTime;
-      
+
       debugLog(`✅ [TESSERACT] OCR completed for: ${file.name}`);
-      debugLog(`📊 [TESSERACT] Extracted ${combinedText.length} characters from ${imagesToProcess.length} page(s) in ${processingTime}ms`);
-      debugLog(`📄 [TESSERACT] Text preview: "${combinedText.substring(0, 100)}..."`);
+      debugLog(
+        `📊 [TESSERACT] Extracted ${combinedText.length} characters from ${imagesToProcess.length} page(s) in ${processingTime}ms`
+      );
+      debugLog(
+        `📄 [TESSERACT] Text preview: "${combinedText.substring(0, 100)}..."`
+      );
 
       onProgress({ status: "Complete", progress: 100 });
       return combinedText;
@@ -378,16 +425,16 @@ export class ClientFileProcessor {
   ): Promise<Blob[]> {
     // Load PDF.js dynamically
     const pdfLib = await loadPDFJS();
-    
+
     const arrayBuffer = await pdfFile.arrayBuffer();
     const pdf = await pdfLib.getDocument({ data: arrayBuffer }).promise;
-    
+
     debugLog(`📖 [PDF CONVERT] PDF has ${pdf.numPages} pages`);
     const images: Blob[] = [];
 
     for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
       debugLog(`🖼️  [PDF CONVERT] Converting page ${pageNum}/${pdf.numPages}`);
-      
+
       const page = await pdf.getPage(pageNum);
       const scale = 2.0; // Higher scale for better OCR accuracy
       const viewport = page.getViewport({ scale });
@@ -439,7 +486,8 @@ export class ClientFileProcessor {
       enhancedPrompt += `### File ${index + 1}: ${file.promptContent}\n\n`;
     });
 
-    enhancedPrompt += "Please analyze this content and respond to my question above.\n";
+    enhancedPrompt +=
+      "Please analyze this content and respond to my question above.\n";
 
     return enhancedPrompt;
   }
@@ -452,7 +500,9 @@ export class ClientFileProcessor {
       return "";
     }
 
-    const fileInfos = processedFiles.map(file => file.displayContent || `📄 ${file.name}`);
+    const fileInfos = processedFiles.map(
+      (file) => file.displayContent || `📄 ${file.name}`
+    );
     return fileInfos.join("\n");
   }
 
@@ -460,7 +510,7 @@ export class ClientFileProcessor {
    * Convert processed files to metadata for database storage
    */
   static toMetadata(processedFiles: ProcessedFile[]): FileMetadata[] {
-    return processedFiles.map(file => ({
+    return processedFiles.map((file) => ({
       name: file.name,
       type: file.type,
       size: file.size,
@@ -482,7 +532,7 @@ export class ClientFileProcessor {
   private static isImageFile(file: File): boolean {
     const imageTypes = [
       "image/jpeg",
-      "image/jpg", 
+      "image/jpg",
       "image/png",
       "image/gif",
       "image/webp",
@@ -521,10 +571,12 @@ export class ClientFileProcessor {
 
     // Also check file extension for files with generic mime types
     const fileName = file.name.toLowerCase();
-    const textExtensions = ['.txt', '.csv', '.rtf', '.md', '.markdown'];
+    const textExtensions = [".txt", ".csv", ".rtf", ".md", ".markdown"];
 
-    return textTypes.includes(file.type.toLowerCase()) ||
-           textExtensions.some(ext => fileName.endsWith(ext));
+    return (
+      textTypes.includes(file.type.toLowerCase()) ||
+      textExtensions.some((ext) => fileName.endsWith(ext))
+    );
   }
 
   /**
@@ -539,10 +591,12 @@ export class ClientFileProcessor {
 
     // Also check file extension
     const fileName = file.name.toLowerCase();
-    const spreadsheetExtensions = ['.xlsx', '.xls', '.xlsm'];
+    const spreadsheetExtensions = [".xlsx", ".xls", ".xlsm"];
 
-    return spreadsheetTypes.includes(file.type.toLowerCase()) ||
-           spreadsheetExtensions.some(ext => fileName.endsWith(ext));
+    return (
+      spreadsheetTypes.includes(file.type.toLowerCase()) ||
+      spreadsheetExtensions.some((ext) => fileName.endsWith(ext))
+    );
   }
 
   /**
@@ -574,19 +628,19 @@ export class ClientFileProcessor {
       const buffer = await file.arrayBuffer();
 
       // Parse workbook
-      const workbook = XLSX.read(buffer, { type: 'array' });
+      const workbook = XLSX.read(buffer, { type: "array" });
 
       // Convert all sheets to formatted text
-      let result = '';
+      let result = "";
 
       workbook.SheetNames.forEach((sheetName, index) => {
         const sheet = workbook.Sheets[sheetName];
 
         // Add sheet header
         if (workbook.SheetNames.length > 1) {
-          result += `\n${'='.repeat(60)}\n`;
+          result += `\n${"=".repeat(60)}\n`;
           result += `Sheet ${index + 1}: ${sheetName}\n`;
-          result += `${'='.repeat(60)}\n\n`;
+          result += `${"=".repeat(60)}\n\n`;
         }
 
         // Convert to CSV format (easier to read than JSON)
@@ -594,14 +648,18 @@ export class ClientFileProcessor {
         result += csv;
 
         if (index < workbook.SheetNames.length - 1) {
-          result += '\n';
+          result += "\n";
         }
       });
 
       return result;
     } catch (error) {
-      console.error('Error parsing spreadsheet:', error);
-      throw new Error(`Failed to parse spreadsheet: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error("Error parsing spreadsheet:", error);
+      throw new Error(
+        `Failed to parse spreadsheet: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
     }
   }
 }

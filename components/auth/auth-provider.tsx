@@ -16,6 +16,9 @@ import { useRouter } from "next/navigation";
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Debug flag - only log in development
+const DEBUG = process.env.NODE_ENV === 'development';
+
 // Cache configuration
 const USER_CACHE_KEY = "lia-user-cache";
 const USER_CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
@@ -94,29 +97,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchUserProfile = useCallback(
     async (email: string) => {
-      console.log("[AUTH-PROVIDER] 🔄 Fetching user profile for:", email);
+      if (DEBUG) console.log("[AUTH-PROVIDER] 🔄 Fetching user profile for:", email);
       setIsFetchingUser(true);
 
-      // Create AbortController only if it doesn't exist
-      // Don't abort existing requests - let them complete
-      if (!abortControllerRef.get()) {
-        const controller = new AbortController();
-        abortControllerRef.set(controller);
-      }
+      // Create AbortController for this request
+      const controller = new AbortController();
+      abortControllerRef.set(controller);
 
       try {
-        const response = await fetch("/api/auth/user", {
+        // Wrap fetch in a race with a timeout to prevent infinite hangs
+        const fetchPromise = fetch("/api/auth/user", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ email }),
-          signal: abortControllerRef.get()?.signal,
+          signal: controller.signal,
         });
+
+        // Create a timeout promise that rejects after 15 seconds
+        const timeoutPromise = new Promise<Response>((_, reject) => {
+          setTimeout(() => {
+            controller.abort();
+            reject(new Error("Request timeout - server took too long to respond"));
+          }, 15000);
+        });
+
+        // Race between fetch and timeout
+        const response = await Promise.race([fetchPromise, timeoutPromise]);
 
         if (response.ok) {
           const userData = await response.json();
-          console.log("[AUTH-PROVIDER] ✅ User profile fetched:", {
+          if (DEBUG) console.log("[AUTH-PROVIDER] ✅ User profile fetched:", {
             email: userData.email,
             hasCompletedOnboarding: userData.hasCompletedOnboarding,
           });
@@ -125,7 +137,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // Save to cache
           const { data: { session } } = await supabase.auth.getSession();
           if (session?.user) {
-            console.log("[AUTH-PROVIDER] 💾 Saving user to cache");
+            if (DEBUG) console.log("[AUTH-PROVIDER] 💾 Saving user to cache");
             saveUserToCache({
               user: userData,
               timestamp: Date.now(),
@@ -139,19 +151,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // If user not found in DB, sign them out from Supabase too
           if (response.status === 404) {
             console.warn("[AUTH-PROVIDER] ⚠️ User not found in DB (404) - signing out");
-            await supabase.auth.signOut();
+            await supabase.auth.signOut().catch(() => {
+              // Ignore signOut errors in cleanup
+            });
           }
         }
       } catch (error: any) {
-        // Ignore abort errors
-        if (error.name !== "AbortError") {
+        // Handle all errors: network failures, timeouts, aborts, JSON parsing, etc.
+        if (error.name === "AbortError") {
+          console.warn("[AUTH-PROVIDER] ⚠️ User profile fetch was aborted");
+        } else if (error.message?.includes("timeout")) {
+          console.error("[AUTH-PROVIDER] ❌ User profile fetch timed out - server may be down");
+        } else {
           console.error("[AUTH-PROVIDER] ❌ Error fetching user profile:", error);
-          setUser(null);
         }
+        setUser(null);
+        clearUserCache();
       } finally {
+        // Always reset loading states, no matter what happens
         setIsFetchingUser(false);
         setIsLoading(false);
-        console.log("[AUTH-PROVIDER] ✅ Fetch user profile complete");
+        if (DEBUG) console.log("[AUTH-PROVIDER] ✅ Fetch user profile complete");
       }
     },
     [supabase]
@@ -160,16 +180,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Get initial session
     const getInitialSession = async () => {
-      console.log("[AUTH-PROVIDER] 🚀 Getting initial session...");
+      if (DEBUG) console.log("[AUTH-PROVIDER] 🚀 Getting initial session...");
       try {
         // Try cache first for instant load
         const cachedUser = loadUserFromCache();
         if (cachedUser) {
-          console.log("[AUTH-PROVIDER] 📦 Cached user found:", cachedUser.user.email);
+          if (DEBUG) console.log("[AUTH-PROVIDER] 📦 Cached user found:", cachedUser.user.email);
           setUser(cachedUser.user);
           setIsLoading(false); // Immediate render with cached data
         } else {
-          console.log("[AUTH-PROVIDER] 📦 No cached user found");
+          if (DEBUG) console.log("[AUTH-PROVIDER] 📦 No cached user found");
         }
 
         // Then validate session
@@ -184,20 +204,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(null);
           clearUserCache();
         } else if (session?.user) {
-          console.log("[AUTH-PROVIDER] ✅ Supabase session found for:", session.user.email);
+          if (DEBUG) console.log("[AUTH-PROVIDER] ✅ Supabase session found for:", session.user.email);
           setSession(session);
 
           // Check if cached user matches session
           if (!cachedUser || cachedUser.sessionId !== session.user.id) {
-            console.log("[AUTH-PROVIDER] 🔄 Cache miss or different session - fetching fresh data");
+            if (DEBUG) console.log("[AUTH-PROVIDER] 🔄 Cache miss or different session - fetching fresh data");
             // Fetch fresh user data if cache miss or different session
-            await fetchUserProfile(session.user.email!);
+            // Wrap in try/catch to ensure errors don't break the flow
+            try {
+              await fetchUserProfile(session.user.email!);
+            } catch (profileError) {
+              console.error("[AUTH-PROVIDER] ❌ Failed to fetch user profile in getInitialSession:", profileError);
+              // Don't throw - allow the finally block to run
+              setUser(null);
+              clearUserCache();
+            }
           } else {
-            console.log("[AUTH-PROVIDER] ✅ Using cached user data");
+            if (DEBUG) console.log("[AUTH-PROVIDER] ✅ Using cached user data");
           }
           // else: use cached data, already set above
         } else {
-          console.log("[AUTH-PROVIDER] ❌ No Supabase session found");
+          if (DEBUG) console.log("[AUTH-PROVIDER] ❌ No Supabase session found");
           // No session, clear cache
           clearUserCache();
           setUser(null);
@@ -208,8 +236,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(null);
         clearUserCache();
       } finally {
+        // CRITICAL: Always set loading to false to prevent infinite loading screen
         setIsLoading(false);
-        console.log("[AUTH-PROVIDER] ✅ Initial session check complete");
+        if (DEBUG) console.log("[AUTH-PROVIDER] ✅ Initial session check complete");
       }
     };
 
@@ -219,17 +248,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("[AUTH-PROVIDER] 🔔 Auth state changed:", event, session?.user?.email);
-      setSession(session);
+      if (DEBUG) console.log("[AUTH-PROVIDER] 🔔 Auth state changed:", event, session?.user?.email);
 
-      if (session?.user) {
-        console.log("[AUTH-PROVIDER] ✅ Session exists - fetching user profile");
-        await fetchUserProfile(session.user.email!);
-        setIsLoading(false);
-      } else {
-        console.log("[AUTH-PROVIDER] ❌ No session - clearing user data");
+      try {
+        setSession(session);
+
+        if (session?.user) {
+          if (DEBUG) console.log("[AUTH-PROVIDER] ✅ Session exists - fetching user profile");
+          try {
+            await fetchUserProfile(session.user.email!);
+          } catch (profileError) {
+            console.error("[AUTH-PROVIDER] ❌ Failed to fetch user profile in auth state change:", profileError);
+            setUser(null);
+            clearUserCache();
+          }
+        } else {
+          if (DEBUG) console.log("[AUTH-PROVIDER] ❌ No session - clearing user data");
+          setUser(null);
+          clearUserCache(); // Clear cache on logout
+        }
+      } catch (error) {
+        console.error("[AUTH-PROVIDER] ❌ Error in auth state change handler:", error);
         setUser(null);
-        clearUserCache(); // Clear cache on logout
+        clearUserCache();
+      } finally {
+        // Always reset loading state
         setIsLoading(false);
       }
     });

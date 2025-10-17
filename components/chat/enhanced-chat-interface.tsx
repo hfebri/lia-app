@@ -48,7 +48,6 @@ export function EnhancedChatInterface({
 }: EnhancedChatInterfaceProps) {
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
 
-  // Render count tracking
   const [inputValue, setInputValue] = useState("");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [attachedFiles, setAttachedFiles] = useState<FileItem[]>([]);
@@ -61,7 +60,6 @@ export function EnhancedChatInterface({
   const [isLoadingConversation, setIsLoadingConversation] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [tempTitle, setTempTitle] = useState("");
-  const [showFilePicker, setShowFilePicker] = useState(false);
   const [preventModelOverride, setPreventModelOverride] = useState(false);
 
   // Ref for auto-scrolling to bottom
@@ -72,18 +70,10 @@ export function EnhancedChatInterface({
   // Ref to track if we just created a conversation (to skip fetch)
   const justCreatedConversationRef = useRef<string | null>(null);
 
-  // Get conversation ID from URL
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  // Use real file upload hook
-  const {
-    files: userFiles,
-    isUploading,
-    uploadFiles,
-    refreshFiles,
-    error: fileError,
-  } = useFileUpload();
+  const { isUploading, refreshFiles, error: fileError } = useFileUpload();
 
   const { refreshConversations, createConversation } = useConversations();
 
@@ -117,7 +107,6 @@ export function EnhancedChatInterface({
     canSend,
     currentModel,
     isClaudeModel,
-    isGeminiModel,
     isOpenAIModel,
     setConversationModel,
   } = useAiChat({
@@ -163,8 +152,6 @@ export function EnhancedChatInterface({
       });
     },
   });
-
-  // We'll just save conversations to database, not display them
 
   // Load models and files on mount
   useEffect(() => {
@@ -284,7 +271,6 @@ export function EnhancedChatInterface({
         // But only if we're not in the middle of a manual model change
         if (!preventModelOverride) {
           setMessages(aiMessages);
-        } else {
         }
 
         // Clear system instruction for loaded conversation (fresh start per conversation)
@@ -373,7 +359,7 @@ export function EnhancedChatInterface({
         setIsEditingTitle(false);
         setTempTitle("");
       }
-    } catch (error) {
+    } catch {
       setIsEditingTitle(false);
       setTempTitle("");
     }
@@ -395,61 +381,6 @@ export function EnhancedChatInterface({
     } else if (e.key === "Escape") {
       cancelEditingTitle();
     }
-  };
-
-  // Save conversation to database when sending message
-  const saveToDatabase = async (content: string) => {
-    try {
-      if (currentConversationId) {
-        // If we have a current conversation ID, add message to that conversation
-
-        const response = await fetch(
-          `/api/conversations/${currentConversationId}/messages`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              content: content,
-              model: selectedModel, // Pass the selected model to ensure proper routing
-            }),
-          }
-        );
-
-        if (!response.ok) {
-          const errorText = await response.text();
-        }
-      } else {
-        // Create a new conversation
-
-        const response = await fetch("/api/conversations", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title: content.slice(0, 30) + (content.length > 30 ? "..." : ""),
-            initialMessage: content,
-            aiModel: selectedModel, // Pass the current selected model
-          }),
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          // Handle error silently
-        } else {
-          // Get the new conversation ID and set it
-          const result = await response.json();
-
-          if (result.success && result.data) {
-            setCurrentConversationId(result.data.id);
-            setConversationTitle(result.data.title);
-
-            // Update the URL with the new conversation ID without page reload
-            const url = new URL(window.location.href);
-            url.searchParams.set("conversation", result.data.id);
-            window.history.pushState({}, "", url);
-          }
-        }
-      }
-    } catch (error) {}
   };
 
   const handleSendMessage = async () => {
@@ -589,15 +520,6 @@ export function EnhancedChatInterface({
 
   const handleFileDetach = (fileId: string) => {
     setAttachedFiles((prev) => prev.filter((f) => f.id !== fileId));
-  };
-
-  const handleAttachExistingFile = (file: FileItem) => {
-    // Check if file is already attached
-    if (!attachedFiles.some((f) => f.id === file.id)) {
-      setSelectedFiles([]);
-      setAttachedFiles([file]);
-    }
-    setShowFilePicker(false);
   };
 
   if (error) {
@@ -1163,67 +1085,6 @@ export function EnhancedChatInterface({
                 >
                   <Paperclip className="h-4 w-4 text-muted-foreground" />
                 </Button>
-
-                {/* Attach existing files button */}
-                {/* <DropdownMenu
-                  open={showFilePicker}
-                  onOpenChange={setShowFilePicker}
-                >
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      disabled={isLoading || isStreaming}
-                      className="shrink-0 h-10 w-10 hover:bg-background/80 transition-colors"
-                      title="Attach existing files"
-                    >
-                      <Library className="h-4 w-4 text-muted-foreground" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent className="w-80 p-4" align="start">
-                    <div className="space-y-3">
-                      <h4 className="font-medium text-sm">Attach Files</h4>
-                      {userFiles.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">
-                          No files uploaded yet. Use the paperclip button to
-                          upload files first.
-                        </p>
-                      ) : (
-                        <ScrollArea className="max-h-48">
-                          <div className="space-y-2">
-                            {userFiles
-                              .filter(
-                                (file) =>
-                                  !attachedFiles.some(
-                                    (attached) => attached.id === file.id
-                                  )
-                              )
-                              .map((file) => (
-                                <div
-                                  key={file.id}
-                                  className="flex items-center justify-between p-2 hover:bg-accent rounded-md cursor-pointer"
-                                  onClick={() => handleAttachExistingFile(file)}
-                                >
-                                  <div className="flex items-center space-x-2 min-w-0 flex-1">
-                                    <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
-                                    <div className="min-w-0">
-                                      <p className="text-sm font-medium truncate">
-                                        {file.originalName}
-                                      </p>
-                                      <p className="text-xs text-muted-foreground">
-                                        {Math.round(file.size / 1024)} KB
-                                      </p>
-                                    </div>
-                                  </div>
-                                  <Plus className="h-4 w-4 text-muted-foreground shrink-0" />
-                                </div>
-                              ))}
-                          </div>
-                        </ScrollArea>
-                      )}
-                    </div>
-                  </DropdownMenuContent>
-                </DropdownMenu> */}
 
                 <div className="flex-1 min-w-0">
                   <Textarea
