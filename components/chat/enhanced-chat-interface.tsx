@@ -25,12 +25,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-
-import {
   Brain,
   Send,
   Square,
@@ -42,17 +36,8 @@ import {
   X,
   Edit2,
   Check,
-  Plus,
-  Library,
-  Image,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import {
-  processFileForAI,
-  validateFileForAI,
-} from "@/lib/utils/file-processing";
-
-// FileItem interface is now imported from the hook
 
 interface EnhancedChatInterfaceProps {
   className?: string;
@@ -486,8 +471,38 @@ export function EnhancedChatInterface({
     }
 
     const messageContent = inputValue.trim();
-    let messageFiles = [...attachedFiles];
-    const filesToProcess = [...selectedFiles]; // Save selected files BEFORE clearing
+
+    // Process files: convert to base64 for images
+    const filesToProcess: File[] = [];
+
+    // Process selectedFiles (raw File objects from file input)
+    for (const file of selectedFiles) {
+      if (file.type.startsWith("image/")) {
+        // Convert image to base64
+        const reader = new FileReader();
+        const base64Promise = new Promise<string>((resolve) => {
+          reader.onload = () => {
+            const base64 = (reader.result as string).split(",")[1];
+            resolve(base64);
+          };
+          reader.readAsDataURL(file);
+        });
+
+        const base64Data = await base64Promise;
+        (file as any).data = base64Data;
+        filesToProcess.push(file);
+      } else {
+        filesToProcess.push(file);
+      }
+    }
+
+    // Process attachedFiles (FileItem objects from hook)
+    for (const f of attachedFiles) {
+      const file = new File([], f.originalName, { type: f.mimeType });
+      if (f.url) (file as any).url = f.url;
+      if (f.metadata?.data) (file as any).data = f.metadata.data;
+      filesToProcess.push(file);
+    }
 
     console.log("[CHAT] Preparing to send message", {
       model: selectedModel,
@@ -495,6 +510,8 @@ export function EnhancedChatInterface({
         name: file.name,
         type: file.type,
         size: file.size,
+        hasData: !!(file as any).data,
+        hasUrl: !!(file as any).url,
       })),
     });
 
@@ -508,396 +525,9 @@ export function EnhancedChatInterface({
       textareaRef.current.style.height = "auto";
     }
 
-    // Handle file processing based on model type
-    const isGeminiModel = selectedModel.startsWith("gemini");
-    const isClaudeModelForUpload = selectedModel.includes("claude");
-
-    if (filesToProcess.length > 0) {
-      if (isGeminiModel) {
-        try {
-          const processedFiles = [];
-
-          for (const file of filesToProcess) {
-            const validation = validateFileForAI(file);
-            if (!validation.isValid) {
-              console.warn("[CHAT] Gemini validation failed", {
-                name: file.name,
-                type: file.type,
-                reason: validation.error,
-              });
-              continue;
-            }
-
-            const fileData = await processFileForAI(file);
-            console.log("[CHAT] Prepared file for Gemini", {
-              name: file.name,
-              type: file.type,
-              size: file.size,
-            });
-            processedFiles.push({
-              id: `temp-${Date.now()}-${Math.random()}`,
-              filename: file.name,
-              originalName: file.name,
-              mimeType: file.type,
-              size: file.size,
-              url: undefined,
-              uploadStatus: "completed" as const,
-              analysisStatus: "completed" as const,
-              uploadedAt: new Date(),
-              metadata: {
-                data: fileData.data,
-                type: file.type,
-                isBase64: true,
-              },
-            });
-          }
-
-          if (processedFiles.length > 0) {
-            messageFiles = [...messageFiles, ...processedFiles];
-          }
-        } catch (error) {
-          return;
-        }
-      } else if (isClaudeModelForUpload) {
-        let imageFiles = filesToProcess.filter((file) =>
-          file.type.startsWith("image/")
-        );
-        const nonImageFiles = filesToProcess.filter(
-          (file) => !file.type.startsWith("image/")
-        );
-
-        if (imageFiles.length > 1) {
-          console.warn(
-            "Claude currently supports a single image per request. Using the first image."
-          );
-          imageFiles = imageFiles.slice(0, 1);
-        }
-
-        if (imageFiles.length === 1) {
-          const file = imageFiles[0];
-          const validation = validateFileForAI(file);
-          if (!validation.isValid) {
-            console.warn("[CHAT] Claude image validation failed", {
-              name: file.name,
-              type: file.type,
-              reason: validation.error,
-            });
-            return;
-          }
-
-          try {
-            const formData = new FormData();
-            formData.append("file", file);
-
-            console.log("[CHAT] Uploading Claude image via /api/upload-image", {
-              name: file.name,
-              size: file.size,
-            });
-
-            const uploadResponse = await fetch("/api/upload-image", {
-              method: "POST",
-              body: formData,
-            });
-
-            const uploadResult = await uploadResponse.json();
-
-            if (uploadResult.success && uploadResult.url) {
-              console.log("[CHAT] Claude image upload successful", {
-                name: file.name,
-                url: uploadResult.url,
-              });
-              messageFiles = [
-                ...messageFiles,
-                {
-                  id: `temp-${Date.now()}-${Math.random()}`,
-                  filename: file.name,
-                  originalName: file.name,
-                  mimeType: file.type,
-                  size: file.size,
-                  url: uploadResult.url,
-                  uploadStatus: "completed" as const,
-                  analysisStatus: "completed" as const,
-                  uploadedAt: new Date(),
-                  metadata: {
-                    type: file.type,
-                    isUrl: true,
-                  },
-                },
-              ];
-            } else {
-              console.error(
-                "Image upload failed for Claude:",
-                uploadResult.error || "Unknown error"
-              );
-              return;
-            }
-          } catch (error) {
-            console.error("Image upload threw for Claude:", error);
-            return;
-          }
-        }
-
-        if (nonImageFiles.length > 0) {
-          try {
-            const processedFiles = [];
-
-            for (const file of nonImageFiles) {
-              const validation = validateFileForAI(file);
-              if (!validation.isValid) {
-                console.warn("[CHAT] Non-image validation failed (Claude)", {
-                  name: file.name,
-                  type: file.type,
-                  reason: validation.error,
-                });
-                continue;
-              }
-
-              const fileData = await processFileForAI(file);
-              console.log("[CHAT] Prepared non-image file for Claude", {
-                name: file.name,
-                type: file.type,
-                size: file.size,
-              });
-              processedFiles.push({
-                id: `temp-${Date.now()}-${Math.random()}`,
-                filename: file.name,
-                originalName: file.name,
-                mimeType: file.type,
-                size: file.size,
-                url: undefined,
-                uploadStatus: "completed" as const,
-                analysisStatus: "completed" as const,
-                uploadedAt: new Date(),
-                metadata: {
-                  data: fileData.data,
-                  type: file.type,
-                  isBase64: true,
-                },
-              });
-            }
-
-            if (processedFiles.length > 0) {
-              messageFiles = [...messageFiles, ...processedFiles];
-            }
-          } catch (error) {
-            console.error(
-              "Failed to process non-image files for Claude:",
-              error
-            );
-            return;
-          }
-        }
-      } else {
-        const imageFiles = filesToProcess.filter((file) =>
-          file.type.startsWith("image/")
-        );
-        const nonImageFiles = filesToProcess.filter(
-          (file) => !file.type.startsWith("image/")
-        );
-
-        if (!isClaudeModelForUpload && imageFiles.length > 1) {
-          console.warn(
-            "OpenAI models currently support a single image attachment per message. Using the first image only."
-          );
-          imageFiles.splice(1);
-        }
-
-        if (imageFiles.length > 0) {
-          const uploadedImages = await Promise.all(
-            imageFiles.map(async (file) => {
-              const validation = validateFileForAI(file);
-              if (!validation.isValid) {
-                console.warn("[CHAT] Image validation failed", {
-                  name: file.name,
-                  type: file.type,
-                  reason: validation.error,
-                });
-                return null;
-              }
-
-              try {
-                const formData = new FormData();
-                formData.append("file", file);
-
-                const uploadResponse = await fetch("/api/upload-image", {
-                  method: "POST",
-                  body: formData,
-                });
-
-                const uploadResult = await uploadResponse.json();
-
-                if (uploadResult.success && uploadResult.url) {
-                  console.log("[CHAT] OpenAI image upload successful", {
-                    name: file.name,
-                    url: uploadResult.url,
-                  });
-
-                  return {
-                    id: `temp-${Date.now()}-${Math.random()}`,
-                    filename: file.name,
-                    originalName: file.name,
-                    mimeType: file.type,
-                    size: file.size,
-                    url: uploadResult.url,
-                    uploadStatus: "completed" as const,
-                    analysisStatus: "completed" as const,
-                    uploadedAt: new Date(),
-                    metadata: {
-                      type: file.type,
-                      isUrl: true,
-                    },
-                  } as FileItem;
-                }
-
-                console.error(
-                  "Image upload failed:",
-                  uploadResult.error || "Unknown error"
-                );
-              } catch (uploadError) {
-                console.error("Image upload threw:", uploadError);
-              }
-
-              return null;
-            })
-          );
-
-          const successfulImages = uploadedImages.filter(
-            (file): file is NonNullable<(typeof uploadedImages)[number]> =>
-              Boolean(file)
-          );
-
-          if (successfulImages.length > 0) {
-            messageFiles = [...messageFiles, ...successfulImages];
-          }
-        }
-
-        try {
-          const processedFiles = [];
-
-          for (const file of nonImageFiles) {
-            const validation = validateFileForAI(file);
-            if (!validation.isValid) {
-              console.warn("[CHAT] Non-image validation failed", {
-                name: file.name,
-                type: file.type,
-                reason: validation.error,
-              });
-              continue;
-            }
-
-            const fileData = await processFileForAI(file);
-            console.log("[CHAT] Prepared non-image file for OpenAI", {
-              name: file.name,
-              type: file.type,
-              size: file.size,
-            });
-            processedFiles.push({
-              id: `temp-${Date.now()}-${Math.random()}`,
-              filename: file.name,
-              originalName: file.name,
-              mimeType: file.type,
-              size: file.size,
-              url: undefined,
-              uploadStatus: "completed" as const,
-              analysisStatus: "completed" as const,
-              uploadedAt: new Date(),
-              metadata: {
-                data: fileData.data,
-                type: file.type,
-                isBase64: true,
-              },
-            });
-          }
-
-          if (processedFiles.length > 0) {
-            messageFiles = [...messageFiles, ...processedFiles];
-          }
-        } catch (error) {
-          console.error("Failed to process non-image files:", error);
-          return;
-        }
-      }
-    }
-
-    // For messages with files, let Dolphin analysis handle the file content
-    // Don't add manual file context since Dolphin provides better analysis
-
-    // Send message to AI - pass files for all models
-    if (messageFiles.length > 0) {
-      // For all models, pass files with their data
-      const allFiles: File[] = [];
-
-      // Process message files
-      if (messageFiles.length > 0) {
-        for (const fileItem of messageFiles) {
-          if (fileItem.metadata?.isBase64 && fileItem.metadata?.data) {
-            // File has base64 data (processed directly for Gemini and non-Claude models)
-            // Convert base64 back to File object for sendMessage compatibility
-            const binaryString = atob(fileItem.metadata.data);
-            const bytes = new Uint8Array(binaryString.length);
-            for (let i = 0; i < binaryString.length; i++) {
-              bytes[i] = binaryString.charCodeAt(i);
-            }
-            const blob = new Blob([bytes], { type: fileItem.metadata.type });
-            const file = new File([blob], fileItem.originalName, {
-              type: fileItem.metadata.type,
-            });
-            // Attach the base64 data to the file for AI processing
-            (file as any).data = fileItem.metadata.data;
-            allFiles.push(file);
-          } else if (
-            fileItem.metadata?.isUrl &&
-            fileItem.url &&
-            isClaudeModelForUpload
-          ) {
-            // For Claude models: Use URL directly, don't fetch the file
-            const file = new File([], fileItem.originalName, {
-              type: fileItem.mimeType,
-            });
-            // Attach the URL to the file for Claude processing
-            (file as any).url = fileItem.url;
-            allFiles.push(file);
-          } else if (fileItem.url) {
-            // File has URL (from Supabase) - for OpenAI models, attach URL to file
-            // For image files, we can pass URL directly without fetching blob
-            if (fileItem.mimeType.startsWith("image/")) {
-              const file = new File([], fileItem.originalName, {
-                type: fileItem.mimeType,
-              });
-              // Attach the URL to the file for OpenAI processing
-              (file as any).url = fileItem.url;
-              allFiles.push(file);
-            } else {
-              // For non-image files, fetch and convert to File
-              const response = await fetch(fileItem.url);
-              const blob = await response.blob();
-              const file = new File([blob], fileItem.originalName, {
-                type: fileItem.mimeType,
-              });
-              allFiles.push(file);
-            }
-          }
-        }
-      }
-
-      console.log(
-        "📤 Sending message with files:",
-        allFiles.length,
-        allFiles.map((f) => ({
-          name: f.name,
-          type: f.type,
-          hasUrl: !!(f as any).url,
-          hasData: !!(f as any).data,
-        }))
-      );
-      await sendMessage(messageContent, allFiles);
-    } else {
-      console.log("📤 Sending message without files");
-      await sendMessage(messageContent);
-    }
-
-    // Save to database after AI response is received
-    // Note: We'll implement this in the useAiChat hook to avoid duplicate AI calls
+    // Send message immediately - file processing will happen in useAiChat hook
+    // The placeholder message will appear in UI while files are being processed
+    await sendMessage(messageContent, filesToProcess);
 
     // Scroll to bottom after sending message
     setTimeout(scrollToBottom, 100);
@@ -942,25 +572,18 @@ export function EnhancedChatInterface({
     e.preventDefault();
     setIsDragOver(false);
 
-    const files = Array.from(e.dataTransfer.files).filter((file) => {
-      const allowedTypes = [
-        ".pdf",
-        ".doc",
-        ".docx",
-        ".txt",
-        ".rtf",
-        ".xls",
-        ".xlsx",
-        ".csv",
-      ];
-      return allowedTypes.some((type) =>
-        file.name.toLowerCase().endsWith(type)
-      );
-    });
+    const files = Array.from(e.dataTransfer.files);
+    const isOpenAI = selectedModel.startsWith("openai/");
 
     if (files.length > 0) {
       setAttachedFiles([]);
-      setSelectedFiles([files[0]]);
+      if (isOpenAI) {
+        // OpenAI: accept all files
+        setSelectedFiles(files);
+      } else {
+        // Others: only accept first file
+        setSelectedFiles([files[0]]);
+      }
     }
   };
 
@@ -1017,7 +640,7 @@ export function EnhancedChatInterface({
           <div className="text-center">
             <Upload className="h-12 w-12 text-blue-500 mx-auto mb-4" />
             <p className="text-lg font-medium text-blue-700 dark:text-blue-300">
-              Drop a file here to upload
+              Drop {selectedModel.startsWith("openai/") ? "files" : "a file"} here to upload
             </p>
             <p className="text-sm text-blue-600 dark:text-blue-400">
               Supports PDF, Word, Excel, and image files
@@ -1323,7 +946,7 @@ export function EnhancedChatInterface({
                       Start a conversation
                     </h3>
                     <p className="text-muted-foreground mb-4">
-                      Ask questions, upload files for analysis using the
+                      Ask questions, upload {selectedModel.startsWith("openai/") ? "files" : "a file"} for analysis using the
                       paperclip button, or start typing below
                     </p>
                   </div>
@@ -1489,7 +1112,7 @@ export function EnhancedChatInterface({
                   })}
                   <div className="text-xs text-muted-foreground flex items-center gap-1">
                     <Upload className="h-3 w-3" />
-                    Will upload when message is sent
+                    Will process when message is sent
                   </div>
                 </div>
               )}
@@ -1505,9 +1128,17 @@ export function EnhancedChatInterface({
                         const target = e.target as HTMLInputElement;
                         if (target.files) {
                           const newFiles = Array.from(target.files);
+                          const isOpenAI = selectedModel.startsWith("openai/");
+
                           if (newFiles.length > 0) {
                             setAttachedFiles([]);
-                            setSelectedFiles([newFiles[0]]);
+                            if (isOpenAI) {
+                              // OpenAI: append all files
+                              setSelectedFiles((prev) => [...prev, ...newFiles]);
+                            } else {
+                              // Others: only accept first file
+                              setSelectedFiles([newFiles[0]]);
+                            }
                           }
                           target.value = ""; // Reset input
                         }
@@ -1515,6 +1146,7 @@ export function EnhancedChatInterface({
                     }
                   }}
                   accept=".pdf,.doc,.docx,.pptx,.ppt,.txt,.rtf,.csv,.md,.xls,.xlsx,.xlsm,.jpg,.jpeg,.png,.gif,.bmp,.webp,.svg"
+                  multiple={selectedModel.startsWith("openai/")}
                 />
                 <Button
                   variant="ghost"
