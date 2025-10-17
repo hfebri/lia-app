@@ -7,7 +7,7 @@ export async function POST() {
   const cookiesToSet: Array<{
     name: string;
     value: string;
-    options?: Parameters<typeof cookieStore.set>[1];
+    options?: Parameters<typeof cookieStore.set>[2];
   }> = [];
 
   const supabase = createServerClient(
