@@ -876,7 +876,8 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     currentModel: state.availableModels.find(
       (m) => m.id === state.selectedModel
     ),
-    isClaudeModel: state.selectedModel === "anthropic/claude-4-sonnet",
+    isClaudeModel:
+      state.availableModels.find(m => m.id === state.selectedModel)?.capabilities?.includes("extended-thinking") || false,
     isGeminiModel: state.selectedModel.includes("gemini"),
     isOpenAIModel: state.selectedModel.startsWith("openai/"),
   };

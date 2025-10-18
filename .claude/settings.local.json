@@ -1,7 +1,6 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm run:*)",
       "Bash(curl:*)",
       "Bash(mkdir:*)",
       "Bash(cp:*)",
@@ -19,7 +18,7 @@
       "mcp__chrome-devtools__click",
       "mcp__chrome-devtools__wait_for"
     ],
-    "deny": [],
+    "deny": ["Bash(npm run dev)"],
     "ask": []
   }
 }

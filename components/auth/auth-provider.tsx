@@ -97,7 +97,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchUserProfile = useCallback(
     async (email: string, activeSession?: Session | null) => {
-      console.log("[AUTH-PROVIDER] 🔄 Fetching user profile for:", email);
+      if (DEBUG) console.log("[AUTH-PROVIDER] 🔄 Fetching user profile for:", email);
       setIsFetchingUser(true);
 
       // Create AbortController for this request
@@ -120,7 +120,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (response.ok) {
           const userData = await response.json();
-          console.log("[AUTH-PROVIDER] ✅ User profile fetched:", {
+          if (DEBUG) console.log("[AUTH-PROVIDER] ✅ User profile fetched:", {
             email: userData.email,
             hasCompletedOnboarding: userData.hasCompletedOnboarding,
           });
@@ -136,7 +136,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             null;
 
           if (sessionToCache?.user) {
-            console.log("[AUTH-PROVIDER] 💾 Saving user to cache");
+            if (DEBUG) console.log("[AUTH-PROVIDER] 💾 Saving user to cache");
             saveUserToCache({
               user: userData,
               timestamp: Date.now(),
@@ -175,7 +175,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Always reset loading states, no matter what happens
         setIsFetchingUser(false);
         setIsLoading(false);
-        console.log("[AUTH-PROVIDER] ✅ Fetch user profile complete");
+        if (DEBUG) console.log("[AUTH-PROVIDER] ✅ Fetch user profile complete");
       }
     },
     [supabase]
@@ -184,7 +184,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Get initial session
     const getInitialSession = async () => {
-      console.log("[AUTH-PROVIDER] 🚀 Getting initial session...");
+      if (DEBUG) console.log("[AUTH-PROVIDER] 🚀 Getting initial session...");
       try {
         // Try cache first for instant load
         const cachedUser = loadUserFromCache();

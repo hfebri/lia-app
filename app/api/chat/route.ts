@@ -4,6 +4,10 @@ import { requireAuthenticatedUser } from "@/lib/auth/session";
 import type { AIMessage, AIProviderName } from "@/lib/ai/types";
 import { LIA_SYSTEM_INSTRUCTION } from "@/lib/constants/ai-models";
 
+// Configure runtime and timeout for this route
+export const runtime = 'nodejs'; // Use Node.js runtime (not Edge) for better timeout support
+export const maxDuration = 60; // Max execution time: Hobby=10s, Pro=60s, Enterprise=300s
+
 export async function POST(request: NextRequest) {
   try {
     // Require authentication for all chat requests and get user info

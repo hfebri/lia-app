@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 
-
 // Available AI models and their configurations
 const AVAILABLE_MODELS = [
   {
@@ -112,6 +111,52 @@ const AVAILABLE_MODELS = [
     pricing: {
       input: 0.003,
       output: 0.015,
+      unit: "1K tokens",
+    },
+  },
+  {
+    id: "anthropic/claude-4.5-sonnet",
+    name: "Claude 4.5 Sonnet",
+    provider: "replicate",
+    description:
+      "Latest Claude model with improved intelligence and performance. Does not support extended thinking mode",
+    maxTokens: 8192,
+    contextWindow: 200000,
+    isDefault: false,
+    capabilities: [
+      "text-generation",
+      "reasoning",
+      "code-generation",
+      "instruction-following",
+      "tool-execution",
+      "image-analysis",
+    ],
+    pricing: {
+      input: 0.003,
+      output: 0.015,
+      unit: "1K tokens",
+    },
+  },
+  {
+    id: "anthropic/claude-4.5-haiku",
+    name: "Claude 4.5 Haiku",
+    provider: "replicate",
+    description:
+      "Fastest Claude model optimized for speed and efficiency. Does not support extended thinking mode",
+    maxTokens: 8192,
+    contextWindow: 200000,
+    isDefault: false,
+    capabilities: [
+      "text-generation",
+      "reasoning",
+      "code-generation",
+      "instruction-following",
+      "image-analysis",
+      "fast-response",
+    ],
+    pricing: {
+      input: 0.001,
+      output: 0.005,
       unit: "1K tokens",
     },
   },

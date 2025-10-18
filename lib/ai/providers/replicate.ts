@@ -16,6 +16,8 @@ export class ReplicateProvider implements AIProvider {
     "openai/gpt-5-mini",
     "openai/gpt-5-nano",
     "anthropic/claude-4-sonnet",
+    "anthropic/claude-4.5-sonnet",
+    "anthropic/claude-4.5-haiku",
     "deepseek-ai/deepseek-r1",
   ];
   private client: Replicate;
@@ -43,23 +45,6 @@ export class ReplicateProvider implements AIProvider {
         reasoning_effort = "medium",
       } = options;
 
-      console.log('🔍 [REPLICATE] generateResponse called with:', {
-        messageCount: messages.length,
-        model,
-        messagesWithFiles: messages.filter(m => m.files && m.files.length > 0).length
-      });
-
-      messages.forEach((msg, idx) => {
-        if (msg.files && msg.files.length > 0) {
-          console.log(`📎 [REPLICATE] Message ${idx} has files:`, msg.files.map(f => ({
-            name: (f as any).name,
-            type: (f as any).type,
-            hasUrl: !!(f as any).url,
-            hasData: !!(f as any).data,
-            dataLength: (f as any).data?.length || 0
-          })));
-        }
-      });
 
       // Build input based on model type
       let input: any;
@@ -116,21 +101,11 @@ export class ReplicateProvider implements AIProvider {
           ? latestUserMessage.files
               .map((file) => {
                 const fileUrl = (file as any).url;
-                console.log('🖼️ Processing file for image_input (latest message only):', {
-                  name: (file as any).name,
-                  hasUrl: !!fileUrl,
-                  url: fileUrl?.substring(0, 100)
-                });
                 // Only return URL, ignore base64 data (Replicate requires URLs)
                 return fileUrl;
               })
               .filter(Boolean)
           : [];
-
-        console.log('📦 Final image_input array:', {
-          count: imageUrls.length,
-          urls: imageUrls.map(url => url.substring(0, 150))
-        });
 
         input = {
           model: modelVariant,
@@ -155,14 +130,6 @@ export class ReplicateProvider implements AIProvider {
           top_p,
         };
       }
-
-      console.log('🚀 [REPLICATE] About to call Replicate API with input:', {
-        model,
-        hasImageInput: !!input.image_input,
-        imageInputCount: input.image_input?.length || 0,
-        imageInputSample: input.image_input?.[0]?.substring(0, 100),
-        inputKeys: Object.keys(input)
-      });
 
       const output = await this.client.run(model as any, { input });
 
@@ -201,24 +168,6 @@ export class ReplicateProvider implements AIProvider {
         reasoning_effort = "medium",
       } = options;
 
-      console.log('🔍 [REPLICATE] generateStream called with:', {
-        messageCount: messages.length,
-        model,
-        messagesWithFiles: messages.filter(m => m.files && m.files.length > 0).length
-      });
-
-      messages.forEach((msg, idx) => {
-        if (msg.files && msg.files.length > 0) {
-          console.log(`📎 [REPLICATE] Message ${idx} has files:`, msg.files.map(f => ({
-            name: (f as any).name,
-            type: (f as any).type,
-            hasUrl: !!(f as any).url,
-            hasData: !!(f as any).data,
-            dataLength: (f as any).data?.length || 0
-          })));
-        }
-      });
-
       // Build input based on model type
       let input: any;
 
@@ -274,21 +223,11 @@ export class ReplicateProvider implements AIProvider {
           ? latestUserMessage.files
               .map((file) => {
                 const fileUrl = (file as any).url;
-                console.log('🖼️ Processing file for image_input (latest message only):', {
-                  name: (file as any).name,
-                  hasUrl: !!fileUrl,
-                  url: fileUrl?.substring(0, 100)
-                });
                 // Only return URL, ignore base64 data (Replicate requires URLs)
                 return fileUrl;
               })
               .filter(Boolean)
           : [];
-
-        console.log('📦 Final image_input array:', {
-          count: imageUrls.length,
-          urls: imageUrls.map(url => url.substring(0, 150))
-        });
 
         input = {
           model: modelVariant,
@@ -313,15 +252,6 @@ export class ReplicateProvider implements AIProvider {
           top_p,
         };
       }
-
-      console.log('🚀 [REPLICATE] About to call Replicate stream API with input:', {
-        model,
-        hasImageInput: !!input.image_input,
-        imageInputCount: input.image_input?.length || 0,
-        imageInputSample: input.image_input?.[0]?.substring(0, 150),
-        inputKeys: Object.keys(input),
-        fullInput: JSON.stringify(input, null, 2).substring(0, 500)
-      });
 
       // For streaming, we use the stream method
       const stream = await this.client.stream(model as any, { input });
