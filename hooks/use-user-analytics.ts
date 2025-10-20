@@ -49,6 +49,13 @@ interface UserAnalytics {
   popularTopics?: PopularTopic[];
 }
 
+interface UseUserAnalyticsParams {
+  period?: string;
+  userId?: string | null;
+  startDate?: Date | null;
+  endDate?: Date | null;
+}
+
 interface UseUserAnalyticsReturn {
   data: UserAnalytics | null;
   isLoading: boolean;
@@ -56,7 +63,8 @@ interface UseUserAnalyticsReturn {
   refetch: () => Promise<void>;
 }
 
-export function useUserAnalytics(period: string = "30"): UseUserAnalyticsReturn {
+export function useUserAnalytics(params: UseUserAnalyticsParams = {}): UseUserAnalyticsReturn {
+  const { period = "30", userId = null, startDate = null, endDate = null } = params;
   const [data, setData] = useState<UserAnalytics | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -66,7 +74,20 @@ export function useUserAnalytics(period: string = "30"): UseUserAnalyticsReturn 
       setIsLoading(true);
       setError(null);
 
-      const response = await fetch(`/api/user/analytics?period=${period}`);
+      // Build query parameters
+      const queryParams = new URLSearchParams();
+      queryParams.append("period", period);
+
+      if (userId) {
+        queryParams.append("userId", userId);
+      }
+
+      if (startDate && endDate) {
+        queryParams.append("startDate", startDate.toISOString().split("T")[0]);
+        queryParams.append("endDate", endDate.toISOString().split("T")[0]);
+      }
+
+      const response = await fetch(`/api/user/analytics?${queryParams.toString()}`);
       const result = await response.json();
 
       if (!response.ok) {
@@ -87,7 +108,8 @@ export function useUserAnalytics(period: string = "30"): UseUserAnalyticsReturn 
 
   useEffect(() => {
     fetchAnalytics();
-  }, [period]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [period, userId, startDate?.toISOString(), endDate?.toISOString()]);
 
   return {
     data,
