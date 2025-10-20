@@ -18,12 +18,6 @@ import { LoadingPage } from "@/components/shared/loading";
 import { motion, AnimatePresence } from "motion/react";
 import { AlertCircle, CheckCircle2, Database, Shield, Bug } from "lucide-react";
 
-const floatingTransition = {
-  duration: 12,
-  repeat: Number.POSITIVE_INFINITY,
-  ease: "easeInOut",
-};
-
 export default function OnboardingPage() {
   const { user, isLoading, isFetchingUser, refreshSession } = useAuth();
   const router = useRouter();
@@ -98,7 +92,9 @@ export default function OnboardingPage() {
       }
 
       console.log("[ONBOARDING] ✅ Profile updated successfully");
-      console.log("[ONBOARDING] 🔄 Refreshing session to get updated user data...");
+      console.log(
+        "[ONBOARDING] 🔄 Refreshing session to get updated user data..."
+      );
 
       // Refresh session to get updated user data
       await refreshSession();
@@ -114,12 +110,15 @@ export default function OnboardingPage() {
     }
   };
 
-  const logoSrc = "/logo-light.svg";
-
   // Show loading screen while authenticating
   // Only wait for isFetchingUser if we don't have user data yet
   // Also show loading if user has already completed onboarding (prevents flash)
-  if (!mounted || isLoading || (isFetchingUser && !user) || user?.hasCompletedOnboarding) {
+  if (
+    !mounted ||
+    isLoading ||
+    (isFetchingUser && !user) ||
+    user?.hasCompletedOnboarding
+  ) {
     return <LoadingPage message="Setting up your workspace..." />;
   }
 
@@ -129,22 +128,17 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-blue-50 via-white to-indigo-100 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950">
-      <motion.div
-        aria-hidden
-        className="pointer-events-none absolute -top-32 -left-32 h-80 w-80 rounded-full bg-indigo-400/40 blur-3xl dark:bg-indigo-600/30"
-        animate={{ x: [0, 40, 0], y: [0, 20, 0], rotate: [0, 15, -10, 0] }}
-        transition={floatingTransition}
+    <div className="relative min-h-screen overflow-hidden">
+      {/* Animated gradient background */}
+      <div
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: "url('/bg.gif')" }}
       />
+
+      {/* Dark overlay for better text readability */}
       <motion.div
         aria-hidden
-        className="pointer-events-none absolute -bottom-40 right-[-6rem] h-[26rem] w-[26rem] rounded-full bg-blue-300/40 blur-3xl dark:bg-blue-500/25"
-        animate={{ x: [0, -30, 0], y: [0, -40, 0], scale: [1, 1.1, 1] }}
-        transition={{ ...floatingTransition, duration: 14 }}
-      />
-      <motion.div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(79,70,229,0.08),_transparent_55%)]"
+        className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/40 via-black/30 to-black/40 dark:from-black/60 dark:via-black/50 dark:to-black/60"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 1.2, ease: "easeOut" }}
@@ -157,29 +151,19 @@ export default function OnboardingPage() {
           transition={{ duration: 0.7, ease: "easeOut" }}
           className="w-full max-w-2xl"
         >
-          <Card className="relative overflow-hidden rounded-3xl border border-white/40 bg-white/35 backdrop-blur-3xl shadow-[0_45px_100px_-50px_rgba(45,50,120,0.65)] transition duration-700 dark:border-white/10 dark:bg-white/10 dark:shadow-[0_45px_110px_-60px_rgba(15,23,42,0.85)]">
-            <div className="pointer-events-none absolute inset-px rounded-[30px] border border-white/30 bg-gradient-to-b from-white/55 via-white/10 to-white/5 dark:border-white/5 dark:from-white/10 dark:via-white/5 dark:to-transparent" />
-            <div className="pointer-events-none absolute -top-32 left-1/2 h-52 w-52 -translate-x-1/2 rounded-full bg-white/25 blur-3xl dark:bg-white/10" />
-
+          <Card className="relative overflow-hidden rounded-3xl border border-white/20 bg-white/15 backdrop-blur-[10px] backdrop-saturate-[180%] shadow-[0_4px_6px_rgba(0,0,0,0.1)] transition duration-700 hover:shadow-[0_8px_12px_rgba(0,0,0,0.15)]">
             <CardHeader className="relative space-y-7 pb-8 text-center">
-              <motion.div
-                className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-white/70 shadow-[0_22px_40px_-18px_rgba(56,128,255,0.45)] dark:bg-white/15"
-                animate={{ rotate: [0, 6, -6, 0], y: [0, -4, 0] }}
-                transition={{
-                  duration: 6,
-                  repeat: Number.POSITIVE_INFINITY,
-                  ease: "easeInOut",
-                }}
-              >
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-black">
                 <Image
                   alt="LIA logo"
-                  src={logoSrc}
+                  src="/loading-white.gif"
                   height={32}
-                  width={48}
+                  width={32}
                   className="h-8 w-auto"
                   priority
+                  unoptimized
                 />
-              </motion.div>
+              </div>
 
               <div className="space-y-3">
                 <motion.div
@@ -187,10 +171,8 @@ export default function OnboardingPage() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.2, duration: 0.6 }}
                 >
-                  <CardTitle className="text-3xl font-semibold">
-                    <span className="bg-gradient-to-r from-indigo-600 via-blue-600 to-purple-500 bg-clip-text text-transparent dark:from-indigo-200 dark:via-sky-200 dark:to-purple-200">
-                      Welcome, {user.name?.split(" ")[0] || "there"}!
-                    </span>
+                  <CardTitle className="text-3xl font-semibold text-white">
+                    Welcome, {user.name?.split(" ")[0] || "there"}!
                   </CardTitle>
                 </motion.div>
                 <motion.div
@@ -198,7 +180,7 @@ export default function OnboardingPage() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.35, duration: 0.6 }}
                 >
-                  <CardDescription className="text-base text-slate-600 dark:text-slate-300">
+                  <CardDescription className="text-base text-white/90">
                     Let&apos;s personalize your LIA experience
                   </CardDescription>
                 </motion.div>
@@ -220,7 +202,7 @@ export default function OnboardingPage() {
                       <div className="space-y-3">
                         <Label
                           htmlFor="professionalRole"
-                          className="text-slate-700 dark:text-slate-200"
+                          className="text-white"
                         >
                           What&apos;s your professional role?
                         </Label>
@@ -236,12 +218,12 @@ export default function OnboardingPage() {
                             onChange={(e) =>
                               setProfessionalRole(e.target.value)
                             }
-                            className="h-12 rounded-xl border-slate-200/50 bg-white/50 text-base backdrop-blur-sm placeholder:text-slate-400 focus-visible:ring-indigo-500 dark:border-white/10 dark:bg-white/5 dark:placeholder:text-slate-500"
+                            className="h-12 rounded-xl border-white/20 bg-white/10 text-white text-base backdrop-blur-sm placeholder:text-white/50 focus-visible:ring-white/30"
                             disabled={isSubmitting}
                             autoFocus
                           />
                         </motion.div>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                        <p className="text-xs text-white/70">
                           This helps LIA tailor responses to your specific needs
                           and expertise
                         </p>
@@ -294,19 +276,19 @@ export default function OnboardingPage() {
                   >
                     <div className="space-y-4">
                       <motion.div
-                        className="flex items-start gap-3 rounded-xl border border-blue-200/50 bg-blue-50/50 p-4 dark:border-blue-500/20 dark:bg-blue-500/10"
+                        className="flex items-start gap-3 rounded-xl border border-white/20 bg-white/10 p-4"
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.1 }}
                       >
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-500/20 dark:bg-blue-500/30">
-                          <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-300" />
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/20">
+                          <AlertCircle className="h-4 w-4 text-white" />
                         </div>
                         <div className="space-y-1">
-                          <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                          <p className="text-sm font-medium text-white">
                             Beta Version
                           </p>
-                          <p className="text-xs text-blue-700 dark:text-blue-200">
+                          <p className="text-xs text-white/80">
                             LIA is currently in beta. You may encounter bugs or
                             unexpected behavior. We&apos;re continuously
                             improving!
@@ -315,19 +297,19 @@ export default function OnboardingPage() {
                       </motion.div>
 
                       <motion.div
-                        className="flex items-start gap-3 rounded-xl border border-purple-200/50 bg-purple-50/50 p-4 dark:border-purple-500/20 dark:bg-purple-500/10"
+                        className="flex items-start gap-3 rounded-xl border border-white/20 bg-white/10 p-4"
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.2 }}
                       >
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-purple-500/20 dark:bg-purple-500/30">
-                          <Bug className="h-4 w-4 text-purple-600 dark:text-purple-300" />
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/20">
+                          <Bug className="h-4 w-4 text-white" />
                         </div>
                         <div className="space-y-1">
-                          <p className="text-sm font-medium text-purple-900 dark:text-purple-100">
+                          <p className="text-sm font-medium text-white">
                             Report Bugs
                           </p>
-                          <p className="text-xs text-purple-700 dark:text-purple-200">
+                          <p className="text-xs text-white/80">
                             Found an issue? Please let us know! Your feedback
                             helps us make LIA better for everyone.
                           </p>
@@ -335,19 +317,19 @@ export default function OnboardingPage() {
                       </motion.div>
 
                       <motion.div
-                        className="flex items-start gap-3 rounded-xl border border-amber-200/50 bg-amber-50/50 p-4 dark:border-amber-500/20 dark:bg-amber-500/10"
+                        className="flex items-start gap-3 rounded-xl border border-white/20 bg-white/10 p-4"
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.3 }}
                       >
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-500/20 dark:bg-amber-500/30">
-                          <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-300" />
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/20">
+                          <AlertCircle className="h-4 w-4 text-white" />
                         </div>
                         <div className="space-y-1">
-                          <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
+                          <p className="text-sm font-medium text-white">
                             AI Limitations
                           </p>
-                          <p className="text-xs text-amber-700 dark:text-amber-200">
+                          <p className="text-xs text-white/80">
                             While LIA is powerful, AI can make mistakes. Always
                             verify critical information and use your
                             professional judgment.
@@ -356,19 +338,19 @@ export default function OnboardingPage() {
                       </motion.div>
 
                       <motion.div
-                        className="flex items-start gap-3 rounded-xl border border-green-200/50 bg-green-50/50 p-4 dark:border-green-500/20 dark:bg-green-500/10"
+                        className="flex items-start gap-3 rounded-xl border border-white/20 bg-white/10 p-4"
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.4 }}
                       >
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-green-500/20 dark:bg-green-500/30">
-                          <Shield className="h-4 w-4 text-green-600 dark:text-green-300" />
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/20">
+                          <Shield className="h-4 w-4 text-white" />
                         </div>
                         <div className="space-y-1">
-                          <p className="text-sm font-medium text-green-900 dark:text-green-100">
+                          <p className="text-sm font-medium text-white">
                             Your Data is Safe
                           </p>
-                          <p className="text-xs text-green-700 dark:text-green-200">
+                          <p className="text-xs text-white/80">
                             All your conversations and files are securely stored
                             in our own database. We prioritize your privacy and
                             data security.
@@ -377,19 +359,19 @@ export default function OnboardingPage() {
                       </motion.div>
 
                       <motion.div
-                        className="flex items-start gap-3 rounded-xl border border-indigo-200/50 bg-indigo-50/50 p-4 dark:border-indigo-500/20 dark:bg-indigo-500/10"
+                        className="flex items-start gap-3 rounded-xl border border-white/20 bg-white/10 p-4"
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.5 }}
                       >
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-500/20 dark:bg-indigo-500/30">
-                          <Database className="h-4 w-4 text-indigo-600 dark:text-indigo-300" />
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/20">
+                          <Database className="h-4 w-4 text-white" />
                         </div>
                         <div className="space-y-1">
-                          <p className="text-sm font-medium text-indigo-900 dark:text-indigo-100">
+                          <p className="text-sm font-medium text-white">
                             Private by Design
                           </p>
-                          <p className="text-xs text-indigo-700 dark:text-indigo-200">
+                          <p className="text-xs text-white/80">
                             Your data stays with you. We don&apos;t share your
                             information with third parties or use it to train AI
                             models.
@@ -408,7 +390,7 @@ export default function OnboardingPage() {
                           type="button"
                           variant="outline"
                           onClick={() => setStep(1)}
-                          className="w-full rounded-xl border-slate-200/50 bg-white/50 backdrop-blur-sm hover:bg-white/70 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10"
+                          className="w-full rounded-xl border-white/20 bg-white/10 text-white backdrop-blur-sm hover:bg-white/20"
                           disabled={isSubmitting}
                         >
                           Back

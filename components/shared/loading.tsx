@@ -1,5 +1,9 @@
+"use client";
+
+import Image from "next/image";
+import { useTheme } from "next-themes";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Bot, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface LoadingSpinnerProps {
@@ -27,11 +31,20 @@ interface LoadingPageProps {
 }
 
 export function LoadingPage({ message = "Loading..." }: LoadingPageProps) {
+  const { resolvedTheme } = useTheme();
+
   return (
     <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
-      <div className="flex items-center space-x-2">
-        <Bot className="h-8 w-8 text-primary animate-pulse" />
-        <LoadingSpinner size="lg" />
+      <div className="flex items-center justify-center">
+        <Image
+          src={"/loading-white.gif"}
+          alt="Loading"
+          width={80}
+          height={80}
+          className="h-8 w-auto bg-black rounded"
+          priority
+          unoptimized
+        />
       </div>
       <p className="text-muted-foreground">{message}</p>
     </div>

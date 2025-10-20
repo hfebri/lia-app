@@ -1,9 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useTheme } from "next-themes";
 import { useAuth } from "@/components/auth/auth-provider";
 import { LoginButton } from "@/components/auth/login-button";
 import {
@@ -15,21 +14,9 @@ import {
 } from "@/components/ui/card";
 import { motion } from "motion/react";
 
-const floatingTransition = {
-  duration: 12,
-  repeat: Number.POSITIVE_INFINITY,
-  ease: "easeInOut",
-};
-
 export default function SignInPage() {
-  const { resolvedTheme } = useTheme();
   const { isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   // Redirect to home if already authenticated
   useEffect(() => {
@@ -46,25 +33,18 @@ export default function SignInPage() {
     }
   }, [isAuthenticated, isLoading, router]);
 
-  const logoSrc = "/logo-light.svg";
-
   return (
-    <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-blue-50 via-white to-indigo-100 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950">
-      <motion.div
-        aria-hidden
-        className="pointer-events-none absolute -top-32 -left-32 h-80 w-80 rounded-full bg-indigo-400/40 blur-3xl dark:bg-indigo-600/30"
-        animate={{ x: [0, 40, 0], y: [0, 20, 0], rotate: [0, 15, -10, 0] }}
-        transition={floatingTransition}
+    <div className="relative min-h-screen overflow-hidden">
+      {/* Animated gradient background */}
+      <div
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: "url('/bg.gif')" }}
       />
+
+      {/* Dark overlay for better text readability */}
       <motion.div
         aria-hidden
-        className="pointer-events-none absolute -bottom-40 right-[-6rem] h-[26rem] w-[26rem] rounded-full bg-blue-300/40 blur-3xl dark:bg-blue-500/25"
-        animate={{ x: [0, -30, 0], y: [0, -40, 0], scale: [1, 1.1, 1] }}
-        transition={{ ...floatingTransition, duration: 14 }}
-      />
-      <motion.div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(79,70,229,0.08),_transparent_55%)]"
+        className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/40 via-black/30 to-black/40 dark:from-black/60 dark:via-black/50 dark:to-black/60"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 1.2, ease: "easeOut" }}
@@ -77,36 +57,25 @@ export default function SignInPage() {
           transition={{ duration: 0.7, ease: "easeOut" }}
           className="w-full max-w-md"
         >
-          <Card className="relative overflow-hidden rounded-3xl border border-white/40 bg-white/35 backdrop-blur-3xl shadow-[0_45px_100px_-50px_rgba(45,50,120,0.65)] transition duration-700 hover:shadow-[0_55px_120px_-55px_rgba(45,50,120,0.75)] dark:border-white/10 dark:bg-white/10 dark:shadow-[0_45px_110px_-60px_rgba(15,23,42,0.85)]">
-            <div className="pointer-events-none absolute inset-px rounded-[30px] border border-white/30 bg-gradient-to-b from-white/55 via-white/10 to-white/5 dark:border-white/5 dark:from-white/10 dark:via-white/5 dark:to-transparent" />
-            <div className="pointer-events-none absolute -top-32 left-1/2 h-52 w-52 -translate-x-1/2 rounded-full bg-white/25 blur-3xl dark:bg-white/10" />
-
+          <Card className="relative overflow-hidden rounded-3xl border border-white/20 bg-white/15 backdrop-blur-[10px] backdrop-saturate-[180%] shadow-[0_4px_6px_rgba(0,0,0,0.1)] transition duration-700 hover:shadow-[0_8px_12px_rgba(0,0,0,0.15)]">
             <CardHeader className="relative space-y-7 pb-8 text-center">
-              <motion.div
-                className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-white/70 shadow-[0_22px_40px_-18px_rgba(56,128,255,0.45)] dark:bg-white/15"
-                animate={{ rotate: [0, 6, -6, 0], y: [0, -4, 0] }}
-                transition={{
-                  duration: 6,
-                  repeat: Number.POSITIVE_INFINITY,
-                  ease: "easeInOut",
-                }}
-              >
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-black">
                 <Image
                   alt="LIA logo"
-                  src={logoSrc}
+                  src="/loading-white.gif"
                   height={32}
-                  width={48}
+                  width={32}
+                  className="h-8 w-auto"
                   priority
+                  unoptimized
                 />
-              </motion.div>
+              </div>
 
               <div className="space-y-3">
-                <CardTitle className="text-3xl font-semibold">
-                  <span className="bg-gradient-to-r from-indigo-600 via-blue-600 to-purple-500 bg-clip-text text-transparent dark:from-indigo-200 dark:via-sky-200 dark:to-purple-200">
-                    LIA is ready when you are
-                  </span>
+                <CardTitle className="text-3xl font-semibold text-white">
+                  LIA is ready when you are
                 </CardTitle>
-                <CardDescription className="text-base text-slate-600 dark:text-slate-300">
+                <CardDescription className="text-base text-white/90">
                   Bring calm to busy deal days, spark sharper conversations, and
                   move forward with confidence.
                 </CardDescription>
@@ -114,37 +83,37 @@ export default function SignInPage() {
             </CardHeader>
 
             <CardContent className="relative space-y-8">
-              <div className="grid gap-3 rounded-2xl border border-slate-200/50 bg-white/30 p-4 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.5)] dark:border-white/10 dark:bg-white/5">
+              <div className="grid gap-3 rounded-2xl border border-white/20 bg-white/10 p-4 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
                 <motion.div
-                  className="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-200"
+                  className="flex items-center gap-3 text-sm text-white/90"
                   initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.2, duration: 0.5, ease: "easeOut" }}
                 >
-                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-indigo-500/10 font-semibold text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-200">
+                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-white/20 font-semibold text-white">
                     1
                   </span>
                   Turn long decks and document stacks into quick, human chats.
                 </motion.div>
                 <motion.div
-                  className="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-200"
+                  className="flex items-center gap-3 text-sm text-white/90"
                   initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.35, duration: 0.5, ease: "easeOut" }}
                 >
-                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-sky-500/10 font-semibold text-sky-600 dark:bg-sky-500/20 dark:text-sky-200">
+                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-white/20 font-semibold text-white">
                     2
                   </span>
                   Keep every insight private with controls that stay on your
                   side.
                 </motion.div>
                 <motion.div
-                  className="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-200"
+                  className="flex items-center gap-3 text-sm text-white/90"
                   initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.5, duration: 0.5, ease: "easeOut" }}
                 >
-                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-purple-500/10 font-semibold text-purple-600 dark:bg-purple-500/20 dark:text-purple-200">
+                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-white/20 font-semibold text-white">
                     3
                   </span>
                   Stay in sync with a workspace shaped for Leverate teams.
@@ -183,7 +152,7 @@ export default function SignInPage() {
               </motion.div>
 
               <div className="space-y-2 text-center">
-                <p className="text-xs text-slate-500 dark:text-slate-400">
+                <p className="text-xs text-white/70">
                   We treat your work like our own. Signing in means you're good
                   with our Terms of Service and Privacy Policy.
                 </p>

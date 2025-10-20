@@ -208,7 +208,9 @@ function SidebarComponent({ className }: SidebarProps) {
               className="h-8 w-auto rounded"
             />
             <h1 className="text-xl font-bold">LIA</h1>
-            <Badge variant="secondary" className="text-xs">Beta</Badge>
+            <Badge variant="secondary" className="text-xs">
+              Beta
+            </Badge>
           </Link>
           <SimpleThemeToggle />
         </div>
@@ -216,7 +218,6 @@ function SidebarComponent({ className }: SidebarProps) {
 
       <div className="flex-1 overflow-y-auto overflow-x-hidden">
         <div className="space-y-4 py-4">
-
           {/* Navigation */}
           <div className="px-3 py-2">
             <h2 className="mb-2 px-4 text-lg font-semibold tracking-tight">
