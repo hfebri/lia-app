@@ -121,7 +121,13 @@ function SidebarComponent({ className }: SidebarProps) {
   // Memoize navigation hooks to prevent unnecessary updates
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { theme } = useTheme();
+  const { resolvedTheme } = useTheme();
+  const [mounted, setMounted] = React.useState(false);
+
+  // Wait for client-side hydration to complete
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Destructure hooks with stable references
   const auth = useAuth();
@@ -200,13 +206,15 @@ function SidebarComponent({ className }: SidebarProps) {
             onClick={(event) => handleLinkNavigation(event, "/")}
             prefetch={false}
           >
-            <Image
-              src={theme === "dark" ? "/logo-dark.svg" : "/logo-light.svg"}
-              alt="LIA Logo"
-              width={32}
-              height={32}
-              className="h-8 w-auto rounded"
-            />
+            {mounted && (
+              <Image
+                src={resolvedTheme === "dark" ? "/logo-dark.svg" : "/logo-light.svg"}
+                alt="LIA Logo"
+                width={32}
+                height={32}
+                className="h-8 w-auto rounded"
+              />
+            )}
             <h1 className="text-xl font-bold">LIA</h1>
             <Badge variant="secondary" className="text-xs">
               Beta
