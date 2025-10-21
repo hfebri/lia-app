@@ -49,28 +49,17 @@ export function StreamingMessage({
 }: StreamingMessageProps) {
   const [displayedContent, setDisplayedContent] = useState("");
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [animationStartTime] = useState(Date.now());
-
-  // Maximum duration for typing animation (in milliseconds)
-  // After this time, just display all content to prevent lag
-  const MAX_TYPING_DURATION = 5000; // 5 seconds
 
   // Typing animation effect
   useEffect(() => {
+    // If not streaming, show all content immediately
     if (!isStreaming) {
-      setDisplayedContent(content);
-      return;
-    }
-
-    // Check if we've exceeded max typing duration
-    const elapsedTime = Date.now() - animationStartTime;
-    if (elapsedTime > MAX_TYPING_DURATION) {
-      // Just display everything immediately
       setDisplayedContent(content);
       setCurrentIndex(content.length);
       return;
     }
 
+    // While streaming, show typing animation
     if (currentIndex < content.length) {
       const timer = setTimeout(() => {
         setDisplayedContent(content.slice(0, currentIndex + 1));
@@ -79,9 +68,9 @@ export function StreamingMessage({
 
       return () => clearTimeout(timer);
     }
-  }, [content, currentIndex, isStreaming, animationStartTime]);
+  }, [content, currentIndex, isStreaming]);
 
-  // Reset when content changes significantly
+  // Reset when new stream starts (content becomes shorter)
   useEffect(() => {
     if (content.length < displayedContent.length) {
       setDisplayedContent(content);
