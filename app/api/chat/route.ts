@@ -6,7 +6,8 @@ import { LIA_SYSTEM_INSTRUCTION } from "@/lib/constants/ai-models";
 
 // Configure runtime and timeout for this route
 export const runtime = 'nodejs'; // Use Node.js runtime (not Edge) for better timeout support
-export const maxDuration = 60; // Max execution time: Hobby=10s, Pro=60s, Enterprise=300s
+export const maxDuration = 300; // Max execution time: Hobby=10s, Pro=60s, Enterprise=300s
+// NOTE: GPT-5 Pro can take 5+ minutes to respond due to extended reasoning
 
 export async function POST(request: NextRequest) {
   try {

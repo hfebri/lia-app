@@ -12,12 +12,11 @@ export class ReplicateProvider implements AIProvider {
   public readonly name = "replicate";
   public readonly models = [
     "openai/gpt-5",
-    "openai/gpt-5-pro",
     "openai/gpt-5-mini",
     "openai/gpt-5-nano",
-    "anthropic/claude-4-sonnet",
     "anthropic/claude-4.5-sonnet",
     "anthropic/claude-4.5-haiku",
+    "anthropic/claude-4-sonnet",
     "deepseek-ai/deepseek-r1",
   ];
   private client: Replicate;

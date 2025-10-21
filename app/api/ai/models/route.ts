@@ -2,29 +2,29 @@ import { NextResponse } from "next/server";
 
 // Available AI models and their configurations
 const AVAILABLE_MODELS = [
-  {
-    id: "openai/gpt-5-pro",
-    name: "GPT-5 Pro",
-    provider: "replicate",
-    description:
-      "Premium GPT-5 tier tuned for complex strategy, long-form synthesis, and high-stakes analysis with expanded reliability controls.",
-    maxTokens: 8192,
-    contextWindow: 32768,
-    isDefault: false,
-    capabilities: [
-      "advanced-reasoning",
-      "long-form",
-      "strategy",
-      "code-generation",
-      "analysis",
-      "tool-use",
-    ],
-    pricing: {
-      input: 0.02,
-      output: 0.06,
-      unit: "1K tokens",
-    },
-  },
+  // {
+  //   id: "openai/gpt-5-pro",
+  //   name: "GPT-5 Pro",
+  //   provider: "replicate",
+  //   description:
+  //     "Premium GPT-5 tier tuned for complex strategy, long-form synthesis, and high-stakes analysis with expanded reliability controls.",
+  //   maxTokens: 8192,
+  //   contextWindow: 32768,
+  //   isDefault: false,
+  //   capabilities: [
+  //     "advanced-reasoning",
+  //     "long-form",
+  //     "strategy",
+  //     "code-generation",
+  //     "analysis",
+  //     "tool-use",
+  //   ],
+  //   pricing: {
+  //     input: 0.02,
+  //     output: 0.06,
+  //     unit: "1K tokens",
+  //   },
+  // },
   {
     id: "openai/gpt-5",
     name: "GPT-5",
@@ -92,29 +92,6 @@ const AVAILABLE_MODELS = [
     },
   },
   {
-    id: "anthropic/claude-4-sonnet",
-    name: "Claude 4 Sonnet",
-    provider: "replicate",
-    description:
-      "Hybrid reasoning model with both near-instant responses and extended thinking capabilities. Superior coding and reasoning performance",
-    maxTokens: 4096,
-    contextWindow: 200000,
-    isDefault: false,
-    capabilities: [
-      "text-generation",
-      "reasoning",
-      "code-generation",
-      "extended-thinking",
-      "instruction-following",
-      "tool-execution",
-    ],
-    pricing: {
-      input: 0.003,
-      output: 0.015,
-      unit: "1K tokens",
-    },
-  },
-  {
     id: "anthropic/claude-4.5-sonnet",
     name: "Claude 4.5 Sonnet",
     provider: "replicate",
@@ -157,6 +134,29 @@ const AVAILABLE_MODELS = [
     pricing: {
       input: 0.001,
       output: 0.005,
+      unit: "1K tokens",
+    },
+  },
+  {
+    id: "anthropic/claude-4-sonnet",
+    name: "Claude 4 Sonnet",
+    provider: "replicate",
+    description:
+      "Hybrid reasoning model with both near-instant responses and extended thinking capabilities. Superior coding and reasoning performance",
+    maxTokens: 4096,
+    contextWindow: 200000,
+    isDefault: false,
+    capabilities: [
+      "text-generation",
+      "reasoning",
+      "code-generation",
+      "extended-thinking",
+      "instruction-following",
+      "tool-execution",
+    ],
+    pricing: {
+      input: 0.003,
+      output: 0.015,
       unit: "1K tokens",
     },
   },

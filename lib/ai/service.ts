@@ -25,7 +25,6 @@ export class AIService {
           apiKey: process.env.REPLICATE_API_TOKEN || "",
           models: [
             "openai/gpt-5",
-            "openai/gpt-5-pro",
             "openai/gpt-5-mini",
             "openai/gpt-5-nano",
           ],
@@ -51,7 +50,7 @@ export class AIService {
         const replicateProvider = ReplicateProvider.create();
         this.providers.set("replicate", replicateProvider);
 
-      } catch (error) {
+      } catch {
       }
     } else {
       // Initialize mock provider for testing when no API key is available
@@ -65,7 +64,7 @@ export class AIService {
         const geminiProvider = GeminiProvider.create();
         this.providers.set("gemini", geminiProvider);
 
-      } catch (error) {
+      } catch {
       }
     }
   }
