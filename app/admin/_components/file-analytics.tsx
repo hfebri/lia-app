@@ -2,7 +2,7 @@
 
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { FileText, Archive, File } from "lucide-react";
+import { FileText, Archive, File, Table, Image } from "lucide-react";
 
 interface FileAnalyticsProps {
   data?: {
@@ -11,6 +11,9 @@ interface FileAnalyticsProps {
       pdf: number;
       docx: number;
       txt: number;
+      csv?: number;
+      xlsx?: number;
+      images?: number;
       other: number;
     };
   };
@@ -64,9 +67,23 @@ export function FileAnalytics({ data }: FileAnalyticsProps) {
       color: "bg-blue-500",
     },
     {
+      type: "Spreadsheets",
+      count: types.xlsx || 0,
+      percentage: totalFiles > 0 ? Math.round(((types.xlsx || 0) / totalFiles) * 100) : 0,
+      icon: Table,
+      color: "bg-emerald-500",
+    },
+    {
+      type: "Images",
+      count: types.images || 0,
+      percentage: totalFiles > 0 ? Math.round(((types.images || 0) / totalFiles) * 100) : 0,
+      icon: Image,
+      color: "bg-purple-500",
+    },
+    {
       type: "Text Files",
-      count: types.txt,
-      percentage: totalFiles > 0 ? Math.round((types.txt / totalFiles) * 100) : 0,
+      count: types.txt + (types.csv || 0),
+      percentage: totalFiles > 0 ? Math.round(((types.txt + (types.csv || 0)) / totalFiles) * 100) : 0,
       icon: FileText,
       color: "bg-green-500",
     },
@@ -77,7 +94,7 @@ export function FileAnalytics({ data }: FileAnalyticsProps) {
       icon: Archive,
       color: "bg-gray-500",
     },
-  ];
+  ].filter(item => item.count > 0); // Only show types with files
 
   const processingStats = {
     successful: Math.max(totalFiles - 1, 0),

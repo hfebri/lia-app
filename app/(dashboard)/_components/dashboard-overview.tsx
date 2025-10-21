@@ -27,9 +27,27 @@ import { FileAnalytics } from "../../admin/_components/file-analytics";
 import { PopularTopics } from "../../admin/_components/popular-topics";
 import { useUserAnalytics } from "@/hooks/use-user-analytics";
 import { DashboardSkeleton } from "../../admin/_components/dashboard-skeleton";
+import { useDashboardFilters } from "@/hooks/use-dashboard-filters";
+import { DashboardFilters } from "@/components/dashboard/dashboard-filters";
+import { useAuth } from "@/components/auth/auth-provider";
 
 export function DashboardOverview() {
-  const { data: analytics, isLoading, error, refetch } = useUserAnalytics();
+  const { user } = useAuth();
+  const {
+    filters,
+    setDateRange,
+    setSelectedUserId,
+    resetFilters,
+    hasActiveFilters,
+  } = useDashboardFilters();
+
+  const { data: analytics, isLoading, error, refetch } = useUserAnalytics({
+    userId: filters.selectedUserId,
+    startDate: filters.dateRange?.from,
+    endDate: filters.dateRange?.to,
+  });
+
+  const isAdmin = user?.role === "admin";
 
   // removed unused handleRenameConversation
 
@@ -78,6 +96,17 @@ export function DashboardOverview() {
 
   return (
     <div className="space-y-6">
+      {/* Dashboard Filters */}
+      <DashboardFilters
+        dateRange={filters.dateRange}
+        selectedUserId={filters.selectedUserId}
+        onDateRangeChange={setDateRange}
+        onUserIdChange={setSelectedUserId}
+        onReset={resetFilters}
+        hasActiveFilters={hasActiveFilters}
+        isAdmin={isAdmin}
+      />
+
       {/* Stats Overview */}
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 auto-rows-fr">
         <Card className="hover:shadow-md transition-shadow border-l-4 border-l-blue-500 h-full min-w-0">
