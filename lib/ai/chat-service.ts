@@ -366,7 +366,7 @@ export class ChatService {
     // Generate a more robust unique ID
     this.messageCounter += 1;
     const timestamp = Date.now();
-    const random = Math.random().toString(36).substr(2, 9);
+    const random = Math.random().toString(36).slice(2, 11);
     const counter = this.messageCounter.toString(36);
 
     return {
