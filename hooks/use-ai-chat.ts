@@ -395,7 +395,10 @@ export function useAiChat(options: UseAiChatOptions = {}) {
               let extractedText = "";
               let base64Data = undefined;
 
+              const { ClientFileProcessor } = await import("@/lib/services/client-file-processor");
               const isImage = file.type.startsWith("image/");
+              const isText = ClientFileProcessor.isTextFile(file);
+              const isSpreadsheet = ClientFileProcessor.isSpreadsheetFile(file);
 
               if (isImage) {
                 // For images, convert to base64 to send directly to AI provider
@@ -408,8 +411,36 @@ export function useAiChat(options: UseAiChatOptions = {}) {
                   reader.readAsDataURL(file);
                 });
                 base64Data = await base64Promise;
+              } else if (isText) {
+                // For text files (CSV, TXT, MD), read directly on client
+                setState((prev) => ({
+                  ...prev,
+                  fileProcessingProgress: {
+                    ...prev.fileProcessingProgress,
+                    [file.name]: {
+                      stage: "processing",
+                      progress: 70,
+                      message: "Reading text content...",
+                    },
+                  },
+                }));
+                extractedText = await ClientFileProcessor.readTextFile(file);
+              } else if (isSpreadsheet) {
+                // For spreadsheets (XLSX, XLS), parse on client
+                setState((prev) => ({
+                  ...prev,
+                  fileProcessingProgress: {
+                    ...prev.fileProcessingProgress,
+                    [file.name]: {
+                      stage: "processing",
+                      progress: 70,
+                      message: "Parsing spreadsheet...",
+                    },
+                  },
+                }));
+                extractedText = await ClientFileProcessor.parseSpreadsheet(file);
               } else {
-                // For non-image files (PDF, DOC, DOCX, PPT, PPTX), use Marker OCR
+                // For documents (PDF, DOC, DOCX, PPT, PPTX), use Marker OCR
                 const ocrResponse = await fetch("/api/files/ocr", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
@@ -424,6 +455,10 @@ export function useAiChat(options: UseAiChatOptions = {}) {
                 if (ocrResponse.ok) {
                   const ocrData = await ocrResponse.json();
                   extractedText = ocrData.data.extractedText;
+                } else {
+                  const errorData = await ocrResponse.json();
+                  console.error(`OCR failed for ${file.name}:`, errorData);
+                  // Continue without extracted text - at least upload succeeded
                 }
               }
 
@@ -437,9 +472,9 @@ export function useAiChat(options: UseAiChatOptions = {}) {
                 promptContent: extractedText || file.name,
                 displayContent: file.name,
                 isImage: isImage,
-                isDocument: !isImage,
-                isText: false,
-                isSpreadsheet: false,
+                isDocument: !isImage && !isText && !isSpreadsheet,
+                isText: isText,
+                isSpreadsheet: isSpreadsheet,
                 error: null,
               });
 
