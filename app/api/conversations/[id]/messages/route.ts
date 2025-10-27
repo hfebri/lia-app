@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ConversationService } from "@/lib/services/conversation";
 import { requireAuthenticatedUser } from "@/lib/auth/session";
 import { getAIService, createMessage } from "@/lib/ai/service";
+import type { AIProviderName } from "@/lib/ai/types";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -140,11 +141,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
 
       // Determine provider based on model - NO FALLBACK LOGIC
-      let provider: "replicate" | "gemini" = "replicate";
-      const selectedModel = model || "openai/gpt-5";
+      let provider: AIProviderName = "openai";
+      const selectedModel = model || "gpt-5";
 
-      if (selectedModel.startsWith("gemini")) {
-        provider = "gemini";
+      if (selectedModel.startsWith("anthropic/") || selectedModel.startsWith("deepseek-ai/")) {
+        provider = "replicate";
+      } else if (selectedModel.startsWith("gpt-")) {
+        provider = "openai";
       }
 
       // Generate AI response

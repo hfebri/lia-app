@@ -85,10 +85,7 @@ export function FileProcessingMessage({
                     <Progress value={fileProgress.progress} className="h-1.5" />
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <Eye className="h-3 w-3" />
-                      <span>{fileProgress.stage}</span>
-                      <span className="ml-auto">
-                        {Math.round(fileProgress.timeElapsed / 1000)}s
-                      </span>
+                      <span>{fileProgress.message || fileProgress.stage}</span>
                     </div>
                   </div>
                 );

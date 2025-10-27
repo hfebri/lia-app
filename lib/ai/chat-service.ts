@@ -86,7 +86,7 @@ export class ChatService {
     options: ChatServiceOptions = {}
   ): Promise<AIResponse> {
     const {
-      model = "openai/gpt-5",
+      model = "gpt-5",
       temperature = 0.7,
       maxTokens = 8192,
       extended_thinking = false,
@@ -171,7 +171,7 @@ export class ChatService {
     options: ChatServiceOptions = {}
   ): AsyncGenerator<StreamingChatResponse> {
     const {
-      model = "openai/gpt-5",
+      model = "gpt-5",
       temperature = 0.7,
       maxTokens = 8192,
       extended_thinking = false,

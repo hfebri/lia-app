@@ -49,6 +49,8 @@ export interface FileMetadata {
   name: string;
   type: string;
   size: number;
+  url?: string;
+  data?: string;
   extractedText?: string;
   processedAt: string;
   isImage: boolean;
@@ -68,13 +70,14 @@ export class ClientFileProcessor {
   /**
    * Process files on the client side before sending to API
    *
-   * OCR is ONLY run for:
-   * - Document files (PDF, DOCX, PPTX, etc.)
-   * - When using Claude/GPT models (via Replicate)
-   *
    * OCR is SKIPPED for:
    * - Image files (all models support natively)
-   * - Document files when using Gemini (native support)
+   * - Document files when using OpenAI (native support)
+   * - Document files when using Claude (native PDF support via Anthropic API)
+   *
+   * OCR is ONLY run for:
+   * - Document files (PDF, DOCX, PPTX, etc.)
+   * - When using other models that don't have native document support
    */
   static async processFiles(
     files: File[],
@@ -133,12 +136,13 @@ export class ClientFileProcessor {
             timeElapsed: Date.now() - startTime,
           });
         } else if (isDocument) {
-          const isGeminiModel = selectedModel.toLowerCase().includes("gemini");
+          const isOpenAIModel = selectedModel.toLowerCase().startsWith("gpt-");
+          const isClaudeModel = selectedModel.includes("claude");
 
-          if (isGeminiModel) {
-            // Gemini supports documents natively - no OCR needed
+          if (isOpenAIModel || isClaudeModel) {
+            // OpenAI and Claude support documents natively - no OCR needed
             debugLog(
-              `📄 [CLIENT] Document file detected - Gemini native support (no OCR needed)`
+              `📄 [CLIENT] Document file detected - ${isClaudeModel ? "Claude" : "OpenAI"} native support (no OCR needed)`
             );
 
             const fileInfo = `📄 Document: ${file.name} (${Math.round(
@@ -158,7 +162,7 @@ export class ClientFileProcessor {
               timeElapsed: Date.now() - startTime,
             });
           } else {
-            // Claude/GPT models need OCR for documents
+            // Other models need OCR for documents
             debugLog(
               `📄 [CLIENT OCR] Document file detected - running OCR for ${selectedModel}`
             );
@@ -516,7 +520,9 @@ export class ClientFileProcessor {
       size: file.size,
       url: file.url, // Include URL for images uploaded to Supabase
       data: file.data, // Include base64 data if available
-      extractedText: file.extractedText,
+      // Map promptContent to extractedText for metadata storage
+      // This ensures isFileAlreadyProcessed can find the extracted text
+      extractedText: file.extractedText || file.promptContent,
       processedAt: new Date().toISOString(),
       isImage: file.isImage,
       isDocument: file.isDocument,

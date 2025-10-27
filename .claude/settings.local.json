@@ -16,9 +16,14 @@
       "mcp__chrome-devtools__list_console_messages",
       "mcp__chrome-devtools__navigate_page",
       "mcp__chrome-devtools__click",
-      "mcp__chrome-devtools__wait_for"
+      "mcp__chrome-devtools__wait_for",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__get-library-docs",
+      "Bash(git add:*)"
     ],
-    "deny": ["Bash(npm run dev)"],
+    "deny": [
+      "Bash(npm run dev)"
+    ],
     "ask": []
   }
 }

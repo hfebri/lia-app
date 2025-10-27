@@ -20,6 +20,7 @@ interface UseAiChatState {
   selectedModel: string;
   availableModels: any[];
   extendedThinking: boolean; // Claude-exclusive
+  webSearch: boolean; // Claude & OpenAI - web search capability
   thinkingMode: boolean; // Gemini-exclusive
   reasoningEffort: ReasoningEffort;
   currentConversationId: string | null; // Track current conversation
@@ -62,7 +63,7 @@ const saveChatToDatabase = async (
 
 export function useAiChat(options: UseAiChatOptions = {}) {
   const {
-    initialModel = "openai/gpt-5",
+    initialModel = "gpt-5",
     maxMessages = 100,
     autoScroll = true,
     onConversationCreated,
@@ -88,6 +89,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     selectedModel: getSavedModel(),
     availableModels: [],
     extendedThinking: false,
+    webSearch: false,
     thinkingMode: false,
     reasoningEffort: "medium",
     currentConversationId: null,
@@ -345,24 +347,114 @@ export function useAiChat(options: UseAiChatOptions = {}) {
 
 
         try {
-          // Dynamically import ClientFileProcessor to avoid SSR issues
-          const { ClientFileProcessor } = await import("@/lib/services/client-file-processor");
-
-          // Process only new files with progress tracking
+          // Process files: Upload to Supabase and get OCR results from backend
           if (filesToProcess.length > 0) {
-            processedFiles = await ClientFileProcessor.processFiles(
-              filesToProcess,
-              state.selectedModel, // Pass current model to determine if OCR is needed
-              (fileName, progress) => {
-                setState((prev) => ({
-                  ...prev,
-                  fileProcessingProgress: {
-                    ...prev.fileProcessingProgress,
-                    [fileName]: progress,
+            for (const file of filesToProcess) {
+              setState((prev) => ({
+                ...prev,
+                fileProcessingProgress: {
+                  ...prev.fileProcessingProgress,
+                  [file.name]: {
+                    stage: "uploading",
+                    progress: 10,
+                    message: "Uploading file...",
                   },
-                }));
+                },
+              }));
+
+              // Upload file to Supabase
+              const formData = new FormData();
+              formData.append("files", file); // API expects "files" field name
+
+              const uploadResponse = await fetch("/api/files/upload", {
+                method: "POST",
+                body: formData,
+              });
+
+              if (!uploadResponse.ok) {
+                const errorData = await uploadResponse.json();
+                throw new Error(`Failed to upload ${file.name}: ${errorData.error || 'Unknown error'}`);
               }
-            );
+
+              const uploadData = await uploadResponse.json();
+              const fileUrl = uploadData.data.file.url;
+
+              // Process with OCR if needed
+              setState((prev) => ({
+                ...prev,
+                fileProcessingProgress: {
+                  ...prev.fileProcessingProgress,
+                  [file.name]: {
+                    stage: "processing",
+                    progress: 60,
+                    message: "Extracting text...",
+                  },
+                },
+              }));
+
+              let extractedText = "";
+              let base64Data = undefined;
+
+              const isImage = file.type.startsWith("image/");
+
+              if (isImage) {
+                // For images, convert to base64 to send directly to AI provider
+                const reader = new FileReader();
+                const base64Promise = new Promise<string>((resolve) => {
+                  reader.onload = () => {
+                    const base64 = (reader.result as string).split(",")[1];
+                    resolve(base64);
+                  };
+                  reader.readAsDataURL(file);
+                });
+                base64Data = await base64Promise;
+              } else {
+                // For non-image files (PDF, DOC, DOCX, PPT, PPTX), use Marker OCR
+                const ocrResponse = await fetch("/api/files/ocr", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    fileUrl,
+                    fileName: file.name,
+                    mimeType: file.type,
+                    mode: "fast",
+                  }),
+                });
+
+                if (ocrResponse.ok) {
+                  const ocrData = await ocrResponse.json();
+                  extractedText = ocrData.data.extractedText;
+                }
+              }
+
+              processedFiles.push({
+                name: file.name,
+                type: file.type,
+                size: file.size,
+                url: fileUrl,
+                data: base64Data, // Only set for images
+                extractedText: extractedText || undefined, // Store extracted text from OCR
+                promptContent: extractedText || file.name,
+                displayContent: file.name,
+                isImage: isImage,
+                isDocument: !isImage,
+                isText: false,
+                isSpreadsheet: false,
+                error: null,
+              });
+
+              setState((prev) => ({
+                ...prev,
+                fileProcessingProgress: {
+                  ...prev.fileProcessingProgress,
+                  [file.name]: {
+                    stage: "complete",
+                    progress: 100,
+                    message: "Complete",
+                  },
+                },
+              }));
+            }
           }
 
           // Get conversation file context (from all previous messages)
@@ -380,23 +472,29 @@ export function useAiChat(options: UseAiChatOptions = {}) {
 
           // Then add newly processed files
           if (processedFiles.length > 0) {
-            enhancedContent = ClientFileProcessor.createEnhancedPrompt(
-              enhancedContent,
-              processedFiles
+            const filesWithContent = processedFiles.filter(
+              (file) => file.promptContent && file.promptContent !== file.name
             );
+
+            if (filesWithContent.length > 0) {
+              enhancedContent += "\n\n## Document Content\n\n";
+              enhancedContent += "I've processed the following files:\n\n";
+
+              filesWithContent.forEach((file, index) => {
+                enhancedContent += `### File ${index + 1}: ${file.name}\n\n${file.promptContent}\n\n`;
+              });
+            }
           }
 
           finalContent = enhancedContent;
 
-          // Create display content (for user message in chat) - only new files
-          const displayContent = processedFiles.length > 0
-            ? ClientFileProcessor.createDisplayContent(processedFiles)
-            : "";
-
-          if (displayContent) {
-            // Store the display content separately so we can show it in the user message
-            (processedFiles as any).displayForMessage = `${content}\n\n${displayContent}`;
+          // For display in chat bubble, only show filenames
+          let displayContent = content;
+          if (processedFiles.length > 0) {
+            displayContent = `${content}\n\n📎 Attached files:\n${processedFiles.map(f => `• ${f.name}`).join('\n')}`;
           }
+
+          (processedFiles as any).displayForMessage = displayContent;
 
         } catch (error) {
           console.error("File processing failed:", error);
@@ -422,9 +520,30 @@ export function useAiChat(options: UseAiChatOptions = {}) {
         };
       }
 
-      // For AI processing, we need to use the enhanced content with extracted text
+      // For AI processing, only send files that the provider can actually process natively
+      // - OpenAI: Only images
+      // - Anthropic (Claude): Images and PDFs
+      // - For all other files: The extracted text is already in finalContent
+      const isOpenAI = state.selectedModel.startsWith("gpt-");
+      const isAnthropic = state.selectedModel.startsWith("claude-");
+
       const fileDataForAI = processedFiles
         .filter(f => f.url || f.data)
+        .filter(file => {
+          const isImage = file.type.startsWith("image/");
+          const isPDF = file.type === "application/pdf";
+
+          if (isOpenAI) {
+            // OpenAI only supports images natively
+            return isImage;
+          } else if (isAnthropic) {
+            // Anthropic supports images and PDFs natively
+            return isImage || isPDF;
+          }
+
+          // For other providers, don't send file data (text is already in content)
+          return false;
+        })
         .map(file => ({
           url: file.url,
           data: file.data,
@@ -471,6 +590,8 @@ export function useAiChat(options: UseAiChatOptions = {}) {
             {
               model: state.selectedModel,
               extended_thinking: state.extendedThinking,
+              thinking_budget_tokens: state.extendedThinking ? 10000 : undefined,
+              enable_web_search: state.webSearch,
               thinking_mode: state.thinkingMode,
               reasoning_effort: state.reasoningEffort,
               systemInstruction: state.systemInstruction,
@@ -556,6 +677,8 @@ export function useAiChat(options: UseAiChatOptions = {}) {
           const response = await chatService.current.sendMessage(allMessages, {
             model: state.selectedModel,
             extended_thinking: state.extendedThinking,
+            thinking_budget_tokens: state.extendedThinking ? 10000 : undefined,
+            enable_web_search: state.webSearch,
             thinking_mode: state.thinkingMode,
             reasoning_effort: state.reasoningEffort,
           });
@@ -684,6 +807,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
           systemInstruction: "", // Clear system instruction on model change
           // Reset model-specific settings when switching models
           extendedThinking: false,
+          webSearch: false,
           thinkingMode: false,
           reasoningEffort: "medium",
         }));
@@ -695,6 +819,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
           currentConversationModel: prev.currentConversationModel || modelId, // Set if not set
           // Reset model-specific settings when switching models
           extendedThinking: false,
+          webSearch: false,
           thinkingMode: false,
           reasoningEffort: "medium",
         }));
@@ -708,6 +833,14 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     setState((prev) => ({
       ...prev,
       extendedThinking: enabled,
+    }));
+  }, []);
+
+  // Toggle web search (Claude & OpenAI)
+  const toggleWebSearch = useCallback((enabled: boolean) => {
+    setState((prev) => ({
+      ...prev,
+      webSearch: enabled,
     }));
   }, []);
 
@@ -793,9 +926,18 @@ export function useAiChat(options: UseAiChatOptions = {}) {
 
   // Start new conversation
   const startNewConversation = useCallback(() => {
+    if (abortController.current) {
+      abortController.current.abort();
+      abortController.current = null;
+    }
+
     setState((prev) => ({
       ...prev,
       messages: [],
+      isLoading: false,
+      isStreaming: false,
+      isProcessingFiles: false,
+      fileProcessingProgress: {},
       currentConversationId: null,
       currentConversationModel: null, // Reset conversation model
       error: null,
@@ -846,6 +988,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     selectedModel: state.selectedModel,
     availableModels: state.availableModels,
     extendedThinking: state.extendedThinking,
+    webSearch: state.webSearch,
     thinkingMode: state.thinkingMode,
     reasoningEffort: state.reasoningEffort,
     currentConversationId: state.currentConversationId,
@@ -865,6 +1008,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     startNewConversation,
     setConversationId,
     toggleExtendedThinking,
+    toggleWebSearch,
     toggleThinkingMode,
     setReasoningEffort,
     setSystemInstruction,
@@ -879,6 +1023,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     isClaudeModel:
       state.availableModels.find(m => m.id === state.selectedModel)?.capabilities?.includes("extended-thinking") || false,
     isGeminiModel: state.selectedModel.includes("gemini"),
-    isOpenAIModel: state.selectedModel.startsWith("openai/"),
+    isOpenAIModel: state.selectedModel.startsWith("gpt-") ||
+                    state.availableModels.find(m => m.id === state.selectedModel)?.provider === "openai",
   };
 }

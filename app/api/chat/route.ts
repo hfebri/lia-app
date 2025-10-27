@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     // Require authentication for all chat requests and get user info
     const authenticatedUser = await requireAuthenticatedUser();
     let messages,
-      model = "openai/gpt-5",
+      model = "gpt-5",
       stream = false,
       extended_thinking = false,
       thinking_budget_tokens = 1024,
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
       const formData = await request.formData();
 
       messages = JSON.parse((formData.get("messages") as string) || "[]");
-      model = (formData.get("model") as string) || "openai/gpt-5";
+      model = (formData.get("model") as string) || "gpt-5";
       stream = formData.get("stream") === "true";
       extended_thinking = formData.get("extended_thinking") === "true";
       thinking_budget_tokens =
@@ -110,12 +110,13 @@ export async function POST(request: NextRequest) {
     const aiService = new AIService();
 
     // Determine provider based on model
-    let provider: AIProviderName = "replicate";
-    if (model.startsWith("gemini")) {
-      provider = "gemini";
-    } else if (model.startsWith("anthropic/") || model.startsWith("openai/") || model.startsWith("deepseek-ai/")) {
-      // Anthropic, OpenAI, and DeepSeek models are served through Replicate
+    let provider: AIProviderName = "openai"; // Default to OpenAI
+    if (model.startsWith("anthropic/") || model.startsWith("deepseek-ai/")) {
+      // Anthropic and DeepSeek models are served through Replicate
       provider = "replicate";
+    } else if (model.startsWith("gpt-")) {
+      // GPT models use direct OpenAI provider
+      provider = "openai";
     }
 
     // Convert messages to AI format - preserve files in messages

@@ -3,11 +3,11 @@ import { NextResponse } from "next/server";
 // Available AI models and their configurations
 const AVAILABLE_MODELS = [
   {
-    id: "openai/gpt-5-pro",
+    id: "gpt-5-pro",
     name: "GPT-5 Pro",
-    provider: "replicate",
+    provider: "openai",
     description:
-      "Premium GPT-5 tier tuned for complex strategy, long-form synthesis, and high-stakes analysis with expanded reliability controls.",
+      "Premium GPT-5 tier tuned for complex strategy, long-form synthesis, and high-stakes analysis with web search capabilities.",
     maxTokens: 8192,
     contextWindow: 32768,
     isDefault: false,
@@ -18,6 +18,8 @@ const AVAILABLE_MODELS = [
       "code-generation",
       "analysis",
       "tool-use",
+      "web-search",
+      "native-vision",
     ],
     pricing: {
       input: 0.02,
@@ -26,11 +28,11 @@ const AVAILABLE_MODELS = [
     },
   },
   {
-    id: "openai/gpt-5",
+    id: "gpt-5",
     name: "GPT-5",
-    provider: "replicate",
+    provider: "openai",
     description:
-      "Most advanced language model with superior reasoning and creativity",
+      "Most advanced language model with superior reasoning, creativity, and web search capabilities",
     maxTokens: 4096,
     contextWindow: 32768,
     isDefault: true,
@@ -41,6 +43,8 @@ const AVAILABLE_MODELS = [
       "code-generation",
       "analysis",
       "tool-use",
+      "web-search",
+      "native-vision",
     ],
     pricing: {
       input: 0.01,
@@ -49,9 +53,9 @@ const AVAILABLE_MODELS = [
     },
   },
   {
-    id: "openai/gpt-5-mini",
+    id: "gpt-5-mini",
     name: "GPT-5 Mini",
-    provider: "replicate",
+    provider: "openai",
     description:
       "Faster version of GPT-5 with balanced speed and cost, ideal for chat and medium-difficulty reasoning",
     maxTokens: 4096,
@@ -63,6 +67,8 @@ const AVAILABLE_MODELS = [
       "code-generation",
       "chat",
       "instruction-following",
+      "web-search",
+      "native-vision",
     ],
     pricing: {
       input: 0.005,
@@ -71,9 +77,9 @@ const AVAILABLE_MODELS = [
     },
   },
   {
-    id: "openai/gpt-5-nano",
+    id: "gpt-5-nano",
     name: "GPT-5 Nano",
-    provider: "replicate",
+    provider: "openai",
     description:
       "Fastest, most cost-effective GPT-5 model, great for fast, simple tasks like classification",
     maxTokens: 2048,
@@ -84,6 +90,8 @@ const AVAILABLE_MODELS = [
       "classification",
       "simple-reasoning",
       "coding",
+      "web-search",
+      "native-vision",
     ],
     pricing: {
       input: 0.002,
@@ -160,75 +168,6 @@ const AVAILABLE_MODELS = [
       unit: "1K tokens",
     },
   },
-  {
-    id: "gemini-2.5-pro",
-    name: "Gemini 2.5 Pro",
-    provider: "gemini",
-    description:
-      "Google's most capable multimodal AI model with advanced reasoning and creative capabilities",
-    maxTokens: 8192,
-    contextWindow: 2000000,
-    isDefault: false,
-    capabilities: [
-      "text-generation",
-      "reasoning",
-      "code-generation",
-      "multimodal",
-      "instruction-following",
-      "creative-writing",
-      "advanced-reasoning",
-    ],
-    pricing: {
-      input: 0.00125,
-      output: 0.005,
-      unit: "1K tokens",
-    },
-  },
-  {
-    id: "gemini-2.5-flash",
-    name: "Gemini 2.5 Flash",
-    provider: "gemini",
-    description:
-      "Google's fast multimodal AI model with excellent performance for text and image analysis",
-    maxTokens: 8192,
-    contextWindow: 1000000,
-    isDefault: false,
-    capabilities: [
-      "text-generation",
-      "reasoning",
-      "code-generation",
-      "multimodal",
-      "instruction-following",
-      "creative-writing",
-    ],
-    pricing: {
-      input: 0.00015,
-      output: 0.0006,
-      unit: "1K tokens",
-    },
-  },
-  {
-    id: "gemini-2.5-flash-lite",
-    name: "Gemini 2.5 Flash Lite",
-    provider: "gemini",
-    description:
-      "Lightweight version of Gemini 2.5 Flash, optimized for speed and cost-efficiency",
-    maxTokens: 4096,
-    contextWindow: 1000000,
-    isDefault: false,
-    capabilities: [
-      "text-generation",
-      "reasoning",
-      "code-generation",
-      "instruction-following",
-      "chat",
-    ],
-    pricing: {
-      input: 0.000075,
-      output: 0.0003,
-      unit: "1K tokens",
-    },
-  },
 ];
 
 export async function GET() {
@@ -239,7 +178,7 @@ export async function GET() {
         models: AVAILABLE_MODELS,
         defaultModel:
           AVAILABLE_MODELS.find((model) => model.isDefault)?.id ||
-          "openai/gpt-5",
+          "gpt-5",
         totalCount: AVAILABLE_MODELS.length,
       },
     });

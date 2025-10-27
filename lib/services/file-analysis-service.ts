@@ -70,12 +70,12 @@ export class FileAnalysisService {
       debugLog(`\n📁 Processing file: ${file.name} (${file.type})`);
       try {
         let result: FileAnalysisResult;
-        if (provider === "gemini") {
-          debugLog(`✅ Gemini provider - handling all files natively`);
-          // Gemini handles all files natively - no preprocessing needed
+        if (provider === "openai") {
+          debugLog(`✅ OpenAI provider - handling all files natively`);
+          // OpenAI handles all files natively - no preprocessing needed
           result = {
             extractedText: "",
-            markdownContent: `File: ${file.name} (${file.type})\nSize: ${file.size} bytes\n\n[File will be processed natively by Gemini]`,
+            markdownContent: `File: ${file.name} (${file.type})\nSize: ${file.size} bytes\n\n[File will be processed natively by OpenAI]`,
             success: true,
           };
         } else if (this.isImageFile(file)) {
@@ -468,16 +468,16 @@ ${content}
    * Check if provider needs file preprocessing
    */
   static needsFilePreprocessing(provider: AIProviderName): boolean {
-    return provider !== "gemini";
+    return provider !== "openai";
   }
 
   /**
    * Check if provider supports native file handling
    */
   static supportsNativeFileHandling(provider: AIProviderName): boolean {
-    // Only Gemini supports all file types natively
-    // Claude and OpenAI support images natively, but documents need OCR
-    return provider === "gemini";
+    // OpenAI supports all file types natively
+    // Claude supports images natively, but documents need OCR
+    return provider === "openai";
   }
 
   /**

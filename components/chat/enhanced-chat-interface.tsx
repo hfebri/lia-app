@@ -504,7 +504,7 @@ export function EnhancedChatInterface({
     setIsDragOver(false);
 
     const files = Array.from(e.dataTransfer.files);
-    const isOpenAI = selectedModel.startsWith("openai/");
+    const isOpenAI = selectedModel.startsWith("gpt-");
 
     if (files.length > 0) {
       setAttachedFiles([]);
@@ -562,7 +562,7 @@ export function EnhancedChatInterface({
           <div className="text-center">
             <Upload className="h-12 w-12 text-blue-500 mx-auto mb-4" />
             <p className="text-lg font-medium text-blue-700 dark:text-blue-300">
-              Drop {selectedModel.startsWith("openai/") ? "files" : "a file"} here to upload
+              Drop {selectedModel.startsWith("gpt-") ? "files" : "a file"} here to upload
             </p>
             <p className="text-sm text-blue-600 dark:text-blue-400">
               Supports PDF, Word, Excel, and image files
@@ -868,7 +868,7 @@ export function EnhancedChatInterface({
                       Start a conversation
                     </h3>
                     <p className="text-muted-foreground mb-4">
-                      Ask questions, upload {selectedModel.startsWith("openai/") ? "files" : "a file"} for analysis using the
+                      Ask questions, upload {selectedModel.startsWith("gpt-") ? "files" : "a file"} for analysis using the
                       paperclip button, or start typing below
                     </p>
                   </div>
@@ -1050,7 +1050,7 @@ export function EnhancedChatInterface({
                         const target = e.target as HTMLInputElement;
                         if (target.files) {
                           const newFiles = Array.from(target.files);
-                          const isOpenAI = selectedModel.startsWith("openai/");
+                          const isOpenAI = selectedModel.startsWith("gpt-");
 
                           if (newFiles.length > 0) {
                             setAttachedFiles([]);
@@ -1068,7 +1068,7 @@ export function EnhancedChatInterface({
                     }
                   }}
                   accept=".pdf,.doc,.docx,.pptx,.ppt,.txt,.rtf,.csv,.md,.xls,.xlsx,.xlsm,.jpg,.jpeg,.png,.gif,.bmp,.webp,.svg"
-                  multiple={selectedModel.startsWith("openai/")}
+                  multiple={selectedModel.startsWith("gpt-")}
                 />
                 <Button
                   variant="ghost"

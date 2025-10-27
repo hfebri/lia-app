@@ -58,7 +58,7 @@ export class ConversationService {
         (initialMessage
           ? generateConversationTitle(initialMessage)
           : "New Conversation"),
-      aiModel: aiModel || "openai/gpt-5", // Use provided model or default
+      aiModel: aiModel || "gpt-5", // Use provided model or default
       messages: [] as any, // Start with empty messages array
       metadata: null,
     };
