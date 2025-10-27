@@ -48,9 +48,7 @@ export class OpenAIProvider implements AIProvider {
     try {
       const {
         model = "gpt-5",
-        temperature = 0.7,
         max_tokens = 8192,
-        top_p = 1,
         system_prompt,
       } = options;
 
@@ -65,14 +63,20 @@ export class OpenAIProvider implements AIProvider {
       });
 
       // Create completion
-      const completion = await this.client.chat.completions.create({
+      // Note: GPT-5 does NOT support temperature, top_p, or logprobs parameters
+      const completionParams: any = {
         model,
         messages: formattedMessages,
-        temperature,
-        max_tokens,
-        top_p,
-        tools: tools.length > 0 ? (tools as any) : undefined,
-      });
+        max_completion_tokens: max_tokens, // GPT-5 uses max_completion_tokens
+        tools: tools.length > 0 ? tools : undefined,
+      };
+
+      // Add reasoning effort if provided
+      if (options.reasoning_effort) {
+        completionParams.reasoning_effort = options.reasoning_effort;
+      }
+
+      const completion = await this.client.chat.completions.create(completionParams);
 
       // Extract content from response
       const content = completion.choices[0]?.message?.content || "";
@@ -102,9 +106,7 @@ export class OpenAIProvider implements AIProvider {
     try {
       const {
         model = "gpt-5",
-        temperature = 0.7,
         max_tokens = 8192,
-        top_p = 1,
         system_prompt,
       } = options;
 
@@ -119,15 +121,21 @@ export class OpenAIProvider implements AIProvider {
       });
 
       // Create streaming completion
-      const stream = await this.client.chat.completions.create({
+      // Note: GPT-5 does NOT support temperature, top_p, or logprobs parameters
+      const streamParams: any = {
         model,
         messages: formattedMessages,
-        temperature,
-        max_tokens,
-        top_p,
-        tools: tools.length > 0 ? (tools as any) : undefined,
+        max_completion_tokens: max_tokens, // GPT-5 uses max_completion_tokens
+        tools: tools.length > 0 ? tools : undefined,
         stream: true,
-      });
+      };
+
+      // Add reasoning effort if provided
+      if (options.reasoning_effort) {
+        streamParams.reasoning_effort = options.reasoning_effort;
+      }
+
+      const stream = await this.client.chat.completions.create(streamParams);
 
       let totalTokens = 0;
       let promptTokens = 0;

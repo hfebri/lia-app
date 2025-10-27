@@ -255,7 +255,7 @@ export function DashboardOverview() {
               className="w-full justify-start h-10 sm:h-11"
               size="default"
             >
-              <Link href="/chat">
+              <Link href="/?newChat=1">
                 <MessageSquare className="h-4 w-4 mr-2" />
                 <span className="truncate">Start New Chat</span>
               </Link>

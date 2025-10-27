@@ -11,6 +11,7 @@ import type {
 
 import { ReplicateProvider } from "./providers/replicate";
 import { OpenAIProvider } from "./providers/openai";
+import { AnthropicProvider } from "./providers/anthropic";
 
 export class AIService {
   private providers: Map<string, AIProvider> = new Map();
@@ -24,6 +25,11 @@ export class AIService {
           apiKey: process.env.OPENAI_API_KEY || "",
           models: ["gpt-5", "gpt-5-mini", "gpt-5-nano", "gpt-5-pro"],
           defaultModel: "gpt-5",
+        },
+        anthropic: {
+          apiKey: process.env.ANTHROPIC_API_KEY || "",
+          models: ["claude-sonnet-4-5-20250929", "claude-haiku-4-5-20251001", "claude-opus-4-1-20250805"],
+          defaultModel: "claude-sonnet-4-5-20250929",
         },
         replicate: {
           apiKey: process.env.REPLICATE_API_TOKEN || "",
@@ -52,6 +58,17 @@ export class AIService {
 
       } catch (error) {
         console.error("Failed to initialize OpenAI provider:", error);
+      }
+    }
+
+    // Initialize Anthropic provider
+    if (this.config.providers.anthropic?.apiKey) {
+      try {
+        const anthropicProvider = AnthropicProvider.create();
+        this.providers.set("anthropic", anthropicProvider);
+
+      } catch (error) {
+        console.error("Failed to initialize Anthropic provider:", error);
       }
     }
 
@@ -157,6 +174,10 @@ export class AIService {
       if (providerName === "openai") {
         throw new Error(
           "OpenAI provider not initialized. Please check your OPENAI_API_KEY configuration."
+        );
+      } else if (providerName === "anthropic") {
+        throw new Error(
+          "Anthropic provider not initialized. Please check your ANTHROPIC_API_KEY configuration."
         );
       } else if (providerName === "replicate") {
         throw new Error(

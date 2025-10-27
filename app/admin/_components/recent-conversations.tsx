@@ -263,7 +263,7 @@ export function RecentConversations({ data, onRename, onDelete }: RecentConversa
             Start your first conversation to see it here
           </p>
           <Button asChild size="sm">
-            <Link href="/chat">
+            <Link href="/?newChat=1">
               <MessageSquare className="h-4 w-4 mr-2" />
               Start Chatting
             </Link>

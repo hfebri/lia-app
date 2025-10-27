@@ -111,7 +111,10 @@ export async function POST(request: NextRequest) {
 
     // Determine provider based on model
     let provider: AIProviderName = "openai"; // Default to OpenAI
-    if (model.startsWith("anthropic/") || model.startsWith("deepseek-ai/")) {
+    if (model.startsWith("claude-") || model.includes("claude")) {
+      // Claude models use direct Anthropic provider
+      provider = "anthropic";
+    } else if (model.startsWith("anthropic/") || model.startsWith("deepseek-ai/")) {
       // Anthropic and DeepSeek models are served through Replicate
       provider = "replicate";
     } else if (model.startsWith("gpt-")) {

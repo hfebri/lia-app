@@ -126,7 +126,8 @@ export async function uploadFile(
       analysisStatus: options.analyzeWithAI
         ? ("pending" as const)
         : ("completed" as const),
-      extractedText,
+      extractedText: extractedText || null,
+      analysis: null, // Explicitly set to null
       metadata: {
         ...extractionMetadata,
         conversationId: options.conversationId,

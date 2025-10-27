@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ConversationService } from "@/lib/services/conversation";
+import { ConversationService, FavoriteLimitError } from "@/lib/services/conversation";
 import { requireAuthenticatedUser } from "@/lib/auth/session";
 
 interface RouteParams {
@@ -62,7 +62,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
     const conversationId = resolvedParams.id;
     const body = await request.json();
-    const { title, metadata } = body;
+    const { title, metadata, isFavorite } = body;
 
     // First check if conversation exists and user owns it
     const existingConversation = await ConversationService.getConversation(
@@ -85,16 +85,57 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     if (title !== undefined) updates.title = title;
     if (metadata !== undefined) updates.metadata = metadata;
 
-    const updatedConversation = await ConversationService.updateConversation(
-      conversationId,
-      updates
-    );
+    let updatedConversation = existingConversation;
 
-    if (!updatedConversation) {
-      return NextResponse.json(
-        { error: "Failed to update conversation" },
-        { status: 500 }
+    if (Object.keys(updates).length > 0) {
+      const result = await ConversationService.updateConversation(
+        conversationId,
+        updates
       );
+
+      if (!result) {
+        return NextResponse.json(
+          { error: "Failed to update conversation" },
+          { status: 500 }
+        );
+      }
+
+      updatedConversation = result;
+    }
+
+    if (
+      typeof isFavorite === "boolean" &&
+      updatedConversation.isFavorite !== isFavorite
+    ) {
+      try {
+        const favoriteResult = await ConversationService.setFavoriteStatus(
+          conversationId,
+          userId,
+          isFavorite
+        );
+
+        if (!favoriteResult) {
+          return NextResponse.json(
+            { error: "Conversation not found" },
+            { status: 404 }
+          );
+        }
+
+        updatedConversation = favoriteResult;
+      } catch (error) {
+        if (error instanceof FavoriteLimitError) {
+          return NextResponse.json(
+            { success: false, error: error.message },
+            { status: 400 }
+          );
+        }
+
+        if (error instanceof Error && error.message === "Forbidden") {
+          return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        }
+
+        throw error;
+      }
     }
 
     return NextResponse.json({

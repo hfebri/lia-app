@@ -30,6 +30,8 @@ export interface Conversation {
     template?: string;
     model?: string;
   };
+  isFavorite?: boolean;
+  favoritedAt?: Date | string | null;
 }
 
 export interface ChatState {

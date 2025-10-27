@@ -1,25 +1,22 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
-import { Badge } from "@/components/ui/badge";
 import {
   Brain,
   ChevronDown,
-  Zap,
-  Clock,
-  DollarSign,
-  Sparkles,
+  HelpCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ModelHelpDialog } from "./model-help-dialog";
 
 interface Model {
   id: string;
@@ -45,45 +42,14 @@ interface ModelSelectorProps {
   className?: string;
 }
 
-const getModelIcon = (modelId: string) => {
-  if (modelId.includes("gpt-5-pro")) {
-    return <Sparkles className="h-4 w-4 text-purple-600" />;
+const getProviderLogo = (provider: string) => {
+  if (provider === "openai") {
+    return "/logo/openai.svg";
   }
-  if (modelId.includes("gpt-5")) return <Sparkles className="h-4 w-4" />;
-  if (modelId.includes("claude")) return <Brain className="h-4 w-4" />;
-  if (modelId.includes("deepseek")) return <Zap className="h-4 w-4" />;
-  return <Brain className="h-4 w-4" />;
-};
-
-const getModelSpeed = (modelId: string) => {
-  if (modelId.includes("gpt-5-pro")) return "Expert";
-  if (modelId.includes("gpt-5-nano")) return "Fastest";
-  if (modelId.includes("gpt-5-mini")) return "Fast";
-  if (modelId.includes("gpt-5")) return "Smart";
-  if (modelId.includes("claude-4")) return "Hybrid";
-  if (modelId.includes("deepseek-r1")) return "Reasoning";
-  return "Medium";
-};
-
-const getSpeedColor = (speed: string) => {
-  switch (speed) {
-    case "Expert":
-      return "text-purple-700";
-    case "Fastest":
-      return "text-emerald-600";
-    case "Fast":
-      return "text-green-600";
-    case "Medium":
-      return "text-yellow-600";
-    case "Smart":
-      return "text-purple-600";
-    case "Hybrid":
-      return "text-blue-600";
-    case "Reasoning":
-      return "text-indigo-600";
-    default:
-      return "text-gray-600";
+  if (provider === "anthropic") {
+    return "/logo/claude.svg";
   }
+  return null;
 };
 
 export function ModelSelector({
@@ -94,9 +60,9 @@ export function ModelSelector({
   className,
 }: ModelSelectorProps) {
   const [open, setOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
 
   const currentModel = models.find((m) => m.id === selectedModel);
-  const speed = currentModel ? getModelSpeed(currentModel.id) : "Medium";
 
   if (!currentModel) {
     return (
@@ -120,7 +86,20 @@ export function ModelSelector({
           )}
         >
           <div className="flex items-center space-x-2">
-            {getModelIcon(currentModel.id)}
+            {getProviderLogo(currentModel.provider) ? (
+              <Image
+                src={getProviderLogo(currentModel.provider)!}
+                alt={currentModel.provider}
+                width={16}
+                height={16}
+                className={cn(
+                  "shrink-0",
+                  currentModel.provider === "openai" && "dark:invert"
+                )}
+              />
+            ) : (
+              <Brain className="h-4 w-4" />
+            )}
             <span className="text-sm font-medium truncate">
               {currentModel.name}
             </span>
@@ -129,75 +108,105 @@ export function ModelSelector({
         </Button>
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="end" className="w-80">
-        <DropdownMenuLabel className="flex items-center space-x-2">
-          <Brain className="h-4 w-4" />
-          <span>Select AI Model</span>
+      <DropdownMenuContent align="end" className="w-[600px]">
+        <DropdownMenuLabel className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <Brain className="h-4 w-4" />
+            <span>Select AI Model</span>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 w-6 p-0"
+            onClick={(e) => {
+              e.stopPropagation();
+              setHelpOpen(true);
+            }}
+          >
+            <HelpCircle className="h-4 w-4 text-muted-foreground" />
+          </Button>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
 
-        {models.map((model) => {
-          const isSelected = model.id === selectedModel;
-          const modelSpeed = getModelSpeed(model.id);
+        {/* Two-column layout grouped by provider */}
+        <div className="grid grid-cols-2 gap-4 p-3">
+          {/* OpenAI Column */}
+          <div className="space-y-2">
+            <div className="font-semibold text-sm mb-2 flex items-center gap-2">
+              <Image
+                src="/logo/openai.svg"
+                alt="OpenAI"
+                width={20}
+                height={20}
+                className="dark:invert"
+              />
+              OpenAI
+            </div>
+            {models
+              .filter((model) => model.provider === "openai")
+              .map((model) => {
+                const isSelected = model.id === selectedModel;
+                return (
+                  <div
+                    key={model.id}
+                    onClick={() => {
+                      onModelChange(model.id);
+                      setOpen(false);
+                    }}
+                    className={cn(
+                      "p-2 rounded-md cursor-pointer hover:bg-accent transition-colors",
+                      isSelected && "bg-accent"
+                    )}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">{model.name}</span>
+                      {isSelected && (
+                        <div className="h-2 w-2 bg-primary rounded-full" />
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
 
-          return (
-            <DropdownMenuItem
-              key={model.id}
-              onClick={() => {
-                onModelChange(model.id);
-                setOpen(false);
-              }}
-              className={cn(
-                "flex flex-col items-start space-y-2 p-3 cursor-pointer",
-                isSelected && "bg-accent"
-              )}
-            >
-              {/* Model Header */}
-              <div className="flex items-center justify-between w-full">
-                <div className="flex items-center space-x-2">
-                  {getModelIcon(model.id)}
-                  <span className="font-medium">{model.name}</span>
-                  {model.isDefault && (
-                    <Badge variant="secondary" className="text-xs">
-                      Default
-                    </Badge>
-                  )}
-                </div>
-                {isSelected && (
-                  <div className="h-2 w-2 bg-primary rounded-full" />
-                )}
-              </div>
-
-              {/* Model Description */}
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                {model.description}
-              </p>
-
-              {/* Capabilities */}
-              <div className="w-full">
-                <div className="text-xs text-muted-foreground mb-1 font-medium">
-                  Best for:
-                </div>
-                <div className="flex flex-wrap gap-1">
-                  {model.capabilities.slice(0, 3).map((capability) => (
-                    <Badge
-                      key={capability}
-                      variant="outline"
-                      className="text-xs px-1.5 py-0.5"
-                    >
-                      {capability.replace("-", " ")}
-                    </Badge>
-                  ))}
-                  {model.capabilities.length > 3 && (
-                    <Badge variant="outline" className="text-xs px-1.5 py-0.5">
-                      +{model.capabilities.length - 3}
-                    </Badge>
-                  )}
-                </div>
-              </div>
-            </DropdownMenuItem>
-          );
-        })}
+          {/* Anthropic Column */}
+          <div className="space-y-2">
+            <div className="font-semibold text-sm mb-2 flex items-center gap-2">
+              <Image
+                src="/logo/claude.svg"
+                alt="Anthropic"
+                width={20}
+                height={20}
+              />
+              Anthropic
+            </div>
+            {models
+              .filter((model) => model.provider === "anthropic")
+              .map((model) => {
+                const isSelected = model.id === selectedModel;
+                return (
+                  <div
+                    key={model.id}
+                    onClick={() => {
+                      onModelChange(model.id);
+                      setOpen(false);
+                    }}
+                    className={cn(
+                      "p-2 rounded-md cursor-pointer hover:bg-accent transition-colors",
+                      isSelected && "bg-accent"
+                    )}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">{model.name}</span>
+                      {isSelected && (
+                        <div className="h-2 w-2 bg-primary rounded-full" />
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+        </div>
 
         <DropdownMenuSeparator />
         <div className="p-2 text-xs text-muted-foreground">
@@ -205,6 +214,8 @@ export function ModelSelector({
           may take longer to respond.
         </div>
       </DropdownMenuContent>
+
+      <ModelHelpDialog open={helpOpen} onOpenChange={setHelpOpen} />
     </DropdownMenu>
   );
 }

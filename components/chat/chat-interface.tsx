@@ -28,6 +28,7 @@ export function ChatInterface({ className }: ChatInterfaceProps) {
     createConversation,
     sendMessage,
     deleteConversation,
+    toggleFavorite,
     clearError,
   } = useChat();
 
@@ -77,6 +78,7 @@ export function ChatInterface({ className }: ChatInterfaceProps) {
             isLoading={isLoading}
             onSelectConversation={selectConversation}
             onDeleteConversation={handleDeleteConversation}
+            onToggleFavorite={toggleFavorite}
             onCreateNew={handleNewConversation}
             className="border-0 h-full"
           />

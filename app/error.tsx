@@ -110,7 +110,7 @@ export default function ErrorPage({ error, reset }: ErrorPageProps) {
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <Button variant="outline" size="sm" asChild className="w-full">
-                <Link href="/chat">
+                <Link href="/?newChat=1">
                   <MessageSquare className="w-3 h-3 mr-2" />
                   Start New Chat
                 </Link>

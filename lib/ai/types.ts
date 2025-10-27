@@ -57,11 +57,11 @@ export interface AIGenerationOptions {
   stream?: boolean;
   system_prompt?: string;
   extended_thinking?: boolean; // Claude-exclusive
-  thinking_budget_tokens?: number;
+  thinking_budget_tokens?: number; // Claude thinking budget (min: 1024)
+  enable_web_search?: boolean; // Claude & OpenAI - enable web search capabilities
+  enable_file_search?: boolean; // OpenAI - enable file search capabilities
   max_image_resolution?: number;
   reasoning_effort?: "minimal" | "low" | "medium" | "high"; // OpenAI
-  enable_web_search?: boolean; // OpenAI - enable web search capabilities
-  enable_file_search?: boolean; // OpenAI - enable file search capabilities
   verbosity?: "low" | "medium" | "high"; // OpenAI - control response detail level
 }
 
@@ -80,11 +80,15 @@ export type AIProviderName = "replicate" | "openai" | "anthropic";
 
 // Tool-related types for function calling and hosted tools
 export interface ToolDefinition {
-  type: "function" | "web_search_preview" | "file_search";
+  type: "function" | "custom";
   function?: {
     name: string;
     description?: string;
     parameters?: Record<string, any>;
+  };
+  custom?: {
+    name: string;
+    description?: string;
   };
 }
 

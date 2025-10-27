@@ -30,6 +30,7 @@ interface NavItem {
   description?: string;
   badge?: string;
   adminOnly?: boolean;
+  matchPath?: string;
 }
 
 const navigationItems: NavItem[] = [
@@ -40,11 +41,12 @@ const navigationItems: NavItem[] = [
     description: "Dashboard overview",
   },
   {
-    title: "Chat",
-    href: "/chat",
+    title: "New Chat",
+    href: "/?newChat=1",
     icon: MessageSquare,
     description: "AI conversations",
     badge: "New",
+    matchPath: "/",
   },
   // Admin items - HIDDEN
   // {
@@ -134,7 +136,8 @@ export function MobileNav({ className, isAdmin = false }: MobileNavProps) {
               <div className="p-4 space-y-1">
                 {filteredItems.map((item) => {
                   const Icon = item.icon;
-                  const isActive = pathname === item.href;
+                  const matchPath = item.matchPath || item.href.split("?")[0];
+                  const isActive = pathname === matchPath;
 
                   return (
                     <Link
@@ -221,9 +224,9 @@ export function MobileNav({ className, isAdmin = false }: MobileNavProps) {
 export function MobileBottomNav({ className }: { className?: string }) {
   const pathname = usePathname();
 
-  const quickNavItems = [
+  const quickNavItems: NavItem[] = [
     { title: "Home", href: "/", icon: Home },
-    { title: "Chat", href: "/chat", icon: MessageSquare },
+    { title: "New Chat", href: "/?newChat=1", icon: MessageSquare, matchPath: "/" },
     { title: "Settings", href: "/settings", icon: Settings },
   ];
 
@@ -237,7 +240,8 @@ export function MobileBottomNav({ className }: { className?: string }) {
       <div className="flex items-center justify-around px-4 py-2">
         {quickNavItems.map((item) => {
           const Icon = item.icon;
-          const isActive = pathname === item.href;
+          const matchPath = item.matchPath || item.href.split("?")[0];
+          const isActive = pathname === matchPath;
 
           return (
             <Link

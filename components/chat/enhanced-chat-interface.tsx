@@ -14,6 +14,7 @@ import { TypingIndicator } from "./typing-indicator";
 import { FileAttachment } from "./file-attachment";
 import { ContextWarning } from "./context-warning";
 import { ExtendedThinkingToggle } from "./extended-thinking-toggle";
+import { WebSearchToggle } from "./web-search-toggle";
 import { ThinkingModeToggle } from "./thinking-mode-toggle";
 import { ReasoningEffortSelector } from "./reasoning-effort-selector";
 import { SystemInstructionButton } from "./system-instruction-button";
@@ -92,6 +93,8 @@ export function EnhancedChatInterface({
     changeModel,
     extendedThinking,
     toggleExtendedThinking,
+    webSearch,
+    toggleWebSearch,
     thinkingMode,
     toggleThinkingMode,
     reasoningEffort,
@@ -158,6 +161,52 @@ export function EnhancedChatInterface({
     loadModels();
     refreshFiles();
   }, [loadModels, refreshFiles]);
+
+  // Handle global "new chat" navigation signal via query param
+  useEffect(() => {
+    if (searchParams.get("newChat") !== "1") {
+      return;
+    }
+
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    // Ensure any active streaming stops before clearing
+    stopStreaming();
+    startNewConversation();
+    justCreatedConversationRef.current = null;
+
+    // Reset local UI state
+    setCurrentConversationId(null);
+    setConversationTitle("AI Assistant");
+    setInputValue("");
+    setSelectedFiles([]);
+    setAttachedFiles([]);
+    setPreventModelOverride(false);
+
+    // Clean up query params so the URL reflects the reset state
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.delete("newChat");
+    nextUrl.searchParams.delete("conversation");
+    const cleanedSearch = nextUrl.searchParams.toString();
+    const destination = cleanedSearch
+      ? `${nextUrl.pathname}?${cleanedSearch}`
+      : nextUrl.pathname;
+
+    router.replace(destination || "/", { scroll: false });
+  }, [
+    searchParams,
+    router,
+    startNewConversation,
+    stopStreaming,
+    setPreventModelOverride,
+    setCurrentConversationId,
+    setConversationTitle,
+    setInputValue,
+    setSelectedFiles,
+    setAttachedFiles,
+  ]);
 
   // Scroll to bottom function
   const scrollToBottom = useCallback(() => {
@@ -657,6 +706,15 @@ export function EnhancedChatInterface({
                 />
               )}
 
+              {/* Web Search Toggle - Show only for Claude models */}
+              {isClaudeModel && (
+                <WebSearchToggle
+                  enabled={webSearch}
+                  onToggle={toggleWebSearch}
+                  disabled={isLoading || isStreaming}
+                />
+              )}
+
               {/* Thinking Mode Toggle - Show only for Gemini models */}
               <ThinkingModeToggle
                 enabled={thinkingMode}
@@ -793,6 +851,15 @@ export function EnhancedChatInterface({
                 <ExtendedThinkingToggle
                   enabled={extendedThinking}
                   onToggle={toggleExtendedThinking}
+                  disabled={isLoading || isStreaming}
+                />
+              )}
+
+              {/* Web Search Toggle - Show only for Claude models */}
+              {isClaudeModel && (
+                <WebSearchToggle
+                  enabled={webSearch}
+                  onToggle={toggleWebSearch}
                   disabled={isLoading || isStreaming}
                 />
               )}

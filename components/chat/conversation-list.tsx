@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MessageCircle, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface ConversationListProps {
   conversations: Conversation[];
@@ -14,6 +15,7 @@ interface ConversationListProps {
   isLoading?: boolean;
   onSelectConversation: (conversation: Conversation) => void;
   onDeleteConversation?: (conversationId: string) => void;
+  onToggleFavorite?: (conversationId: string, shouldFavorite: boolean) => void;
   onCreateNew?: () => void;
   className?: string;
 }
@@ -24,6 +26,7 @@ export function ConversationList({
   isLoading = false,
   onSelectConversation,
   onDeleteConversation,
+  onToggleFavorite,
   onCreateNew,
   className,
 }: ConversationListProps) {
@@ -58,7 +61,7 @@ export function ConversationList({
   }
 
   return (
-    <Card className={className}>
+    <Card className={cn("overflow-hidden", className)}>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg font-semibold flex items-center gap-2">
@@ -105,6 +108,15 @@ export function ConversationList({
                   onDelete={
                     onDeleteConversation
                       ? () => onDeleteConversation(conversation.id)
+                      : undefined
+                  }
+                  onToggleFavorite={
+                    onToggleFavorite
+                      ? () =>
+                          onToggleFavorite(
+                            conversation.id,
+                            !conversation.isFavorite
+                          )
                       : undefined
                   }
                 />

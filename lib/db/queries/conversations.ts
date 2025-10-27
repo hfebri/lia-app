@@ -190,6 +190,8 @@ export async function getConversationsByUserId(
     userId: conversations.userId,
     createdAt: conversations.createdAt,
     updatedAt: conversations.updatedAt,
+    isFavorite: conversations.isFavorite,
+    favoritedAt: conversations.favoritedAt,
   };
 
   const sortColumn =
@@ -203,7 +205,11 @@ export async function getConversationsByUserId(
       .select()
       .from(conversations)
       .where(eq(conversations.userId, userId))
-      .orderBy(orderBy)
+      .orderBy(
+        desc(conversations.isFavorite),
+        desc(conversations.favoritedAt),
+        orderBy
+      )
       .limit(limit)
       .offset(offset),
     db
@@ -241,6 +247,8 @@ export async function getConversationsWithLastMessage(
     .from(conversations)
     .where(eq(conversations.userId, userId))
     .orderBy(
+      desc(conversations.isFavorite),
+      desc(conversations.favoritedAt),
       sortOrder === "asc"
         ? asc(conversations.updatedAt)
         : desc(conversations.updatedAt)
@@ -366,3 +374,17 @@ export async function clearConversationMessages(
 ): Promise<Conversation | null> {
   return replaceConversationMessages(conversationId, []);
 }
+
+// Count favorite conversations for a user
+export async function getFavoriteConversationCount(
+  userId: string
+): Promise<number> {
+  const result = await db
+    .select({ count: count() })
+    .from(conversations)
+    .where(and(eq(conversations.userId, userId), eq(conversations.isFavorite, true)));
+
+  return Number(result[0]?.count ?? 0);
+}
+
+// Get favorite conversations for a user (sorted by favoritedAt)

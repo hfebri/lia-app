@@ -3,21 +3,20 @@ import type { ToolDefinition } from "../types";
 /**
  * Web Search Tool Definition
  *
- * OpenAI's hosted web search tool (web_search_preview) allows the model
- * to search the web for real-time information to answer user queries.
- *
- * This is a hosted tool provided by OpenAI - no implementation needed.
- * The model will automatically invoke this tool when it needs to search
- * for current information beyond its training data.
+ * OpenAI's custom web search tool allows the model to search the web
+ * for real-time information to answer user queries.
  *
  * Features:
  * - Real-time web search capabilities
  * - Automatic citation and source tracking
  * - Reduces hallucinations by grounding in real data
- * - No additional configuration required
  */
 export const webSearchTool: ToolDefinition = {
-  type: "web_search_preview",
+  type: "custom",
+  custom: {
+    name: "web_search",
+    description: "Search the web for real-time information and current events",
+  },
 };
 
 /**
