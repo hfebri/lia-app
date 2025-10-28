@@ -250,11 +250,23 @@ export class ChatService {
     const decoder = new TextDecoder();
     let buffer = "";
 
+    let hasReceivedCompletion = false;
+
     try {
       while (true) {
         const { done, value } = await reader.read();
 
-        if (done) break;
+        if (done) {
+          // If stream ended without completion signal, send one
+          if (!hasReceivedCompletion) {
+            yield {
+              content: "",
+              isComplete: true,
+              usage: undefined,
+            };
+          }
+          break;
+        }
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
@@ -265,6 +277,13 @@ export class ChatService {
             const data = line.slice(6);
 
             if (data === "[DONE]") {
+              if (!hasReceivedCompletion) {
+                yield {
+                  content: "",
+                  isComplete: true,
+                  usage: undefined,
+                };
+              }
               return;
             }
 
@@ -275,6 +294,7 @@ export class ChatService {
               if (parsed.error) {
                 // If it's already marked as error, just yield it as content
                 if (parsed.content) {
+                  hasReceivedCompletion = true;
                   yield {
                     content: parsed.content,
                     isComplete: true,
@@ -289,6 +309,10 @@ export class ChatService {
               // Only yield if there's actual content or if it's the completion marker
               const content = parsed.content || "";
               const isComplete = parsed.isComplete || false;
+
+              if (isComplete) {
+                hasReceivedCompletion = true;
+              }
 
               // Filter out empty content and content that's just "{}"
               const trimmedContent = content.trim();
@@ -351,7 +375,7 @@ export class ChatService {
     // Generate a more robust unique ID
     this.messageCounter += 1;
     const timestamp = Date.now();
-    const random = Math.random().toString(36).substr(2, 9);
+    const random = Math.random().toString(36).slice(2, 11);
     const counter = this.messageCounter.toString(36);
 
     return {

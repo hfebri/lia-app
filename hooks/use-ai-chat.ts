@@ -649,7 +649,9 @@ export function useAiChat(options: UseAiChatOptions = {}) {
             }));
 
             // Create or update assistant message when complete
-              if (chunk.isComplete && accumulatedContent.trim()) {
+            if (chunk.isComplete) {
+              // Only create message if there's content
+              if (accumulatedContent.trim()) {
                 const assistantMessage = chatService.current.createMessage(
                   "assistant",
                   accumulatedContent,
@@ -699,12 +701,22 @@ export function useAiChat(options: UseAiChatOptions = {}) {
                     }
                   }
                 } catch (error) {
-                console.warn(
-                  "Failed to save streaming chat to database:",
-                  error
-                );
-                // Don't break the chat flow if database save fails
+                  console.warn(
+                    "Failed to save streaming chat to database:",
+                    error
+                  );
+                  // Don't break the chat flow if database save fails
+                }
+              } else {
+                // Stream completed but no content - just clear the loading state
+                setState((prev) => ({
+                  ...prev,
+                  streamingContent: "",
+                  isLoading: false,
+                  isStreaming: false,
+                }));
               }
+              break; // Exit loop when complete
             }
           }
         } else {
