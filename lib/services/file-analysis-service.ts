@@ -1,6 +1,5 @@
 import type { AIProviderName } from "../ai/types";
 import Replicate from "replicate";
-import Tesseract from "tesseract.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 const debugLog = (...args: unknown[]) => {
@@ -33,9 +32,6 @@ export class FileAnalysisService {
   // Available models for file analysis
   private static readonly MARKER_MODEL =
     "cuuupid/marker:4eb62a42c3e5b8695a796936e69afa2c004839aef15410f01492d59783baf752";
-
-  // Current active model (switch between 'tesseract' and 'marker')
-  private static readonly ACTIVE_MODEL: "tesseract" | "marker" = "tesseract";
 
   constructor() {
     // Initialize Replicate client for file analysis
@@ -92,24 +88,16 @@ export class FileAnalysisService {
           };
         } else {
           // Use selected model to extract content for all non-Gemini, non-image files
-          debugLog(
-            `🔧 Using ${FileAnalysisService.ACTIVE_MODEL} for processing document`
-          );
+          debugLog(`🔧 Using Marker OCR for processing document`);
           debugLog(`📊 File analysis details:`);
           debugLog(`  - File name: ${file.name}`);
           debugLog(`  - File type: ${file.type}`);
           debugLog(`  - File size: ${file.size} bytes`);
           debugLog(`  - Is image file: ${this.isImageFile(file)}`);
           debugLog(`  - Is document file: ${this.isDocumentFile(file)}`);
-          debugLog(`  - Active model: ${FileAnalysisService.ACTIVE_MODEL}`);
-
-          if (FileAnalysisService.ACTIVE_MODEL === "marker") {
-            debugLog(`🚀 Starting Marker model processing...`);
-            result = await this.analyzeFileWithMarker(file);
-          } else {
-            debugLog(`🚀 Starting Tesseract OCR processing...`);
-            result = await this.analyzeFileWithTesseract(file);
-          }
+          debugLog(`  - Using Marker OCR`);
+          debugLog(`🚀 Starting Marker model processing...`);
+          result = await this.analyzeFileWithMarker(file);
         }
 
         results.push(result);
@@ -130,156 +118,6 @@ export class FileAnalysisService {
   /**
    * Use Tesseract OCR to analyze document files and extract text content
    */
-  private async analyzeFileWithTesseract(
-    file: FileContent
-  ): Promise<FileAnalysisResult> {
-    debugLog(
-      `\n🚀 [TESSERACT START] Beginning OCR analysis for: ${file.name}`
-    );
-    debugLog(
-      `📝 [TESSERACT] File details: ${file.type}, ${file.size} bytes`
-    );
-
-    try {
-      // Check if file is a document type that Tesseract can handle
-      debugLog(`🔍 [TESSERACT] Checking file type compatibility...`);
-      if (!this.isDocumentFile(file)) {
-        debugLog(
-          `❌ [TESSERACT] File type ${file.type} not supported by Tesseract OCR`
-        );
-        return {
-          extractedText: "",
-          markdownContent: "",
-          success: false,
-          error:
-            "File type not supported by Tesseract OCR. Only document files (PDF, DOCX, PPTX) are supported.",
-        };
-      }
-
-      debugLog(`✅ [TESSERACT] File type ${file.type} is supported`);
-      debugLog(`🔍 [TESSERACT] Starting OCR processing for: ${file.name}`);
-      const startTime = Date.now();
-
-      // Convert base64 to buffer for Tesseract (Node.js compatible)
-      debugLog(
-        `📦 [TESSERACT] Converting base64 to buffer for file: ${file.name}`
-      );
-      debugLog(
-        `📦 [TESSERACT] Base64 data length: ${file.data.length} characters`
-      );
-
-      const buffer = Buffer.from(file.data, "base64");
-      debugLog(`📦 [TESSERACT] Buffer created successfully`);
-      debugLog(
-        `📊 [TESSERACT] Buffer details: size=${buffer.length} bytes, type=${file.type}`
-      );
-
-      // Use Tesseract to extract text
-      debugLog(
-        `🚀 [TESSERACT] Starting Tesseract.recognize() for: ${file.name}`
-      );
-      debugLog(`🔧 [TESSERACT] Language: eng, Options: logger enabled`);
-
-      const recognitionStart = Date.now();
-      const {
-        data: { text },
-      } = await Tesseract.recognize(buffer, "eng", {
-        logger: (m) => {
-          const progressText = m.progress
-            ? `(${Math.round(m.progress * 100)}%)`
-            : "";
-          const elapsed = Date.now() - recognitionStart;
-          debugLog(
-            `🔧 [TESSERACT PROGRESS] [${file.name}] ${m.status} ${progressText} - ${elapsed}ms elapsed`
-          );
-        },
-      });
-
-      const recognitionEnd = Date.now();
-      const recognitionTime = recognitionEnd - recognitionStart;
-      debugLog(`✅ [TESSERACT] OCR recognition completed for: ${file.name}`);
-      debugLog(`⏱️  [TESSERACT] Recognition time: ${recognitionTime}ms`);
-
-      const endTime = Date.now();
-      const processingTime = endTime - startTime;
-      debugLog(`⏱️  [TESSERACT] Total processing time: ${processingTime}ms`);
-
-      const cleanContent = text.trim();
-      debugLog(
-        `📝 [TESSERACT] Extracted text length: ${text.length} characters`
-      );
-      debugLog(
-        `📝 [TESSERACT] Clean content length: ${cleanContent.length} characters`
-      );
-
-      if (!cleanContent) {
-        debugLog(
-          `❌ [TESSERACT] No text content extracted from document: ${file.name}`
-        );
-        return {
-          extractedText: "",
-          markdownContent: "",
-          success: false,
-          error: "No text content extracted from document",
-        };
-      }
-
-      debugLog(
-        `📄 [TESSERACT] Text preview (first 100 chars): "${cleanContent.substring(
-          0,
-          100
-        )}..."`
-      );
-
-      // Format as markdown with analysis details
-      debugLog(`📝 [TESSERACT] Formatting content as markdown...`);
-      const markdownContent = this.formatAsMarkdownForTesseract(
-        file.name,
-        file.type,
-        cleanContent,
-        processingTime
-      );
-
-      debugLog(
-        `✅ [TESSERACT COMPLETE] Successfully processed: ${file.name}`
-      );
-      debugLog(
-        `📊 [TESSERACT SUMMARY] ${cleanContent.length} chars extracted in ${processingTime}ms`
-      );
-
-      return {
-        extractedText: cleanContent,
-        markdownContent: markdownContent,
-        success: true,
-      };
-    } catch (error) {
-      debugLog(
-        `❌ [TESSERACT ERROR] Failed to process ${file.name}:`,
-        error
-      );
-      debugLog(
-        `💥 [TESSERACT ERROR] Error type: ${
-          error instanceof Error ? error.constructor.name : typeof error
-        }`
-      );
-      debugLog(
-        `💥 [TESSERACT ERROR] Error message: ${
-          error instanceof Error ? error.message : String(error)
-        }`
-      );
-
-      return {
-        extractedText: "",
-        markdownContent: "",
-        success: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : "Tesseract OCR analysis failed",
-      };
-    }
-  }
-
   /**
    * Use Marker model to extract text from files
    */
@@ -369,33 +207,6 @@ export class FileAnalysisService {
   /**
    * Format the extracted content as markdown for Tesseract OCR
    */
-  private formatAsMarkdownForTesseract(
-    fileName: string,
-    fileType: string,
-    content: string,
-    processingTime: number
-  ): string {
-    const timestamp = new Date().toISOString();
-
-    return `# Document Analysis: ${fileName}
-
-**File Type:** ${fileType}
-**Analyzed:** ${timestamp}
-**Analysis Method:** Tesseract OCR
-**Processing Time:** ${processingTime}ms
-
----
-
-## Extracted Text Content
-
-${content}
-
----
-
-*Document text extraction completed using Tesseract.js OCR for local, fast document processing.*
-`;
-  }
-
   /**
    * Format the extracted content as markdown for Marker model
    */

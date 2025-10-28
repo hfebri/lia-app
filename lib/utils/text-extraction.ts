@@ -1,3 +1,5 @@
+import { MarkerOCRService } from "@/lib/services/marker-ocr";
+
 // Use dynamic imports to avoid module load-time errors
 
 const isDev = process.env.NODE_ENV !== "production";
@@ -6,6 +8,15 @@ const debugLog = (...args: unknown[]) => {
     console.log(...args);
   }
 };
+
+let markerService: MarkerOCRService | null = null;
+
+function getMarkerService(): MarkerOCRService {
+  if (!markerService) {
+    markerService = MarkerOCRService.create();
+  }
+  return markerService;
+}
 
 export interface TextExtractionResult {
   success: boolean;
@@ -32,7 +43,7 @@ export async function extractTextFromFile(
   try {
     switch (mimeType) {
       case "application/pdf":
-        return await extractFromPDF(buffer);
+        return await extractFromPDF(buffer, filename);
 
       case "application/msword":
       case "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
@@ -77,7 +88,10 @@ export async function extractTextFromFile(
 /**
  * Extract text from PDF files
  */
-async function extractFromPDF(buffer: Buffer): Promise<TextExtractionResult> {
+async function extractFromPDF(
+  buffer: Buffer,
+  filename: string
+): Promise<TextExtractionResult> {
   try {
     const pdf = await import("pdf-parse");
     const data = await pdf.default(buffer);
@@ -116,13 +130,12 @@ async function extractFromPDF(buffer: Buffer): Promise<TextExtractionResult> {
     );
 
     try {
-      // Try to use OCR on the PDF buffer directly
-      // Note: This is a simplified approach. A more robust solution would convert
-      // PDF pages to images first, but Tesseract can handle some PDF files directly
-      const ocrResult = await extractFromImage(
+      // Try to use Marker OCR on the PDF buffer directly
+      const ocrResult = await runMarkerOCR(
         buffer,
         "application/pdf",
-        "scanned.pdf"
+        filename,
+        "accurate"
       );
 
       if (
@@ -351,58 +364,59 @@ async function extractFromImage(
   mimeType: string,
   filename: string
 ): Promise<TextExtractionResult> {
+  return runMarkerOCR(buffer, mimeType, filename, "fast");
+}
+
+async function runMarkerOCR(
+  buffer: Buffer,
+  mimeType: string,
+  filename: string,
+  mode: "fast" | "balanced" | "accurate" = "fast"
+): Promise<TextExtractionResult> {
+  if (!MarkerOCRService.isSupportedFileType(mimeType)) {
+    return {
+      success: false,
+      error: `Marker OCR does not support files of type ${mimeType}`,
+    };
+  }
+
   try {
-    debugLog(`🚀 [OCR] Starting Tesseract OCR for image: ${filename}`);
-    const startTime = Date.now();
+    const service = getMarkerService();
+    const dataUrl = `data:${mimeType};base64,${buffer.toString("base64")}`;
 
-    // Dynamically import Tesseract to avoid SSR issues
-    const Tesseract = await import("tesseract.js");
-
-    const {
-      data: { text },
-    } = await Tesseract.recognize(buffer, "eng", {
-      logger: (m) => {
-        const elapsed = Date.now() - startTime;
-        debugLog(
-          `🔧 [OCR] [${filename}] ${m.status} (${Math.round(
-            (m.progress || 0) * 100
-          )}%) - ${elapsed}ms`
-        );
-      },
+    const result = await service.processFile(dataUrl, {
+      mode,
+      force_ocr: true,
+      include_metadata: true,
     });
 
-    const cleanText = text.trim();
-    const processingTime = Date.now() - startTime;
+    const rawContent = (result.markdown || "").trim();
 
-    debugLog(`✅ [OCR] Completed OCR for: ${filename}`);
-    debugLog(
-      `📊 [OCR] Extracted ${cleanText.length} characters in ${processingTime}ms`
-    );
-
-    if (!cleanText) {
+    if (!rawContent) {
       return {
         success: false,
-        error: "No text content found in image",
+        error: "No text content extracted from document",
       };
     }
 
-    const wordCount = cleanText
+    const wordCount = rawContent
       .split(/\s+/)
       .filter((word) => word.length > 0).length;
 
     return {
       success: true,
-      text: cleanText,
+      text: rawContent,
       metadata: {
         wordCount,
-        charCount: cleanText.length,
+        charCount: rawContent.length,
+        pageCount: result.metadata?.pages,
       },
     };
   } catch (error) {
-    console.error(`❌ [OCR] Error processing image ${filename}:`, error);
+    console.error(`❌ [Marker OCR] Error processing ${filename}:`, error);
     return {
       success: false,
-      error: `OCR extraction failed: ${
+      error: `Marker OCR failed: ${
         error instanceof Error ? error.message : "Unknown error"
       }`,
     };
