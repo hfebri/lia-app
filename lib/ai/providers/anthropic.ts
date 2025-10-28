@@ -8,6 +8,15 @@ import type {
   AIError,
 } from "../types";
 
+type Base64ImageSource = Extract<
+  Anthropic.ImageBlockParam["source"],
+  { type: "base64" }
+>;
+type Base64DocumentSource = Extract<
+  Anthropic.DocumentBlockParam["source"],
+  { type: "base64" }
+>;
+
 /**
  * Anthropic Provider
  *
@@ -254,8 +263,7 @@ export class AnthropicProvider implements AIProvider {
         // Add files (images and PDFs)
         for (const file of message.files || []) {
           if (this.isImageFile(file.type)) {
-            // Handle images
-            const imageSource = this.getFileSource(file);
+            const imageSource = this.getImageSource(file);
             if (imageSource) {
               content.push({
                 type: "image",
@@ -263,8 +271,7 @@ export class AnthropicProvider implements AIProvider {
               });
             }
           } else if (this.isPDFFile(file.type)) {
-            // Handle PDF documents
-            const documentSource = this.getFileSource(file);
+            const documentSource = this.getDocumentSource(file);
             if (documentSource) {
               content.push({
                 type: "document",
@@ -293,21 +300,42 @@ export class AnthropicProvider implements AIProvider {
   /**
    * Get file source for Anthropic API
    */
-  private getFileSource(file: {
+  private getImageSource(file: {
     type: string;
     data?: string;
     url?: string;
-  }): Anthropic.ImageBlockParam["source"] | Anthropic.DocumentBlockParam["source"] | null {
-    // Prefer base64 data
+  }): Anthropic.ImageBlockParam["source"] | null {
     if (file.data) {
       return {
         type: "base64",
-        media_type: file.type as Anthropic.ImageBlockParam["source"]["media_type"],
+        media_type: file.type as Base64ImageSource["media_type"],
         data: file.data,
       };
     }
 
-    // Fallback to URL if available
+    if (file.url) {
+      return {
+        type: "url",
+        url: file.url,
+      };
+    }
+
+    return null;
+  }
+
+  private getDocumentSource(file: {
+    type: string;
+    data?: string;
+    url?: string;
+  }): Anthropic.DocumentBlockParam["source"] | null {
+    if (file.data) {
+      return {
+        type: "base64",
+        media_type: file.type as Base64DocumentSource["media_type"],
+        data: file.data,
+      };
+    }
+
     if (file.url) {
       return {
         type: "url",

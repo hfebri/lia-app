@@ -135,7 +135,9 @@ export class OpenAIProvider implements AIProvider {
         streamParams.reasoning_effort = options.reasoning_effort;
       }
 
-      const stream = await this.client.chat.completions.create(streamParams);
+      const stream = (await this.client.chat.completions.create(
+        streamParams
+      )) as unknown as AsyncIterable<any>;
 
       let totalTokens = 0;
       let promptTokens = 0;

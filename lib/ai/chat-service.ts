@@ -59,6 +59,8 @@ export interface ChatServiceOptions {
   max_image_resolution?: number;
   reasoning_effort?: "minimal" | "low" | "medium" | "high";
   systemInstruction?: string; // Custom system instruction for conversation
+  enable_web_search?: boolean;
+  enable_file_search?: boolean;
 }
 
 export class ChatService {
@@ -141,9 +143,13 @@ export class ChatService {
         temperature,
         maxTokens,
         extended_thinking,
+        thinking_mode: options.thinking_mode,
         thinking_budget_tokens,
         max_image_resolution,
         reasoning_effort,
+        enable_web_search: options.enable_web_search,
+        enable_file_search: options.enable_file_search,
+        systemInstruction: options.systemInstruction,
       }),
     });
 
@@ -213,9 +219,12 @@ export class ChatService {
         temperature,
         maxTokens,
         extended_thinking,
+        thinking_mode: options.thinking_mode,
         thinking_budget_tokens,
         max_image_resolution,
         reasoning_effort,
+        enable_web_search: options.enable_web_search,
+        enable_file_search: options.enable_file_search,
         systemInstruction: systemInstruction || undefined, // Only include if not empty
       }),
     });
