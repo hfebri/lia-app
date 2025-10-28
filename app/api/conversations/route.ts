@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ConversationService } from "@/lib/services/conversation";
 import { requireAuthenticatedUser } from "@/lib/auth/session";
+import { ProductivityTracker } from "@/lib/services/productivity-tracker";
 
 // GET /api/conversations - Get user's conversations
 export async function GET(request: NextRequest) {
@@ -75,6 +76,9 @@ export async function POST(request: NextRequest) {
       initialMessage,
       aiModel,
     });
+
+    // Track conversation creation for productivity metrics (non-blocking)
+    ProductivityTracker.trackConversationCreated(userId);
 
     return NextResponse.json({
       success: true,

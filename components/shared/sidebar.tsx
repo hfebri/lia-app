@@ -32,6 +32,7 @@ import {
   Bug,
   Star,
   MoreVertical,
+  TrendingUp,
 } from "lucide-react";
 import { SimpleThemeToggle } from "@/components/ui/theme-toggle";
 import {
@@ -97,6 +98,11 @@ const navigationItems: NavItem[] = [
     href: "/?newChat=1",
     icon: MessageSquare,
     matchPath: "/",
+  },
+  {
+    title: "Productivity",
+    href: "/productivity",
+    icon: TrendingUp,
   },
 ];
 

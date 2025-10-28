@@ -3,6 +3,7 @@ import { ConversationService } from "@/lib/services/conversation";
 import { requireAuthenticatedUser } from "@/lib/auth/session";
 import { getAIService, createMessage } from "@/lib/ai/service";
 import type { AIProviderName } from "@/lib/ai/types";
+import { ProductivityTracker } from "@/lib/services/productivity-tracker";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -175,6 +176,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           },
         }
       );
+
+      // Track message creation for productivity metrics (non-blocking)
+      // Track both user and assistant messages
+      ProductivityTracker.trackMessageCreated(userId);
+      ProductivityTracker.trackMessageCreated(userId);
 
       return NextResponse.json({
         success: true,
