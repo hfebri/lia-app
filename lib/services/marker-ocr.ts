@@ -1,10 +1,16 @@
 import Replicate from "replicate";
+import crypto from "crypto";
 
 /**
  * Marker OCR Service
  *
  * Uses Replicate's datalab-to/marker model for high-quality document OCR.
  * Supports: PDF, DOC, DOCX, PPT, PPTX, PNG, JPG, JPEG, WEBP
+ *
+ * Features:
+ * - In-memory caching to avoid re-processing same files
+ * - Cache eviction after 1 hour
+ * - Automatic cache size management (max 100 entries)
  */
 
 interface MarkerInput {
@@ -33,8 +39,16 @@ interface MarkerOutput {
   images?: Record<string, string>;
 }
 
+interface CacheEntry {
+  result: MarkerOutput;
+  timestamp: number;
+}
+
 export class MarkerOCRService {
   private client: Replicate;
+  private static cache: Map<string, CacheEntry> = new Map();
+  private static readonly CACHE_TTL = 60 * 60 * 1000; // 1 hour
+  private static readonly MAX_CACHE_SIZE = 100;
 
   constructor() {
     const apiKey = process.env.REPLICATE_API_TOKEN;
@@ -47,7 +61,56 @@ export class MarkerOCRService {
   }
 
   /**
-   * Process a file using Marker OCR
+   * Generate cache key from file URL and options
+   */
+  private static getCacheKey(fileUrl: string, options: Partial<MarkerInput>): string {
+    const keyData = JSON.stringify({
+      url: fileUrl,
+      mode: options.mode || "fast",
+      force_ocr: options.force_ocr ?? false,
+      include_metadata: options.include_metadata ?? true,
+    });
+    return crypto.createHash("md5").update(keyData).digest("hex");
+  }
+
+  /**
+   * Get cached result if available and not expired
+   */
+  private static getCachedResult(cacheKey: string): MarkerOutput | null {
+    const entry = this.cache.get(cacheKey);
+    if (!entry) return null;
+
+    const now = Date.now();
+    if (now - entry.timestamp > this.CACHE_TTL) {
+      // Cache expired
+      this.cache.delete(cacheKey);
+      return null;
+    }
+
+    return entry.result;
+  }
+
+  /**
+   * Store result in cache with automatic size management
+   */
+  private static setCachedResult(cacheKey: string, result: MarkerOutput): void {
+    // If cache is full, remove oldest entries
+    if (this.cache.size >= this.MAX_CACHE_SIZE) {
+      const entriesToRemove = this.cache.size - this.MAX_CACHE_SIZE + 1;
+      const keys = Array.from(this.cache.keys());
+      for (let i = 0; i < entriesToRemove; i++) {
+        this.cache.delete(keys[i]);
+      }
+    }
+
+    this.cache.set(cacheKey, {
+      result,
+      timestamp: Date.now(),
+    });
+  }
+
+  /**
+   * Process a file using Marker OCR with caching
    * @param fileUrl - URL to the file (must be publicly accessible)
    * @param options - Marker processing options
    */
@@ -55,6 +118,16 @@ export class MarkerOCRService {
     fileUrl: string,
     options: Partial<MarkerInput> = {}
   ): Promise<MarkerOutput> {
+    // Check cache first (unless skip_cache is true)
+    if (!options.skip_cache) {
+      const cacheKey = MarkerOCRService.getCacheKey(fileUrl, options);
+      const cachedResult = MarkerOCRService.getCachedResult(cacheKey);
+      if (cachedResult) {
+        console.log(`[Marker OCR] Cache hit for ${fileUrl.substring(0, 50)}...`);
+        return cachedResult;
+      }
+    }
+
     try {
       const input: MarkerInput = {
         file: fileUrl,
@@ -71,12 +144,21 @@ export class MarkerOCRService {
         disable_image_extraction: options.disable_image_extraction ?? false,
       };
 
+      console.log(`[Marker OCR] Processing file: ${fileUrl.substring(0, 50)}... (mode: ${input.mode})`);
       const output = await this.client.run("datalab-to/marker", {
         input,
       });
 
-      // The output is a structured object with markdown and metadata
-      return output as MarkerOutput;
+      const result = output as MarkerOutput;
+
+      // Cache the result
+      if (!options.skip_cache) {
+        const cacheKey = MarkerOCRService.getCacheKey(fileUrl, options);
+        MarkerOCRService.setCachedResult(cacheKey, result);
+        console.log(`[Marker OCR] Cached result for ${fileUrl.substring(0, 50)}...`);
+      }
+
+      return result;
     } catch (error) {
       console.error("Marker OCR error:", error);
       throw new Error(
@@ -85,6 +167,25 @@ export class MarkerOCRService {
         }`
       );
     }
+  }
+
+  /**
+   * Clear the OCR cache
+   */
+  static clearCache(): void {
+    this.cache.clear();
+    console.log("[Marker OCR] Cache cleared");
+  }
+
+  /**
+   * Get cache statistics
+   */
+  static getCacheStats(): { size: number; maxSize: number; ttl: number } {
+    return {
+      size: this.cache.size,
+      maxSize: this.MAX_CACHE_SIZE,
+      ttl: this.CACHE_TTL,
+    };
   }
 
   /**
