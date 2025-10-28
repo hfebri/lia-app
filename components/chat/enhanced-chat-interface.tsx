@@ -611,7 +611,8 @@ export function EnhancedChatInterface({
           <div className="text-center">
             <Upload className="h-12 w-12 text-blue-500 mx-auto mb-4" />
             <p className="text-lg font-medium text-blue-700 dark:text-blue-300">
-              Drop {selectedModel.startsWith("gpt-") ? "files" : "a file"} here to upload
+              Drop {selectedModel.startsWith("gpt-") ? "files" : "a file"} here
+              to upload
             </p>
             <p className="text-sm text-blue-600 dark:text-blue-400">
               Supports PDF, Word, Excel, and image files
@@ -628,7 +629,6 @@ export function EnhancedChatInterface({
           <div className="hidden xl:flex items-center justify-between p-4 gap-3">
             <div className="flex items-center space-x-4 min-w-0 flex-1">
               <div className="flex items-center space-x-2">
-                <Brain className="h-6 w-6 text-primary shrink-0" />
                 <div>
                   <div className="flex items-center gap-2">
                     {isEditingTitle && currentConversationId ? (
@@ -935,8 +935,10 @@ export function EnhancedChatInterface({
                       Start a conversation
                     </h3>
                     <p className="text-muted-foreground mb-4">
-                      Ask questions, upload {selectedModel.startsWith("gpt-") ? "files" : "a file"} for analysis using the
-                      paperclip button, or start typing below
+                      Ask questions, upload{" "}
+                      {selectedModel.startsWith("gpt-") ? "files" : "a file"}{" "}
+                      for analysis using the paperclip button, or start typing
+                      below
                     </p>
                   </div>
                 </div>
@@ -1123,7 +1125,10 @@ export function EnhancedChatInterface({
                             setAttachedFiles([]);
                             if (isOpenAI) {
                               // OpenAI: append all files
-                              setSelectedFiles((prev) => [...prev, ...newFiles]);
+                              setSelectedFiles((prev) => [
+                                ...prev,
+                                ...newFiles,
+                              ]);
                             } else {
                               // Others: only accept first file
                               setSelectedFiles([newFiles[0]]);
