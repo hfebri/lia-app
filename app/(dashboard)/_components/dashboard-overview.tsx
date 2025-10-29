@@ -21,7 +21,6 @@ import {
   AlertCircle,
   BarChart3,
   Activity as ActivityIcon,
-  Award,
 } from "lucide-react";
 import { ActivityChart } from "../../admin/_components/activity-chart";
 // removed unused RecentConversations import
@@ -32,7 +31,6 @@ import { DashboardSkeleton } from "../../admin/_components/dashboard-skeleton";
 import { useDashboardFilters } from "@/hooks/use-dashboard-filters";
 import { DashboardFilters } from "@/components/dashboard/dashboard-filters";
 import { useAuth } from "@/components/auth/auth-provider";
-import { ProductivityMetricsTab } from "./productivity-metrics-tab";
 
 export function DashboardOverview() {
   const { user } = useAuth();
@@ -112,14 +110,10 @@ export function DashboardOverview() {
 
       {/* Main Tabs - Activity vs Productivity */}
       <Tabs defaultValue="activity" className="w-full">
-        <TabsList className="grid w-full max-w-md grid-cols-2">
+        <TabsList className="grid w-full max-w-md grid-cols-1">
           <TabsTrigger value="activity" className="flex items-center gap-2">
             <ActivityIcon className="h-4 w-4" />
             Activity
-          </TabsTrigger>
-          <TabsTrigger value="productivity" className="flex items-center gap-2">
-            <Award className="h-4 w-4" />
-            Productivity
           </TabsTrigger>
         </TabsList>
 
@@ -312,15 +306,8 @@ export function DashboardOverview() {
           </CardContent>
         </Card>
       </div>
-        </TabsContent>
-
-        <TabsContent value="productivity" className="mt-6">
-          <ProductivityMetricsTab
-            userId={filters.selectedUserId || user?.id}
-            dateRange={filters.dateRange || undefined}
-          />
-        </TabsContent>
-      </Tabs>
-    </div>
-  );
+    </TabsContent>
+  </Tabs>
+  </div>
+);
 }
