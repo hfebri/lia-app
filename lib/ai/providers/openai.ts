@@ -50,14 +50,21 @@ export class OpenAIProvider implements AIProvider {
         model = "gpt-5",
         max_tokens = 8192,
         system_prompt,
+        enable_web_search,
       } = options;
+
+      // Use Responses API if web_search is enabled
+      // The Responses API supports hosted tools like web_search
+      if (enable_web_search) {
+        return await this.generateResponseWithResponsesAPI(messages, options);
+      }
 
       // Format messages for OpenAI API
       const formattedMessages = this.formatMessages(messages, system_prompt);
 
-      // Get enabled tools
+      // Get enabled tools (excluding web_search since it requires Responses API)
       const tools = getEnabledTools({
-        enable_web_search: options.enable_web_search,
+        enable_web_search: false, // web_search handled by Responses API
         enable_file_search: options.enable_file_search,
         hasDocuments: this.hasDocuments(messages),
       });
@@ -97,6 +104,108 @@ export class OpenAIProvider implements AIProvider {
   }
 
   /**
+   * Generate response using OpenAI Responses API
+   * This API supports hosted tools like web_search
+   */
+  private async generateResponseWithResponsesAPI(
+    messages: AIMessage[],
+    options: AIGenerationOptions = {}
+  ): Promise<AIResponse> {
+    try {
+      const {
+        model = "gpt-5",
+        max_tokens = 8192,
+        system_prompt,
+      } = options;
+
+      // Format input for Responses API
+      // Responses API expects a single input string, not a messages array
+      const input = this.formatInputForResponsesAPI(messages, system_prompt);
+
+      // Build request parameters for Responses API
+      // Note: Responses API uses max_output_tokens, NOT max_completion_tokens
+      const requestParams: any = {
+        model,
+        input,
+        max_output_tokens: max_tokens,
+        tools: [{ type: "web_search" }], // Hosted tools use simple type format
+      };
+
+      // Add reasoning effort if provided
+      // Note: Responses API uses nested reasoning.effort, not reasoning_effort
+      if (options.reasoning_effort) {
+        requestParams.reasoning = {
+          effort: options.reasoning_effort,
+        };
+      }
+
+      console.log("[OpenAI] Using Responses API with web_search tool");
+      console.log("[OpenAI] Request params:", JSON.stringify(requestParams, null, 2));
+
+      // Call Responses API
+      // Note: The OpenAI SDK might not have types for this yet
+      const response = await (this.client as any).responses.create(requestParams);
+
+      console.log("[OpenAI] Response received:", {
+        hasOutputText: !!response.output_text,
+        outputLength: response.output_text?.length,
+        usage: response.usage,
+      });
+
+      // Extract content from response
+      const content = response.output_text || "";
+
+      return {
+        content: content.trim(),
+        model,
+        provider: this.name,
+        usage: {
+          prompt_tokens: response.usage?.prompt_tokens || 0,
+          completion_tokens: response.usage?.completion_tokens || 0,
+          total_tokens: response.usage?.total_tokens || 0,
+        },
+      };
+    } catch (error) {
+      console.error("[OpenAI] Responses API error:", error);
+      console.error("[OpenAI] Error details:", JSON.stringify(error, null, 2));
+      throw this.handleError(error, options.model);
+    }
+  }
+
+  /**
+   * Format messages for Responses API
+   * Converts messages array to a single input string
+   */
+  private formatInputForResponsesAPI(
+    messages: AIMessage[],
+    systemPrompt?: string
+  ): string {
+    let input = "";
+
+    // Add system prompt if provided
+    if (systemPrompt) {
+      input += `System: ${systemPrompt}\n\n`;
+    }
+
+    // Add conversation history
+    for (const message of messages) {
+      const role = message.role === "assistant" ? "Assistant" : "User";
+      input += `${role}: ${message.content}\n\n`;
+
+      // Add file context if present
+      if (message.files && message.files.length > 0) {
+        for (const file of message.files) {
+          if (file.url) {
+            input += `[Attached file: ${file.name || file.url}]\n`;
+          }
+        }
+      }
+    }
+
+    return input.trim();
+  }
+
+  /**
    * Generate a streaming response
    */
   async *generateStream(
@@ -108,14 +217,47 @@ export class OpenAIProvider implements AIProvider {
         model = "gpt-5",
         max_tokens = 8192,
         system_prompt,
+        enable_web_search,
       } = options;
+
+      // Check if Responses API supports streaming
+      // If web_search is enabled, we may need to fallback to non-streaming
+      if (enable_web_search) {
+        console.log("[OpenAI] Web search enabled - checking if Responses API supports streaming");
+
+        // Try streaming with Responses API
+        try {
+          yield* this.generateStreamWithResponsesAPI(messages, options);
+          return;
+        } catch (error: any) {
+          // If streaming not supported, fallback to non-streaming
+          if (error.message?.includes("streaming") || error.code === "stream_not_supported") {
+            console.log("[OpenAI] Responses API doesn't support streaming, falling back to non-streaming");
+            const response = await this.generateResponseWithResponsesAPI(messages, options);
+
+            // Yield the full content as a single chunk
+            yield {
+              content: response.content,
+              isComplete: false,
+            };
+
+            yield {
+              content: "",
+              isComplete: true,
+              usage: response.usage,
+            };
+            return;
+          }
+          throw error;
+        }
+      }
 
       // Format messages for OpenAI API
       const formattedMessages = this.formatMessages(messages, system_prompt);
 
-      // Get enabled tools
+      // Get enabled tools (excluding web_search since it requires Responses API)
       const tools = getEnabledTools({
-        enable_web_search: options.enable_web_search,
+        enable_web_search: false, // web_search handled by Responses API
         enable_file_search: options.enable_file_search,
         hasDocuments: this.hasDocuments(messages),
       });
@@ -181,6 +323,102 @@ export class OpenAIProvider implements AIProvider {
       }
     } catch (error) {
       throw this.handleError(error, options.model);
+    }
+  }
+
+  /**
+   * Generate streaming response using OpenAI Responses API
+   * This API supports hosted tools like web_search
+   */
+  private async *generateStreamWithResponsesAPI(
+    messages: AIMessage[],
+    options: AIGenerationOptions = {}
+  ): AsyncGenerator<AIStreamChunk> {
+    try {
+      const {
+        model = "gpt-5",
+        max_tokens = 8192,
+        system_prompt,
+      } = options;
+
+      // Format input for Responses API
+      const input = this.formatInputForResponsesAPI(messages, system_prompt);
+
+      // Build request parameters for Responses API
+      // Note: Responses API uses max_output_tokens, NOT max_completion_tokens
+      const requestParams: any = {
+        model,
+        input,
+        max_output_tokens: max_tokens,
+        tools: [{ type: "web_search" }],
+      };
+
+      // Add reasoning effort if provided
+      // Note: Responses API uses nested reasoning.effort, not reasoning_effort
+      if (options.reasoning_effort) {
+        requestParams.reasoning = {
+          effort: options.reasoning_effort,
+        };
+      }
+
+      console.log("[OpenAI] Streaming with Responses API and web_search tool");
+      console.log("[OpenAI] Stream request params:", JSON.stringify(requestParams, null, 2));
+
+      // Call Responses API with streaming
+      // IMPORTANT: Must use responses.stream() not responses.create({stream: true})
+      const stream = await (this.client as any).responses.stream(requestParams);
+
+      console.log("[OpenAI] Stream started, waiting for events...");
+
+      // Stream chunks - Responses API structure
+      let eventCount = 0;
+      for await (const chunk of stream) {
+        eventCount++;
+
+        // Log first few chunks to understand structure
+        if (eventCount <= 5) {
+          console.log("[OpenAI] Chunk:", JSON.stringify(chunk, null, 2));
+        }
+
+        // Handle different chunk types based on Responses API
+        if (chunk.type === "response.output_text.delta" && chunk.delta) {
+          console.log(`[OpenAI] Text delta: ${chunk.delta.length} chars`);
+          yield {
+            content: chunk.delta,
+            isComplete: false,
+          };
+        } else if (chunk.item && typeof chunk.item === "object") {
+          // Some chunks have item.text or item.content
+          const text = chunk.item.text || chunk.item.content;
+          if (text) {
+            console.log(`[OpenAI] Text from item: ${text.length} chars`);
+            yield {
+              content: text,
+              isComplete: false,
+            };
+          }
+        } else if (chunk.response && chunk.type === "response.completed") {
+          // Stream completed
+          console.log("[OpenAI] Stream completed");
+
+          yield {
+            content: "",
+            isComplete: true,
+            usage: {
+              prompt_tokens: chunk.response.usage?.prompt_tokens || 0,
+              completion_tokens: chunk.response.usage?.completion_tokens || 0,
+              total_tokens: chunk.response.usage?.total_tokens || 0,
+            },
+          };
+          break;
+        }
+      }
+
+      console.log("[OpenAI] Stream finished");
+    } catch (error) {
+      console.error("[OpenAI] Responses API streaming error:", error);
+      console.error("[OpenAI] Stream error details:", JSON.stringify(error, null, 2));
+      throw error;
     }
   }
 

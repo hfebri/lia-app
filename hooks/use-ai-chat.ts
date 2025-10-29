@@ -131,25 +131,201 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     }
   }, []);
 
+  /**
+   * Detect if the user is referencing specific files in their message
+   * Returns array of matching file names
+   *
+   * TODO: Future enhancement - implement fuzzy filename matching
+   */
+  const detectFileReferences = useCallback(
+    (message: string, availableFiles: Array<{ name: string; type: string }>) => {
+      const lowerMessage = message.toLowerCase();
+      const referencedFiles: string[] = [];
+
+      for (const file of availableFiles) {
+        const fileName = file.name.toLowerCase();
+
+        // Exact filename match (case-insensitive)
+        if (lowerMessage.includes(fileName)) {
+          referencedFiles.push(file.name);
+          continue;
+        }
+
+        // Extension-based match (e.g., "the CSV file")
+        const extension = file.name.split('.').pop()?.toLowerCase();
+        if (extension) {
+          const extensionPatterns = [
+            `${extension} file`,
+            `the ${extension}`,
+            `.${extension}`,
+          ];
+
+          if (extensionPatterns.some(pattern => lowerMessage.includes(pattern))) {
+            referencedFiles.push(file.name);
+          }
+        }
+      }
+
+      return [...new Set(referencedFiles)]; // Remove duplicates
+    },
+    []
+  );
+
   // Build file context from all previous messages in conversation
-  const buildConversationFileContext = useCallback(() => {
+  // Uses smart summarization to reduce token usage
+  const buildConversationFileContext = useCallback(async (currentMessage?: string) => {
     const allFiles = state.messages
       .filter((msg) => msg.role === "user" && msg.metadata?.files)
       .flatMap((msg) => msg.metadata!.files!);
 
     if (allFiles.length === 0) return "";
 
-    const context = allFiles
-      .map(
-        (file, idx) =>
-          `[File ${idx + 1}: ${file.name}${file.error ? " (Error)" : ""}]\n${
-            file.extractedText || "No text extracted"
-          }`
-      )
+    // Import token utilities
+    const { estimateTokenCount, truncateFileContent, DEFAULT_TOKEN_LIMITS } = await import("@/lib/utils/token-estimation");
+
+    // Detect if user is referencing specific files in current message
+    const referencedFiles = currentMessage
+      ? detectFileReferences(currentMessage, allFiles)
+      : [];
+
+    // Build context with smart summary/full content selection
+    const filesWithContent = allFiles.map((file, idx) => {
+      const isReferenced = referencedFiles.includes(file.name);
+      const hasError = !!file.error;
+
+      // Use full content if:
+      // 1. User specifically mentioned this file, OR
+      // 2. File has no summary available
+      const useFullContent = isReferenced || !file.summary;
+
+      const content = useFullContent
+        ? (file.extractedText || "No text extracted")
+        : (file.summary || "No text extracted");
+
+      const contentType = useFullContent ? "Full Content" : "Summary";
+      const errorSuffix = hasError ? " (Error)" : "";
+
+      return {
+        name: file.name,
+        content,
+        header: `[File ${idx + 1}: ${file.name} - ${contentType}${errorSuffix}]`,
+        timestamp: new Date(file.processedAt || Date.now()).getTime(),
+      };
+    });
+
+    // Estimate total tokens BEFORE building context
+    const totalTokens = filesWithContent.reduce(
+      (sum, f) => sum + estimateTokenCount(f.content),
+      0
+    );
+
+    // Apply truncation if exceeds token budget
+    const maxFileTokens = DEFAULT_TOKEN_LIMITS.maxFileTokens;
+    let finalFiles = filesWithContent;
+
+    if (totalTokens > maxFileTokens) {
+      console.warn(`[Context Builder] Token limit exceeded: ${totalTokens} > ${maxFileTokens}. Applying truncation.`);
+
+      // Track truncation event
+      const { trackFileContextEvent } = await import("@/lib/utils/file-context-analytics");
+      trackFileContextEvent("truncation_event", {
+        originalTokens: totalTokens,
+        maxTokens: maxFileTokens,
+        filesAffected: filesWithContent.length,
+      });
+
+      // Truncate file content to fit within budget
+      // IMPORTANT: Add unique index to prevent collisions with duplicate filenames
+      const filesWithIndex = filesWithContent.map((f, idx) => ({
+        name: f.name,
+        content: f.content,
+        timestamp: f.timestamp,
+        uniqueKey: `${idx}_${f.name}_${f.timestamp}`, // Stable unique identifier
+      }));
+
+      const truncated = truncateFileContent(
+        filesWithIndex,
+        maxFileTokens
+      );
+
+      // Debug logging to verify uniqueKey preservation
+      if (process.env.DEBUG_FILE_CONTEXT === 'true' || process.env.NEXT_PUBLIC_DEBUG_FILE_CONTEXT === 'true') {
+        console.log('[Context Builder] Truncation debug:', {
+          originalFiles: filesWithIndex.map(f => ({ name: f.name, uniqueKey: f.uniqueKey })),
+          truncatedFiles: truncated.map(t => ({ name: t.name, uniqueKey: t.uniqueKey, hasKey: !!t.uniqueKey })),
+        });
+      }
+
+      // IMPORTANT: truncateFileContent reorders by recency, can't use index
+      // Use uniqueKey instead of name to handle duplicate filenames correctly
+      // Each file gets a stable identifier (idx_name_timestamp) that survives reordering
+      const truncatedByKey = new Map<string, string>(
+        truncated.map((t) => {
+          if (!t.uniqueKey) {
+            console.warn(`[Context Builder] Missing uniqueKey for file: ${t.name}. Falling back to name (may cause issues with duplicates).`);
+          }
+          // Use uniqueKey if available, fall back to name only as last resort
+          const key = t.uniqueKey || t.name;
+          return [key, t.content];
+        })
+      );
+
+      finalFiles = filesWithContent.map((f, idx) => {
+        const uniqueKey = `${idx}_${f.name}_${f.timestamp}`;
+        const truncatedContent = truncatedByKey.get(uniqueKey);
+        if (!truncatedContent && f.name === filesWithContent[idx - 1]?.name) {
+          // Potential duplicate filename issue
+          console.warn(`[Context Builder] Could not find truncated content for duplicate file: ${f.name} (key: ${uniqueKey})`);
+        }
+        return {
+          ...f,
+          content: truncatedContent || f.content,
+        };
+      });
+    }
+
+    // Build final context string
+    const context = finalFiles
+      .map(f => `${f.header}\n${f.content}`)
       .join("\n\n---\n\n");
 
+    // Calculate final token count
+    const finalTokens = estimateTokenCount(context);
+
+    // Track context built event
+    const { trackFileContextEvent } = await import("@/lib/utils/file-context-analytics");
+    trackFileContextEvent("context_built", {
+      totalFiles: allFiles.length,
+      referencedFiles: referencedFiles.length,
+      filesUsingSummary: allFiles.filter(f => f.summary && !referencedFiles.includes(f.name)).length,
+      filesUsingFullContent: allFiles.filter(f => !f.summary || referencedFiles.includes(f.name)).length,
+      totalTokens: finalTokens,
+      truncated: totalTokens > maxFileTokens,
+    });
+
+    // Track file reference detection if any files were referenced
+    if (referencedFiles.length > 0) {
+      trackFileContextEvent("file_reference_detected", {
+        referencedFiles,
+        message: currentMessage,
+      });
+    }
+
+    // Log context building decision for debugging
+    if (process.env.DEBUG_FILE_CONTEXT === 'true' || process.env.NEXT_PUBLIC_DEBUG_FILE_CONTEXT === 'true') {
+      console.log('[Context Builder]', {
+        totalFiles: allFiles.length,
+        referencedFiles,
+        filesUsingSummary: allFiles.filter(f => f.summary && !referencedFiles.includes(f.name)).length,
+        filesUsingFullContent: allFiles.filter(f => !f.summary || referencedFiles.includes(f.name)).length,
+        originalTokens: totalTokens,
+        finalTokens,
+        truncated: totalTokens > maxFileTokens,
+      });
+    }
+
     return `\n\n[CONVERSATION CONTEXT - Available Files]\n${context}\n[END CONVERSATION CONTEXT]\n\n`;
-  }, [state.messages]);
+  }, [state.messages, detectFileReferences]);
 
   // Check if a file has already been processed in this conversation
   const isFileAlreadyProcessed = useCallback(
@@ -232,7 +408,8 @@ export function useAiChat(options: UseAiChatOptions = {}) {
       }));
 
       // ALWAYS include file context if conversation has files (even without new uploads)
-      const fileContext = buildConversationFileContext();
+      // Pass current message to enable smart file reference detection
+      const fileContext = await buildConversationFileContext(content);
       if (fileContext && (!files || files.length === 0)) {
         // No new files, but conversation has files - include context
         finalContent = content + fileContext;
@@ -462,6 +639,89 @@ export function useAiChat(options: UseAiChatOptions = {}) {
                 }
               }
 
+              // Generate AI summary for large text content (server-side)
+              let summary: string | undefined;
+              let summaryTokens: number | undefined;
+              let usingSummary = false;
+
+              if (extractedText && !isImage) {
+                // Only summarize text-based content (not images)
+                // IMPORTANT: Summarization MUST be server-side to protect API keys
+                setState((prev) => ({
+                  ...prev,
+                  fileProcessingProgress: {
+                    ...prev.fileProcessingProgress,
+                    [file.name]: {
+                      stage: "summarizing",
+                      progress: 85,
+                      message: "Generating AI summary...",
+                    },
+                  },
+                }));
+
+                try {
+                  const startTime = Date.now();
+
+                  // Track summarization request
+                  const { trackFileContextEvent } = await import("@/lib/utils/file-context-analytics");
+                  trackFileContextEvent("summarization_request", {
+                    fileName: file.name,
+                    fileType: file.type,
+                  });
+
+                  // Call server-side summarization API
+                  const summaryResponse = await fetch("/api/files/summarize", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      content: extractedText,
+                      fileName: file.name,
+                      mimeType: file.type,
+                    }),
+                  });
+
+                  if (summaryResponse.ok) {
+                    const summaryData = await summaryResponse.json();
+                    const summaryResult = summaryData.data;
+
+                    if (!summaryResult.skipped) {
+                      summary = summaryResult.summary;
+                      summaryTokens = summaryResult.summaryTokens;
+                      usingSummary = true;
+
+                      // Track success
+                      const latency = Date.now() - startTime;
+                      trackFileContextEvent("summarization_success", {
+                        fileName: file.name,
+                        originalTokens: summaryResult.originalTokens,
+                        summaryTokens: summaryResult.summaryTokens,
+                        latency,
+                        hadError: !!summaryResult.error,
+                      });
+                    }
+                  } else {
+                    const errorData = await summaryResponse.json();
+                    console.error(`[File Processing] Summarization API failed for ${file.name}:`, errorData);
+
+                    // Track error
+                    trackFileContextEvent("summarization_error", {
+                      fileName: file.name,
+                      error: errorData.error || "API request failed",
+                    });
+                  }
+                } catch (error) {
+                  console.error(`[File Processing] Summarization failed for ${file.name}:`, error);
+
+                  // Track error
+                  const { trackFileContextEvent } = await import("@/lib/utils/file-context-analytics");
+                  trackFileContextEvent("summarization_error", {
+                    fileName: file.name,
+                    error: error instanceof Error ? error.message : "Unknown error",
+                  });
+                  // Continue without summary - fallback to full content
+                }
+              }
+
               processedFiles.push({
                 name: file.name,
                 type: file.type,
@@ -476,6 +736,10 @@ export function useAiChat(options: UseAiChatOptions = {}) {
                 isText: isText,
                 isSpreadsheet: isSpreadsheet,
                 error: null,
+                // Summarization fields
+                summary,
+                summaryTokens,
+                usingSummary,
               });
 
               setState((prev) => ({
@@ -493,7 +757,8 @@ export function useAiChat(options: UseAiChatOptions = {}) {
           }
 
           // Get conversation file context (from all previous messages)
-          const fileContext = buildConversationFileContext();
+          // Pass current message to enable smart file reference detection
+          const fileContext = await buildConversationFileContext(content);
 
           // Create enhanced prompt with:
           // 1. Conversation file context (all files from previous messages)

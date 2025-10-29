@@ -15,11 +15,28 @@ import {
  * - period: "week" | "month" (default: "week")
  * - startDate: ISO date string (optional, overrides period)
  * - endDate: ISO date string (optional, overrides period)
+ * - userId: user ID to filter by (admin only)
  */
 export async function GET(request: NextRequest) {
   try {
-    const { userId } = await requireAuthenticatedUser();
+    const { userId: authUserId, user } = await requireAuthenticatedUser();
     const { searchParams } = new URL(request.url);
+
+    // Get userId from query params (for admin filtering)
+    const targetUserId = searchParams.get("userId");
+
+    // If filtering by different user, check admin permission
+    if (targetUserId && targetUserId !== authUserId) {
+      if (user.role !== "admin") {
+        return NextResponse.json(
+          { success: false, error: "Admin access required to view other users" },
+          { status: 403 }
+        );
+      }
+    }
+
+    // Use filtered userId or authenticated userId
+    const userId = targetUserId || authUserId;
 
     const period = (searchParams.get("period") || "week") as "week" | "month";
     const startDateParam = searchParams.get("startDate");

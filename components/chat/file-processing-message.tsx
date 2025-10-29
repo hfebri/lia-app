@@ -84,7 +84,11 @@ export function FileProcessingMessage({
                     </div>
                     <Progress value={fileProgress.progress} className="h-1.5" />
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Eye className="h-3 w-3" />
+                      {fileProgress.stage === "summarizing" ? (
+                        <Sparkles className="h-3 w-3 animate-pulse" />
+                      ) : (
+                        <Eye className="h-3 w-3" />
+                      )}
                       <span>{fileProgress.message || fileProgress.stage}</span>
                     </div>
                   </div>

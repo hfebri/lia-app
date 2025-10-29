@@ -20,6 +20,8 @@ import {
   RefreshCw,
   AlertCircle,
   BarChart3,
+  Activity as ActivityIcon,
+  Award,
 } from "lucide-react";
 import { ActivityChart } from "../../admin/_components/activity-chart";
 // removed unused RecentConversations import
@@ -30,6 +32,7 @@ import { DashboardSkeleton } from "../../admin/_components/dashboard-skeleton";
 import { useDashboardFilters } from "@/hooks/use-dashboard-filters";
 import { DashboardFilters } from "@/components/dashboard/dashboard-filters";
 import { useAuth } from "@/components/auth/auth-provider";
+import { ProductivityMetricsTab } from "./productivity-metrics-tab";
 
 export function DashboardOverview() {
   const { user } = useAuth();
@@ -107,6 +110,20 @@ export function DashboardOverview() {
         isAdmin={isAdmin}
       />
 
+      {/* Main Tabs - Activity vs Productivity */}
+      <Tabs defaultValue="activity" className="w-full">
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="activity" className="flex items-center gap-2">
+            <ActivityIcon className="h-4 w-4" />
+            Activity
+          </TabsTrigger>
+          <TabsTrigger value="productivity" className="flex items-center gap-2">
+            <Award className="h-4 w-4" />
+            Productivity
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="activity" className="mt-6 space-y-6">
       {/* Stats Overview */}
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 auto-rows-fr">
         <Card className="hover:shadow-md transition-shadow border-l-4 border-l-blue-500 h-full min-w-0">
@@ -295,6 +312,15 @@ export function DashboardOverview() {
           </CardContent>
         </Card>
       </div>
+        </TabsContent>
+
+        <TabsContent value="productivity" className="mt-6">
+          <ProductivityMetricsTab
+            userId={filters.selectedUserId || user?.id}
+            dateRange={filters.dateRange || undefined}
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

@@ -99,11 +99,6 @@ const navigationItems: NavItem[] = [
     icon: MessageSquare,
     matchPath: "/",
   },
-  {
-    title: "Productivity",
-    href: "/productivity",
-    icon: TrendingUp,
-  },
 ];
 
 const adminItems: NavItem[] = [
@@ -155,14 +150,11 @@ function SidebarComponent({ className }: SidebarProps) {
 
   // Memoize expensive computations with more granular dependencies
   const isAdmin = useMemo(() => user && checkRole("admin"), [user, checkRole]);
-  const recentConversations = useMemo(
-    () => {
-      // Conversations are already sorted by the provider
-      // Just take the first 10
-      return conversations.slice(0, 10);
-    },
-    [conversations]
-  );
+  const recentConversations = useMemo(() => {
+    // Conversations are already sorted by the provider
+    // Just take the first 10
+    return conversations.slice(0, 10);
+  }, [conversations]);
 
   // Create stable callback references
   const stableCreateConversation = useCallback(
@@ -302,7 +294,7 @@ function SidebarComponent({ className }: SidebarProps) {
               </h2>
             </div>
 
-            <ScrollArea className="h-96">
+            <ScrollArea className="h-72">
               <div className="space-y-1">
                 {isLoading ? (
                   <div className="space-y-2 px-4 py-2">

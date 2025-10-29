@@ -17,6 +17,10 @@ export interface ProcessedFile {
   error?: string | null;
   displayContent?: string;
   promptContent?: string;
+  // Summarization fields
+  summary?: string;
+  summaryTokens?: number;
+  usingSummary?: boolean;
 }
 
 export interface FileMetadata {
@@ -32,6 +36,10 @@ export interface FileMetadata {
   isText: boolean;
   isSpreadsheet: boolean;
   error?: string | null;
+  // Summarization fields
+  summary?: string;
+  summaryTokens?: number;
+  usingSummary?: boolean;
 }
 
 export interface FileProcessingProgress {
@@ -104,6 +112,10 @@ export class ClientFileProcessor {
       isText: file.isText,
       isSpreadsheet: file.isSpreadsheet,
       error: file.error,
+      // Preserve summarization fields
+      summary: file.summary,
+      summaryTokens: file.summaryTokens,
+      usingSummary: file.usingSummary,
     }));
   }
 

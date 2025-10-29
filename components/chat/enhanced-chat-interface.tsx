@@ -706,8 +706,8 @@ export function EnhancedChatInterface({
                 />
               )}
 
-              {/* Web Search Toggle - Show only for Claude models */}
-              {isClaudeModel && (
+              {/* Web Search Toggle - Show only for OpenAI models */}
+              {isOpenAIModel && (
                 <WebSearchToggle
                   enabled={webSearch}
                   onToggle={toggleWebSearch}
@@ -855,8 +855,8 @@ export function EnhancedChatInterface({
                 />
               )}
 
-              {/* Web Search Toggle - Show only for Claude models */}
-              {isClaudeModel && (
+              {/* Web Search Toggle - Show only for OpenAI models */}
+              {isOpenAIModel && (
                 <WebSearchToggle
                   enabled={webSearch}
                   onToggle={toggleWebSearch}
@@ -1140,7 +1140,7 @@ export function EnhancedChatInterface({
                     }
                   }}
                   accept=".pdf,.doc,.docx,.pptx,.ppt,.txt,.rtf,.csv,.md,.xls,.xlsx,.xlsm,.jpg,.jpeg,.png,.gif,.bmp,.webp,.svg"
-                  multiple={selectedModel.startsWith("gpt-")}
+                  multiple={true}
                 />
                 <Button
                   variant="ghost"

@@ -123,8 +123,8 @@ export async function getRawActivityData(
     }
 
     // Model usage
-    if (conv.model) {
-      models[conv.model] = (models[conv.model] || 0) + 1;
+    if (conv.aiModel) {
+      models[conv.aiModel] = (models[conv.aiModel] || 0) + 1;
     }
 
     // Favorite conversations
@@ -392,18 +392,18 @@ export async function calculateDailySnapshot(
     activityByHour[hour].conversations += 1;
 
     // Model usage
-    if (conv.model) {
-      if (!modelsUsed[conv.model]) {
-        modelsUsed[conv.model] = {
+    if (conv.aiModel) {
+      if (!modelsUsed[conv.aiModel]) {
+        modelsUsed[conv.aiModel] = {
           conversations: 0,
           messages: 0,
           tokensUsed: 0,
         };
       }
-      modelsUsed[conv.model].conversations += 1;
-      modelsUsed[conv.model].messages += messages.length;
+      modelsUsed[conv.aiModel].conversations += 1;
+      modelsUsed[conv.aiModel].messages += messages.length;
       if (conv.metadata && (conv.metadata as any).totalTokens) {
-        modelsUsed[conv.model].tokensUsed += (conv.metadata as any).totalTokens;
+        modelsUsed[conv.aiModel].tokensUsed += (conv.metadata as any).totalTokens;
       }
     }
   }

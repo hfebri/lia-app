@@ -94,9 +94,10 @@ export class AnthropicProvider implements AIProvider {
         };
       }
 
-      // Add web search tool if enabled
+      // Note: Web search is not supported for Anthropic provider
+      // Claude does not have native web search - only OpenAI GPT-5 supports it
       if (enable_web_search) {
-        requestParams.tools = this.getWebSearchTool();
+        console.warn("[Anthropic] Web search requested but not supported. Use OpenAI GPT-5 for web search.");
       }
 
       // Create completion
@@ -172,9 +173,10 @@ export class AnthropicProvider implements AIProvider {
         };
       }
 
-      // Add web search tool if enabled
+      // Note: Web search is not supported for Anthropic provider
+      // Claude does not have native web search - only OpenAI GPT-5 supports it
       if (enable_web_search) {
-        requestParams.tools = this.getWebSearchTool();
+        console.warn("[Anthropic] Web search requested but not supported. Use OpenAI GPT-5 for web search.");
       }
 
       // Create streaming completion
@@ -365,29 +367,6 @@ export class AnthropicProvider implements AIProvider {
     return mimeType === "application/pdf";
   }
 
-  /**
-   * Get web search tool definition
-   * Note: This is a placeholder for web search functionality
-   * Actual implementation may require beta access or specific API version
-   */
-  private getWebSearchTool(): Anthropic.Tool[] {
-    return [
-      {
-        name: "web_search",
-        description: "Search the web for current information, news, or answers to questions. Use this when you need up-to-date information or facts that you don't have in your training data.",
-        input_schema: {
-          type: "object",
-          properties: {
-            query: {
-              type: "string",
-              description: "The search query to look up on the web"
-            }
-          },
-          required: ["query"]
-        }
-      }
-    ];
-  }
 
   /**
    * Handle errors and convert to AIError format
