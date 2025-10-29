@@ -985,7 +985,9 @@ export function EnhancedChatInterface({
                   )}
 
                   {isLoading && !isStreaming && !isProcessingFiles && (
-                    <TypingIndicator />
+                    <TypingIndicator
+                      status={webSearch ? "searching" : "thinking"}
+                    />
                   )}
 
                   {isStreaming && streamingContent && (
