@@ -22,6 +22,7 @@ interface Model {
   id: string;
   name: string;
   provider: string;
+  descriptor?: string;
   description: string;
   maxTokens: number;
   contextWindow: number;
@@ -159,7 +160,14 @@ export function ModelSelector({
                     )}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">{model.name}</span>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium">{model.name}</span>
+                        {model.descriptor && (
+                          <span className="text-xs text-muted-foreground">
+                            {model.descriptor}
+                          </span>
+                        )}
+                      </div>
                       {isSelected && (
                         <div className="h-2 w-2 bg-primary rounded-full" />
                       )}
@@ -197,7 +205,14 @@ export function ModelSelector({
                     )}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">{model.name}</span>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium">{model.name}</span>
+                        {model.descriptor && (
+                          <span className="text-xs text-muted-foreground">
+                            {model.descriptor}
+                          </span>
+                        )}
+                      </div>
                       {isSelected && (
                         <div className="h-2 w-2 bg-primary rounded-full" />
                       )}
