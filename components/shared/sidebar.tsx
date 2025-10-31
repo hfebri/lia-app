@@ -237,9 +237,9 @@ function SidebarComponent({ className }: SidebarProps) {
               />
             )}
             <h1 className="text-xl font-bold">LIA</h1>
-            <Badge variant="secondary" className="text-xs">
+            {/* <Badge variant="secondary" className="text-xs">
               Beta
-            </Badge>
+            </Badge> */}
           </Link>
           <SimpleThemeToggle />
         </div>

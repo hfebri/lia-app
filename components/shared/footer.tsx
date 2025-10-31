@@ -19,7 +19,7 @@ export function Footer() {
               height={16}
             />
             <span className="font-bold">LIA</span>
-            <Badge variant="secondary" className="ml-2">Beta</Badge>
+            {/* <Badge variant="secondary" className="ml-2">Beta</Badge> */}
           </div>
           <p className="text-center text-sm leading-loose text-muted-foreground md:text-left">
             Powered by Leverate Group.

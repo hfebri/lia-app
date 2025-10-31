@@ -275,7 +275,7 @@ export default function OnboardingPage() {
                     className="space-y-6"
                   >
                     <div className="space-y-4">
-                      <motion.div
+                      {/* <motion.div
                         className="flex items-start gap-3 rounded-xl border border-white/20 bg-white/10 p-4"
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -294,7 +294,7 @@ export default function OnboardingPage() {
                             improving!
                           </p>
                         </div>
-                      </motion.div>
+                      </motion.div> */}
 
                       <motion.div
                         className="flex items-start gap-3 rounded-xl border border-white/20 bg-white/10 p-4"
