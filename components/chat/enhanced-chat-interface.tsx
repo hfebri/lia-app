@@ -548,22 +548,30 @@ export function EnhancedChatInterface({
     setIsDragOver(false);
   };
 
-  const handleDrop = (e: React.DragEvent) => {
+  const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
 
     const files = Array.from(e.dataTransfer.files);
-    const isOpenAI = selectedModel.startsWith("gpt-");
 
     if (files.length > 0) {
-      setAttachedFiles([]);
-      if (isOpenAI) {
-        // OpenAI: accept all files
-        setSelectedFiles(files);
-      } else {
-        // Others: only accept first file
-        setSelectedFiles([files[0]]);
+      // Validate files using new utilities
+      const { validateMultipleFiles } = await import("@/lib/utils/file-processing");
+      const allFiles = [...selectedFiles, ...files];
+      const validation = validateMultipleFiles(allFiles);
+
+      if (!validation.isValid) {
+        // Show validation errors
+        const errorMessage = validation.errors
+          .map((e) => e.fileName === "general" ? e.error : `${e.fileName}: ${e.error}`)
+          .join("\n");
+        alert(`File validation failed:\n\n${errorMessage}`);
+        return;
       }
+
+      // All providers now support multiple files (Anthropic + OpenAI)
+      setAttachedFiles([]);
+      setSelectedFiles((prev) => [...prev, ...files]);
     }
   };
 
@@ -706,8 +714,8 @@ export function EnhancedChatInterface({
                 />
               )}
 
-              {/* Web Search Toggle - Show only for OpenAI models */}
-              {isOpenAIModel && (
+              {/* Web Search Toggle - Show for both Claude and OpenAI models */}
+              {(isClaudeModel || isOpenAIModel) && (
                 <WebSearchToggle
                   enabled={webSearch}
                   onToggle={toggleWebSearch}
@@ -855,8 +863,8 @@ export function EnhancedChatInterface({
                 />
               )}
 
-              {/* Web Search Toggle - Show only for OpenAI models */}
-              {isOpenAIModel && (
+              {/* Web Search Toggle - Show for both Claude and OpenAI models */}
+              {(isClaudeModel || isOpenAIModel) && (
                 <WebSearchToggle
                   enabled={webSearch}
                   onToggle={toggleWebSearch}
@@ -1060,53 +1068,112 @@ export function EnhancedChatInterface({
             <div className="space-y-3">
               {/* Selected Files Preview - Will upload when message is sent */}
               {selectedFiles.length > 0 && (
-                <div className="flex flex-wrap gap-2 px-4">
-                  {selectedFiles.map((file, index) => {
-                    const isImage = file.type.startsWith("image/");
-                    const isPDF = file.type === "application/pdf";
-                    const imageUrl = isImage ? URL.createObjectURL(file) : null;
+                <div className="space-y-2 px-4">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <div className="flex items-center gap-1">
+                      <Upload className="h-3 w-3" />
+                      Will process when message is sent
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span>{selectedFiles.length} / 10 files</span>
+                      <span>•</span>
+                      <span>
+                        {(selectedFiles.reduce((sum, f) => sum + f.size, 0) / (1024 * 1024)).toFixed(1)} / 50 MB
+                      </span>
+                    </div>
+                  </div>
 
-                    return (
-                      <div
-                        key={index}
-                        className="flex items-center gap-2 bg-background border border-border rounded-lg px-3 py-2 text-sm"
-                      >
-                        {isImage && imageUrl ? (
-                          <img
-                            src={imageUrl}
-                            alt={file.name}
-                            className="h-8 w-8 rounded object-cover border border-border/50"
-                            onLoad={() => {
-                              // Clean up object URL after image loads
-                              setTimeout(
-                                () => URL.revokeObjectURL(imageUrl),
-                                1000
-                              );
-                            }}
-                          />
-                        ) : isPDF ? (
-                          <div className="h-8 w-8 rounded border border-border/50 bg-red-50 dark:bg-red-950/20 flex items-center justify-center">
-                            <FileText className="h-4 w-4 text-red-500" />
+                  {/* Model Recommendation Banner for Large Documents */}
+                  {(() => {
+                    // Estimate tokens from file sizes (rough: 1KB ≈ 285 tokens)
+                    const totalBytes = selectedFiles.reduce((sum, f) => sum + f.size, 0);
+                    const estimatedTokens = Math.round((totalBytes / 1024) * 285);
+
+                    // Show recommendation if estimated tokens > 150K
+                    if (estimatedTokens > 150000) {
+                      const isGpt5 = selectedModel.startsWith("gpt-5");
+                      const needsGpt5 = estimatedTokens > 190000;
+
+                      if (needsGpt5 && !isGpt5) {
+                        return (
+                          <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg text-xs">
+                            <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                            <div className="flex-1">
+                              <p className="font-medium text-amber-900 dark:text-amber-100 mb-1">
+                                Large Document Detected (~{Math.round(estimatedTokens / 1000)}K tokens)
+                              </p>
+                              <p className="text-amber-700 dark:text-amber-300">
+                                Switch to <span className="font-semibold">GPT-5</span> for documents over 190K tokens.
+                                Claude 4.5 supports up to 200K tokens and may truncate your content.
+                              </p>
+                            </div>
                           </div>
-                        ) : (
-                          <FileText className="h-4 w-4 text-muted-foreground" />
-                        )}
-                        <span className="max-w-32 truncate">{file.name}</span>
+                        );
+                      } else if (!needsGpt5 && !isGpt5 && estimatedTokens > 150000) {
+                        const hasPDF = selectedFiles.some(f => f.type === "application/pdf");
+                        return (
+                          <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg text-xs">
+                            <Brain className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+                            <div className="flex-1">
+                              <p className="text-blue-700 dark:text-blue-300">
+                                Large document (~{Math.round(estimatedTokens / 1000)}K tokens).
+                                {hasPDF ? (
+                                  <> Claude supports <span className="font-semibold">native PDF processing</span> (no OCR needed). GPT-5 offers more token capacity (272K vs 200K).</>
+                                ) : (
+                                  <> Consider <span className="font-semibold">GPT-5</span> for more headroom (272K limit vs Claude's 200K).</>
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      }
+                    }
+                    return null;
+                  })()}
+                  <div className="flex flex-wrap gap-2">
+                    {selectedFiles.map((file, index) => {
+                      const isImage = file.type.startsWith("image/");
+                      const isPDF = file.type === "application/pdf";
+                      const imageUrl = isImage ? URL.createObjectURL(file) : null;
 
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleFileRemove(index)}
-                          className="h-5 w-5 p-0 hover:bg-destructive/10 hover:text-destructive"
+                      return (
+                        <div
+                          key={index}
+                          className="flex items-center gap-2 bg-background border border-border rounded-lg px-3 py-2 text-sm"
                         >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    );
-                  })}
-                  <div className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Upload className="h-3 w-3" />
-                    Will process when message is sent
+                          {isImage && imageUrl ? (
+                            <img
+                              src={imageUrl}
+                              alt={file.name}
+                              className="h-8 w-8 rounded object-cover border border-border/50"
+                              onLoad={() => {
+                                // Clean up object URL after image loads
+                                setTimeout(
+                                  () => URL.revokeObjectURL(imageUrl),
+                                  1000
+                                );
+                              }}
+                            />
+                          ) : isPDF ? (
+                            <div className="h-8 w-8 rounded border border-border/50 bg-red-50 dark:bg-red-950/20 flex items-center justify-center">
+                              <FileText className="h-4 w-4 text-red-500" />
+                            </div>
+                          ) : (
+                            <FileText className="h-4 w-4 text-muted-foreground" />
+                          )}
+                          <span className="max-w-32 truncate">{file.name}</span>
+
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleFileRemove(index)}
+                            className="h-5 w-5 p-0 hover:bg-destructive/10 hover:text-destructive"
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -1118,31 +1185,37 @@ export function EnhancedChatInterface({
                   ref={(ref) => {
                     if (ref) {
                       ref.style.display = "none";
-                      ref.onchange = (e) => {
+                      ref.onchange = async (e) => {
                         const target = e.target as HTMLInputElement;
                         if (target.files) {
                           const newFiles = Array.from(target.files);
-                          const isOpenAI = selectedModel.startsWith("gpt-");
 
                           if (newFiles.length > 0) {
-                            setAttachedFiles([]);
-                            if (isOpenAI) {
-                              // OpenAI: append all files
-                              setSelectedFiles((prev) => [
-                                ...prev,
-                                ...newFiles,
-                              ]);
-                            } else {
-                              // Others: only accept first file
-                              setSelectedFiles([newFiles[0]]);
+                            // Validate files using new utilities
+                            const { validateMultipleFiles } = await import("@/lib/utils/file-processing");
+                            const allFiles = [...selectedFiles, ...newFiles];
+                            const validation = validateMultipleFiles(allFiles);
+
+                            if (!validation.isValid) {
+                              // Show validation errors
+                              const errorMessage = validation.errors
+                                .map((e) => e.fileName === "general" ? e.error : `${e.fileName}: ${e.error}`)
+                                .join("\n");
+                              alert(`File validation failed:\n\n${errorMessage}`);
+                              target.value = ""; // Reset input
+                              return;
                             }
+
+                            // All providers now support multiple files (Anthropic + OpenAI)
+                            setAttachedFiles([]);
+                            setSelectedFiles((prev) => [...prev, ...newFiles]);
                           }
                           target.value = ""; // Reset input
                         }
                       };
                     }
                   }}
-                  accept=".pdf,.doc,.docx,.pptx,.ppt,.txt,.rtf,.csv,.md,.xls,.xlsx,.xlsm,.jpg,.jpeg,.png,.gif,.bmp,.webp,.svg"
+                  accept=".pdf,.doc,.docx,.pptx,.ppt,.txt,.rtf,.csv,.md,.xls,.xlsx,.xlsm,.odt,.ods,.odp,.jpg,.jpeg,.png,.gif,.bmp,.webp,.svg"
                   multiple={true}
                 />
                 <Button

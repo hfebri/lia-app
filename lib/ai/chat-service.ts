@@ -46,6 +46,7 @@ export interface StreamingChatResponse {
     completion_tokens: number;
     total_tokens: number;
   };
+  fileValidationWarnings?: Array<{ fileName: string; reason: string }>;
 }
 
 export interface ChatServiceOptions {
@@ -166,7 +167,11 @@ export class ChatService {
       throw new Error(data.error || "Failed to get AI response");
     }
 
-    return data.data;
+    // Return both data and warnings (if any)
+    return {
+      ...data.data,
+      fileValidationWarnings: data.fileValidationWarnings,
+    };
   }
 
   /**
@@ -309,6 +314,7 @@ export class ChatService {
               // Only yield if there's actual content or if it's the completion marker
               const content = parsed.content || "";
               const isComplete = parsed.isComplete || false;
+              const fileValidationWarnings = parsed.fileValidationWarnings;
 
               if (isComplete) {
                 hasReceivedCompletion = true;
@@ -320,7 +326,8 @@ export class ChatService {
                 (trimmedContent &&
                   trimmedContent !== "{}" &&
                   trimmedContent !== '""') ||
-                isComplete;
+                isComplete ||
+                fileValidationWarnings; // Also yield if we have warnings
 
               if (shouldYield) {
                 yield {
@@ -330,6 +337,7 @@ export class ChatService {
                       : content,
                   isComplete,
                   usage: parsed.usage,
+                  fileValidationWarnings,
                 };
               }
 

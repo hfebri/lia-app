@@ -43,6 +43,8 @@ export class AnthropicProvider implements AIProvider {
   constructor(apiKey: string) {
     this.client = new Anthropic({
       apiKey,
+      // NOTE: Beta headers for web search are added per-request (see generateResponse/generateStream)
+      // because they're only needed when enable_web_search is true
     });
   }
 
@@ -94,14 +96,28 @@ export class AnthropicProvider implements AIProvider {
         };
       }
 
-      // Note: Web search is not supported for Anthropic provider
-      // Claude does not have native web search - only OpenAI GPT-5 supports it
+      // Add Claude's native web search tool if enabled
+      // Cost: $10 per 1,000 searches + standard token costs
+      // IMPORTANT: Requires organization to enable web search in Anthropic Console
+      // https://console.anthropic.com → Privacy Settings → Enable Web Search
+      let extraHeaders: Record<string, string> = {};
       if (enable_web_search) {
-        console.warn("[Anthropic] Web search requested but not supported. Use OpenAI GPT-5 for web search.");
+        console.log("[Anthropic] Enabling web search tool (max 5 searches)");
+        requestParams.tools = [
+          {
+            type: "web_search_20250305",
+            name: "web_search",
+            max_uses: 5, // Limit to 5 searches per request
+          } as any,
+        ];
+        // REQUIRED: Beta header for web search tool
+        extraHeaders["anthropic-beta"] = "web-search-2025-03-05";
       }
 
       // Create completion
-      const message = await this.client.messages.create(requestParams);
+      const message = await this.client.messages.create(requestParams, {
+        headers: Object.keys(extraHeaders).length > 0 ? extraHeaders : undefined,
+      });
 
       // Extract content from response
       const textContent = message.content.find(
@@ -173,14 +189,27 @@ export class AnthropicProvider implements AIProvider {
         };
       }
 
-      // Note: Web search is not supported for Anthropic provider
-      // Claude does not have native web search - only OpenAI GPT-5 supports it
+      // Add Claude's native web search tool if enabled
+      // Cost: $10 per 1,000 searches + standard token costs
+      // IMPORTANT: Requires organization to enable web search in Anthropic Console
+      let extraHeaders: Record<string, string> = {};
       if (enable_web_search) {
-        console.warn("[Anthropic] Web search requested but not supported. Use OpenAI GPT-5 for web search.");
+        console.log("[Anthropic Stream] Enabling web search tool (max 5 searches)");
+        requestParams.tools = [
+          {
+            type: "web_search_20250305",
+            name: "web_search",
+            max_uses: 5, // Limit to 5 searches per request
+          } as any,
+        ];
+        // REQUIRED: Beta header for web search tool
+        extraHeaders["anthropic-beta"] = "web-search-2025-03-05";
       }
 
       // Create streaming completion
-      const stream = await this.client.messages.create(requestParams);
+      const stream = await this.client.messages.create(requestParams, {
+        headers: Object.keys(extraHeaders).length > 0 ? extraHeaders : undefined,
+      });
 
       let totalTokens = 0;
       let promptTokens = 0;
@@ -251,7 +280,7 @@ export class AnthropicProvider implements AIProvider {
       const hasFiles = message.files && message.files.length > 0;
 
       if (hasFiles && message.role === "user") {
-        // User message with files - use content array format
+        // User message with files - use content array format for native vision
         const content: Anthropic.MessageParam["content"] = [];
 
         // Add text content first
@@ -262,7 +291,8 @@ export class AnthropicProvider implements AIProvider {
           });
         }
 
-        // Add files (images and PDFs)
+        // Add all files with native vision support
+        // Multiple images and PDFs supported in a single message
         for (const file of message.files || []) {
           if (this.isImageFile(file.type)) {
             const imageSource = this.getImageSource(file);

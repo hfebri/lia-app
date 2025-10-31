@@ -617,25 +617,115 @@ export function useAiChat(options: UseAiChatOptions = {}) {
                 }));
                 extractedText = await ClientFileProcessor.parseSpreadsheet(file);
               } else {
-                // For documents (PDF, DOC, DOCX, PPT, PPTX), use Marker OCR
-                const ocrResponse = await fetch("/api/files/ocr", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    fileUrl,
-                    fileName: file.name,
-                    mimeType: file.type,
-                    mode: "fast",
-                  }),
-                });
+                // For PDFs and documents
+                const isPDF = file.type === "application/pdf";
+                const isClaude = state.selectedModel.includes("claude");
 
-                if (ocrResponse.ok) {
-                  const ocrData = await ocrResponse.json();
-                  extractedText = ocrData.data.extractedText;
+                if (isPDF && isClaude) {
+                  // Claude has NATIVE PDF support - send directly as base64 without OCR
+                  // This is much faster, more accurate, and cheaper than OCR
+                  // We also kick off OCR in the background for follow-up messages
+                  setState((prev) => ({
+                    ...prev,
+                    fileProcessingProgress: {
+                      ...prev.fileProcessingProgress,
+                      [file.name]: {
+                        stage: "processing",
+                        progress: 70,
+                        message: "Preparing PDF for Claude (native support)...",
+                      },
+                    },
+                  }));
+
+                  // Get base64 immediately (fast)
+                  const reader = new FileReader();
+                  const base64Promise = new Promise<string>((resolve) => {
+                    reader.onload = () => {
+                      const base64 = (reader.result as string).split(",")[1];
+                      resolve(base64);
+                    };
+                    reader.readAsDataURL(file);
+                  });
+
+                  base64Data = await base64Promise;
+
+                  // Kick off OCR in background (don't await)
+                  // The OCR result will be stored when it completes
+                  const fileName = file.name;
+                  fetch("/api/files/ocr", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      fileUrl,
+                      fileName: file.name,
+                      mimeType: file.type,
+                      mode: "fast",
+                    }),
+                  })
+                    .then(async (res) => {
+                      if (res.ok) {
+                        const ocrData = await res.json();
+                        const ocrText = ocrData.data.extractedText;
+
+                        // Update the processed file's extractedText when OCR completes
+                        // This will be available for follow-up messages
+                        setState((prev) => {
+                          const updatedMessages = prev.messages.map(msg => {
+                            if (msg.metadata?.files) {
+                              const updatedFiles = msg.metadata.files.map(f =>
+                                f.name === fileName && !f.extractedText
+                                  ? { ...f, extractedText: ocrText }
+                                  : f
+                              );
+                              return { ...msg, metadata: { ...msg.metadata, files: updatedFiles } };
+                            }
+                            return msg;
+                          });
+                          return { ...prev, messages: updatedMessages };
+                        });
+
+                        console.log(`[Background OCR] Completed for ${fileName}, text stored for follow-ups`);
+                      }
+                    })
+                    .catch((err) => {
+                      console.error(`[Background OCR] Failed for ${fileName}:`, err);
+                    });
+
+                  // Don't set extractedText here - Claude will process PDF natively
+                  // OCR text will be added later when background job completes
                 } else {
-                  const errorData = await ocrResponse.json();
-                  console.error(`OCR failed for ${file.name}:`, errorData);
-                  // Continue without extracted text - at least upload succeeded
+                  // For non-Claude models or non-PDF documents, use Marker OCR
+                  setState((prev) => ({
+                    ...prev,
+                    fileProcessingProgress: {
+                      ...prev.fileProcessingProgress,
+                      [file.name]: {
+                        stage: "processing",
+                        progress: 70,
+                        message: "Extracting text with OCR...",
+                      },
+                    },
+                  }));
+
+                  const ocrResponse = await fetch("/api/files/ocr", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      fileUrl,
+                      fileName: file.name,
+                      mimeType: file.type,
+                      mode: "fast",
+                    }),
+                  });
+
+                  if (ocrResponse.ok) {
+                    const ocrData = await ocrResponse.json();
+                    extractedText = ocrData.data.extractedText;
+                  } else {
+                    const errorData = await ocrResponse.json();
+                    console.error(`OCR failed for ${file.name}:`, errorData);
+                    // Continue without extracted text - at least upload succeeded
+                  }
                 }
               }
 
@@ -905,6 +995,36 @@ export function useAiChat(options: UseAiChatOptions = {}) {
 
             accumulatedContent += chunk.content;
 
+            // Handle file validation warnings (shown in first chunk)
+            if (chunk.fileValidationWarnings && chunk.fileValidationWarnings.length > 0) {
+              const { toastWarning } = await import("@/components/providers/toast-provider");
+
+              // Group warnings by type
+              const generalWarnings = chunk.fileValidationWarnings.filter(w => w.fileName === "general");
+              const fileSpecificWarnings = chunk.fileValidationWarnings.filter(w => w.fileName !== "general");
+
+              // Show general warnings
+              generalWarnings.forEach(warning => {
+                toastWarning("File Upload Warning", warning.reason);
+              });
+
+              // Show file-specific warnings (combine if many)
+              if (fileSpecificWarnings.length > 0) {
+                if (fileSpecificWarnings.length === 1) {
+                  toastWarning(
+                    `File Skipped: ${fileSpecificWarnings[0].fileName}`,
+                    fileSpecificWarnings[0].reason
+                  );
+                } else {
+                  const fileList = fileSpecificWarnings.map(w => `• ${w.fileName}: ${w.reason}`).join('\n');
+                  toastWarning(
+                    `${fileSpecificWarnings.length} Files Skipped`,
+                    fileList
+                  );
+                }
+              }
+            }
+
             setState((prev) => ({
               ...prev,
               streamingContent: accumulatedContent,
@@ -994,6 +1114,36 @@ export function useAiChat(options: UseAiChatOptions = {}) {
             thinking_mode: state.thinkingMode,
             reasoning_effort: state.reasoningEffort,
           });
+
+          // Handle file validation warnings (non-streaming)
+          if (response.fileValidationWarnings && response.fileValidationWarnings.length > 0) {
+            const { toastWarning } = await import("@/components/providers/toast-provider");
+
+            // Group warnings by type
+            const generalWarnings = response.fileValidationWarnings.filter(w => w.fileName === "general");
+            const fileSpecificWarnings = response.fileValidationWarnings.filter(w => w.fileName !== "general");
+
+            // Show general warnings
+            generalWarnings.forEach(warning => {
+              toastWarning("File Upload Warning", warning.reason);
+            });
+
+            // Show file-specific warnings (combine if many)
+            if (fileSpecificWarnings.length > 0) {
+              if (fileSpecificWarnings.length === 1) {
+                toastWarning(
+                  `File Skipped: ${fileSpecificWarnings[0].fileName}`,
+                  fileSpecificWarnings[0].reason
+                );
+              } else {
+                const fileList = fileSpecificWarnings.map(w => `• ${w.fileName}: ${w.reason}`).join('\n');
+                toastWarning(
+                  `${fileSpecificWarnings.length} Files Skipped`,
+                  fileList
+                );
+              }
+            }
+          }
 
           const assistantMessage = chatService.current.createMessage(
             "assistant",

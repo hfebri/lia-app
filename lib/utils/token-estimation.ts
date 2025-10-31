@@ -31,12 +31,25 @@ export interface TokenLimits {
 
 /**
  * Default token limits based on common AI model context windows
+ *
+ * Model Capabilities (as of 2025):
+ * - Claude 4.5 Sonnet: 200K input tokens
+ * - GPT-5: 272K input tokens, 128K output tokens (400K total)
+ *
+ * IMPORTANT: Images sent as base64 consume significant tokens:
+ * - A 2048x2048 image ≈ 5,000-7,000 tokens (vision tokens, not text)
+ * - Base64 text representation is NOT counted here but IS sent to API
+ * - Multiple images can quickly exceed limits
+ *
+ * For document-heavy workflows with vision:
+ * - Conservative limits to account for base64 overhead
+ * - Images/PDFs use native vision APIs (counted separately by provider)
  */
 export const DEFAULT_TOKEN_LIMITS: TokenLimits = {
-  maxContextTokens: 200000, // Conservative limit (most models support 200K-1M)
-  reservedTokens: 10000,    // Reserve for system prompts, formatting, response
-  maxFileTokens: 150000,    // Max tokens for all file content combined
-  maxHistoryTokens: 40000,  // Max tokens for conversation history
+  maxContextTokens: 250000, // Increased for GPT-5 (272K input limit)
+  reservedTokens: 20000,    // Reserve for system prompts, formatting, response (increased for safety)
+  maxFileTokens: 120000,    // REDUCED: Max tokens for extracted text only (not including base64 images)
+  maxHistoryTokens: 30000,  // Max tokens for conversation history
 };
 
 /**
@@ -86,6 +99,51 @@ export interface TruncatedFile {
 export function estimateTokenCount(text: string): number {
   if (!text) return 0;
   return Math.ceil(text.length / 3.5);
+}
+
+/**
+ * Estimate vision tokens for an image
+ *
+ * Vision APIs use different token calculations based on image dimensions
+ * OpenAI/Anthropic vision tokens: ~170 tokens per 512x512 tile
+ *
+ * @param file - File object with size information
+ * @returns Estimated vision token count
+ */
+export function estimateImageTokens(file: { size: number; type: string }): number {
+  if (!file.type.startsWith("image/")) return 0;
+
+  // Rough estimation based on file size
+  // After compression to 2048px max dimension:
+  // - Small images (<500KB): ~1,000-2,000 tokens
+  // - Medium images (500KB-2MB): ~2,000-5,000 tokens
+  // - Large images (2MB-5MB): ~5,000-8,000 tokens
+  // - Very large (5MB+): ~8,000-12,000 tokens
+
+  const sizeInMB = file.size / (1024 * 1024);
+
+  if (sizeInMB < 0.5) return 1500;
+  if (sizeInMB < 2) return 3500;
+  if (sizeInMB < 5) return 6500;
+  return 10000; // Cap at 10K for very large images
+}
+
+/**
+ * Estimate total tokens including text and vision content
+ *
+ * @param textTokens - Token count from extracted text
+ * @param files - Array of file attachments
+ * @returns Total estimated token count
+ */
+export function estimateTotalTokens(
+  textTokens: number,
+  files: Array<{ size: number; type: string }> = []
+): number {
+  const imageTokens = files.reduce((sum, file) => {
+    return sum + estimateImageTokens(file);
+  }, 0);
+
+  return textTokens + imageTokens;
 }
 
 /**
@@ -216,4 +274,85 @@ export function formatTruncationInfo(
 ): string {
   const percentKept = Math.round((truncatedTokens / originalTokens) * 100);
   return `(${percentKept}% of content included, ${originalTokens.toLocaleString()} → ${truncatedTokens.toLocaleString()} tokens)`;
+}
+
+/**
+ * Model context window limits
+ */
+export const MODEL_CONTEXT_LIMITS = {
+  "claude-4.5-sonnet": {
+    maxInputTokens: 200000,
+    maxOutputTokens: 64000,
+    name: "Claude 4.5 Sonnet",
+    bestFor: "High-quality analysis, coding, and reasoning tasks",
+  },
+  "gpt-5": {
+    maxInputTokens: 272000,
+    maxOutputTokens: 128000,
+    name: "GPT-5",
+    bestFor: "Very long documents, extensive analysis, and large context needs",
+  },
+} as const;
+
+/**
+ * Recommend the best AI model for document analysis based on token count
+ *
+ * @param estimatedTokens - Estimated token count of the document(s)
+ * @returns Recommendation object with model ID and reason
+ */
+export function recommendModelForDocument(estimatedTokens: number): {
+  modelId: string;
+  modelName: string;
+  reason: string;
+  warning?: string;
+} {
+  // Account for reserved tokens (system prompts, formatting, etc.)
+  const effectiveTokens = estimatedTokens + DEFAULT_TOKEN_LIMITS.reservedTokens;
+
+  // For very large documents (>190K tokens), use GPT-5
+  if (effectiveTokens > 190000) {
+    return {
+      modelId: "gpt-5",
+      modelName: MODEL_CONTEXT_LIMITS["gpt-5"].name,
+      reason: `Document size (~${Math.round(estimatedTokens / 1000)}K tokens) exceeds Claude 4.5's limit. GPT-5 supports up to 272K input tokens.`,
+      warning: effectiveTokens > 250000
+        ? "Document is very large and may still be truncated. Consider summarizing first."
+        : undefined,
+    };
+  }
+
+  // For large documents (150K-190K tokens), recommend GPT-5 but Claude is still viable
+  if (effectiveTokens > 150000) {
+    return {
+      modelId: "gpt-5",
+      modelName: MODEL_CONTEXT_LIMITS["gpt-5"].name,
+      reason: `Large document (~${Math.round(estimatedTokens / 1000)}K tokens). GPT-5 recommended for better headroom, but Claude 4.5 will also work.`,
+    };
+  }
+
+  // For normal documents (<150K tokens), Claude 4.5 is preferred for quality
+  return {
+    modelId: "claude-4.5-sonnet",
+    modelName: MODEL_CONTEXT_LIMITS["claude-4.5-sonnet"].name,
+    reason: `Document size (~${Math.round(estimatedTokens / 1000)}K tokens) fits well within Claude 4.5's context window. Recommended for best quality.`,
+  };
+}
+
+/**
+ * Get model-specific effective token limit
+ *
+ * @param modelId - Model identifier
+ * @returns Effective token limit after accounting for reserved tokens
+ */
+export function getEffectiveTokenLimit(modelId: string): number {
+  if (modelId.includes("gpt-5")) {
+    return MODEL_CONTEXT_LIMITS["gpt-5"].maxInputTokens - DEFAULT_TOKEN_LIMITS.reservedTokens;
+  }
+
+  if (modelId.includes("claude")) {
+    return MODEL_CONTEXT_LIMITS["claude-4.5-sonnet"].maxInputTokens - DEFAULT_TOKEN_LIMITS.reservedTokens;
+  }
+
+  // Default to Claude limits for unknown models
+  return MODEL_CONTEXT_LIMITS["claude-4.5-sonnet"].maxInputTokens - DEFAULT_TOKEN_LIMITS.reservedTokens;
 }

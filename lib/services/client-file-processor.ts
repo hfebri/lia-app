@@ -51,6 +51,52 @@ export interface FileProcessingProgress {
 
 export class ClientFileProcessor {
   /**
+   * Process multiple files for AI with native vision support
+   * Uses browser APIs for base64 conversion and compression
+   *
+   * @param files - Array of File objects to process
+   * @param options - Processing options
+   * @returns Array of processed files with metadata
+   */
+  static async processMultipleFiles(
+    files: File[],
+    options?: {
+      compressImages?: boolean;
+      onProgress?: (fileName: string, progress: number, total: number) => void;
+    }
+  ): Promise<ProcessedFile[]> {
+    const { processMultipleFilesForAI } = await import("@/lib/utils/file-processing");
+
+    const aiFiles = await processMultipleFilesForAI(files, {
+      compressImages: options?.compressImages ?? true,
+      extractText: true,
+      onProgress: options?.onProgress,
+    });
+
+    // Convert AIFileAttachment to ProcessedFile format
+    return aiFiles.map((aiFile) => ({
+      name: aiFile.name,
+      type: aiFile.type,
+      size: aiFile.size ?? 0,
+      data: aiFile.data,
+      extractedText: aiFile.extractedText,
+      isImage: aiFile.type.startsWith("image/"),
+      isDocument: aiFile.type === "application/pdf",
+      isText: aiFile.type.startsWith("text/"),
+      isSpreadsheet: aiFile.type.includes("spreadsheet") || aiFile.type.includes("excel"),
+      error: aiFile.error || null,
+      // Display content for UI (shortened summary)
+      displayContent: aiFile.error
+        ? `❌ ${aiFile.name} (${aiFile.error})`
+        : aiFile.extractedText
+        ? `📄 ${aiFile.name} (${Math.ceil(aiFile.extractedText.length / 1000)}KB text)`
+        : `📄 ${aiFile.name}`,
+      // Prompt content for AI (full data)
+      promptContent: aiFile.extractedText || `[File: ${aiFile.name}]`,
+    }));
+  }
+
+  /**
    * Create enhanced prompt content that includes processed file summaries.
    */
   static createEnhancedPrompt(

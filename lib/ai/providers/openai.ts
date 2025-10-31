@@ -455,11 +455,11 @@ export class OpenAIProvider implements AIProvider {
         continue;
       }
 
-      // Check if message has files (images)
+      // Check if message has files
       const hasFiles = message.files && message.files.length > 0;
 
       if (hasFiles && message.role === "user") {
-        // User message with images - use content array format
+        // User message with files - use content array format for native vision
         const content: OpenAI.Chat.ChatCompletionContentPart[] = [
           {
             type: "text",
@@ -467,7 +467,8 @@ export class OpenAIProvider implements AIProvider {
           },
         ];
 
-        // Add images
+        // Add all images with native vision support
+        // Multiple images are supported in a single message
         for (const file of message.files || []) {
           if (this.isImageFile(file.type)) {
             // Prefer URL, fallback to base64 data
@@ -478,6 +479,8 @@ export class OpenAIProvider implements AIProvider {
                 type: "image_url",
                 image_url: {
                   url: imageUrl,
+                  // Optional: Add detail level for token optimization
+                  // detail: "auto" | "low" | "high"
                 },
               });
             }

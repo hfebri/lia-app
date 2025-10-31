@@ -6,21 +6,31 @@ import { cn } from "@/lib/utils";
 
 interface TypingIndicatorProps {
   className?: string;
-  status?: "thinking" | "processing" | "searching" | "analyzing" | "generating" | "reading" | "finalizing" | "preparing" | "processing-files" | "scanning-images";
+  status?:
+    | "thinking"
+    | "processing"
+    | "searching"
+    | "analyzing"
+    | "generating"
+    | "reading"
+    | "finalizing"
+    | "preparing"
+    | "processing-files"
+    | "scanning-images";
   isProcessingFiles?: boolean;
 }
 
 const STATUS_MESSAGES = {
-  thinking: "Noted ya, aku lagi mikir dulu biar stay on brief.",
-  processing: "Aku lagi prosesin datanya, nanti aku jump in lagi.",
-  reading: "Hold on, aku mau tap in baca materinya dulu.",
-  searching: "Sebentar, aku lagi tap in hunting insight yang relevan.",
-  analyzing: "Aku lagi breaking down angkanya biar nggak miss.",
-  preparing: "Jawabannya aku draft dulu biar ready di-share.",
-  generating: "Aku lagi ngetik versi yang cakep, bentar lagi drop.",
-  finalizing: "Almost done, aku polish dulu baru aku share.",
-  "processing-files": "Aku lagi scan file-nya dulu ya, stay tuned.",
-  "scanning-images": "Aku lagi baca image-nya, bentar ya nge-extract info.",
+  thinking: "Noted ya, aku lagi mikir dulu biar stay on brief...",
+  processing: "Aku lagi prosesin datanya, nanti aku jump in lagi...",
+  reading: "Hold on, aku mau tap in baca materinya dulu...",
+  searching: "Sebentar, aku lagi tap in hunting insight yang relevan...",
+  analyzing: "Aku lagi breaking down angkanya biar nggak miss...",
+  preparing: "Jawabannya aku draft dulu biar ready di-share...",
+  generating: "Aku lagi ngetik versi yang cakep, bentar lagi drop...",
+  finalizing: "Almost done, aku polish dulu baru aku share...",
+  "processing-files": "Aku lagi scan file-nya dulu ya, stay tuned...",
+  "scanning-images": "Aku lagi baca image-nya, bentar ya nge-extract info...",
 };
 
 const STATUS_CYCLE = [
@@ -42,7 +52,11 @@ const FILE_PROCESSING_CYCLE = [
   "preparing",
 ] as const;
 
-export function TypingIndicator({ className, status, isProcessingFiles }: TypingIndicatorProps) {
+export function TypingIndicator({
+  className,
+  status,
+  isProcessingFiles,
+}: TypingIndicatorProps) {
   const [cycleIndex, setCycleIndex] = useState(0);
 
   // Always cycle through statuses during a single session

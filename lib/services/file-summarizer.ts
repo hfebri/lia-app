@@ -15,9 +15,16 @@ import { estimateTokenCount, truncateToTokenLimit } from "@/lib/utils/token-esti
 const SUMMARIZATION_THRESHOLD_TOKENS = 10000;
 
 /**
- * Target compression ratio for summaries (5-10% of original)
+ * Target compression ratios for summaries based on file size
+ * - Small files (10K-50K tokens): 8% compression (92% reduction)
+ * - Medium files (50K-100K tokens): 5% compression (95% reduction)
+ * - Large files (>100K tokens): 3% compression (97% reduction)
  */
-const TARGET_SUMMARY_RATIO = 0.08; // 8% of original
+function getTargetSummaryRatio(tokenCount: number): number {
+  if (tokenCount > 100000) return 0.03; // 3% for very large files
+  if (tokenCount > 50000) return 0.05;  // 5% for large files
+  return 0.08;                          // 8% for medium files
+}
 
 /**
  * Maximum time to wait for summarization (30 seconds)
@@ -181,7 +188,8 @@ export async function summarizeFileContent(
 
     // Determine file type and get appropriate prompt
     const fileType = getFileType(fileName, mimeType);
-    const targetTokens = Math.ceil(originalTokens * TARGET_SUMMARY_RATIO);
+    const summaryRatio = getTargetSummaryRatio(originalTokens);
+    const targetTokens = Math.ceil(originalTokens * summaryRatio);
     const prompt = getSummarizationPrompt(fileType, targetTokens);
 
     // Create Anthropic provider
@@ -242,7 +250,8 @@ export async function summarizeFileContent(
     // Fallback to truncation
     // IMPORTANT: Set skipped: false so client uses the truncated text
     // Otherwise the full original text flows into context during outages
-    const targetTokens = Math.ceil(originalTokens * TARGET_SUMMARY_RATIO);
+    const summaryRatio = getTargetSummaryRatio(originalTokens);
+    const targetTokens = Math.ceil(originalTokens * summaryRatio);
     const truncationResult = truncateToTokenLimit(content, targetTokens, true);
 
     return {
