@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useAiChat } from "@/hooks/use-ai-chat";
 import { useConversations } from "@/hooks/use-conversations";
 import { useFileUpload, type FileItem } from "@/hooks/use-file-upload";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { ModelSelector } from "./model-selector";
 import { StreamingMessage } from "./streaming-message";
 import { MessageItem } from "./message-item";
@@ -73,6 +73,7 @@ export function EnhancedChatInterface({
 
   const searchParams = useSearchParams();
   const router = useRouter();
+  const pathname = usePathname();
 
   const { isUploading, refreshFiles, error: fileError } = useFileUpload();
 
@@ -186,18 +187,19 @@ export function EnhancedChatInterface({
     setPreventModelOverride(false);
 
     // Clean up query params so the URL reflects the reset state
-    const nextUrl = new URL(window.location.href);
-    nextUrl.searchParams.delete("newChat");
-    nextUrl.searchParams.delete("conversation");
-    const cleanedSearch = nextUrl.searchParams.toString();
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("newChat");
+    params.delete("conversation");
+    const cleanedSearch = params.toString();
     const destination = cleanedSearch
-      ? `${nextUrl.pathname}?${cleanedSearch}`
-      : nextUrl.pathname;
+      ? `${pathname}?${cleanedSearch}`
+      : pathname;
 
-    router.replace(destination || "/", { scroll: false });
+    router.replace(destination, { scroll: false });
   }, [
     searchParams,
     router,
+    pathname,
     startNewConversation,
     stopStreaming,
     setPreventModelOverride,
@@ -756,9 +758,10 @@ export function EnhancedChatInterface({
                     setPreventModelOverride(true);
 
                     // Clear current conversation and URL - new conversation will be created when user sends first message
-                    const url = new URL(window.location.href);
-                    url.searchParams.delete("conversation");
-                    window.history.pushState({}, "", url);
+                    const params = new URLSearchParams(searchParams.toString());
+                    params.delete("conversation");
+                    const newUrl = params.toString() ? `${pathname}?${params}` : pathname;
+                    router.replace(newUrl, { scroll: false });
 
                     // Update local state immediately
                     setCurrentConversationId(null);
@@ -905,9 +908,10 @@ export function EnhancedChatInterface({
                     setPreventModelOverride(true);
 
                     // Clear current conversation and URL - new conversation will be created when user sends first message
-                    const url = new URL(window.location.href);
-                    url.searchParams.delete("conversation");
-                    window.history.pushState({}, "", url);
+                    const params = new URLSearchParams(searchParams.toString());
+                    params.delete("conversation");
+                    const newUrl = params.toString() ? `${pathname}?${params}` : pathname;
+                    router.replace(newUrl, { scroll: false });
 
                     // Update local state immediately
                     setCurrentConversationId(null);
@@ -958,9 +962,10 @@ export function EnhancedChatInterface({
                     onStartNew={() => {
                       startNewConversation();
                       // Clear URL to indicate new conversation
-                      const url = new URL(window.location.href);
-                      url.searchParams.delete("conversation");
-                      window.history.pushState({}, "", url);
+                      const params = new URLSearchParams(searchParams.toString());
+                      params.delete("conversation");
+                      const newUrl = params.toString() ? `${pathname}?${params}` : pathname;
+                      router.replace(newUrl, { scroll: false });
                       setCurrentConversationId(null);
                       setConversationTitle("AI Assistant");
                     }}
