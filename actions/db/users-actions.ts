@@ -2,9 +2,9 @@
 
 import { db } from "@/db/db";
 import { users, files, conversations } from "@/db/schema";
-import type { User, NewUser } from "@/db/types";
+import type { User } from "@/db/types";
 import { ActionState } from "@/types";
-import { eq, and, or, desc, count, sql } from "drizzle-orm";
+import { eq, desc, count, sql } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth/session";
 
 export async function getUsersWithCountsAction(): Promise<

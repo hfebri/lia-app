@@ -3,7 +3,6 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useTheme } from "next-themes";
-import { Badge } from "@/components/ui/badge";
 
 export function Footer() {
   const { theme } = useTheme();
