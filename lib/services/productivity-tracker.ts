@@ -68,9 +68,6 @@ export class ProductivityTracker {
   ): Promise<void> {
     try {
       await calculateDailySnapshot(userId, date);
-      console.log(
-        `[Productivity Tracker] Recalculated metrics for ${userId} on ${date.toISOString().split("T")[0]}`
-      );
     } catch (error) {
       console.error("[Productivity Tracker] Error recalculating metrics:", error);
       throw error;

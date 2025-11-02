@@ -19,8 +19,6 @@ export async function POST(request: NextRequest) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    console.log(`[Productivity] Calculating metrics for user ${userId}...`);
-
     // Calculate today's snapshot
     await calculateDailySnapshot(userId, today);
 
@@ -44,8 +42,6 @@ export async function POST(request: NextRequest) {
         });
       }
     }
-
-    console.log(`[Productivity] Calculation completed for user ${userId}`);
 
     return NextResponse.json({
       success: true,

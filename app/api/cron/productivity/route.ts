@@ -39,18 +39,8 @@ export async function POST(request: NextRequest) {
     const dateParam = searchParams.get("date");
     const targetDate = dateParam ? new Date(dateParam) : undefined;
 
-    console.log(
-      `[Productivity Cron] Starting calculation for ${
-        targetDate
-          ? targetDate.toISOString().split("T")[0]
-          : "yesterday"
-      }`
-    );
-
     // Calculate metrics for all users
     await calculateMetricsForAllUsers(targetDate);
-
-    console.log("[Productivity Cron] Calculation completed successfully");
 
     return NextResponse.json({
       success: true,

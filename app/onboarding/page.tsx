@@ -33,34 +33,14 @@ export default function OnboardingPage() {
 
   // Redirect if not authenticated or already completed onboarding
   useEffect(() => {
-    console.log("[ONBOARDING] 📊 Auth state:", {
-      isLoading,
-      isFetchingUser,
-      hasUser: !!user,
-      userEmail: user?.email,
-      hasCompletedOnboarding: user?.hasCompletedOnboarding,
-    });
-
     // Auth is ready if not loading AND (not fetching OR we have user data)
     // This prevents race condition where user data exists but isFetchingUser is still true
     const isAuthReady = !isLoading && (!isFetchingUser || user !== null);
 
     if (isAuthReady && !user) {
-      console.log(
-        "[ONBOARDING] ❌ Auth complete, no user found - redirecting to /signin"
-      );
       router.push("/signin");
     } else if (isAuthReady && user?.hasCompletedOnboarding) {
-      console.log(
-        "[ONBOARDING] ✅ User already completed onboarding - redirecting to /"
-      );
       router.push("/");
-    } else if (isAuthReady && user) {
-      console.log(
-        "[ONBOARDING] 🎯 User authenticated, showing onboarding wizard"
-      );
-    } else {
-      console.log("[ONBOARDING] ⏳ Still loading auth state...");
     }
   }, [isLoading, isFetchingUser, user, router]);
 
@@ -75,7 +55,6 @@ export default function OnboardingPage() {
     setError(null);
 
     try {
-      console.log("[ONBOARDING] 💾 Submitting profile update...");
       const response = await fetch("/api/auth/update-profile", {
         method: "POST",
         headers: {
@@ -91,15 +70,8 @@ export default function OnboardingPage() {
         throw new Error("Failed to update profile");
       }
 
-      console.log("[ONBOARDING] ✅ Profile updated successfully");
-      console.log(
-        "[ONBOARDING] 🔄 Refreshing session to get updated user data..."
-      );
-
       // Refresh session to get updated user data
       await refreshSession();
-
-      console.log("[ONBOARDING] ➡️ Redirecting to home...");
 
       // Use Next.js router for client-side navigation
       router.push("/");

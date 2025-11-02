@@ -2,13 +2,6 @@ import { MarkerOCRService } from "@/lib/services/marker-ocr";
 
 // Use dynamic imports to avoid module load-time errors
 
-const isDev = process.env.NODE_ENV !== "production";
-const debugLog = (...args: unknown[]) => {
-  if (isDev) {
-    console.log(...args);
-  }
-};
-
 let markerService: MarkerOCRService | null = null;
 
 function getMarkerService(): MarkerOCRService {
@@ -105,9 +98,6 @@ async function extractFromPDF(
 
     // If we have substantial text content, return it
     if (wordCount > 10) {
-      debugLog(
-        `📄 [PDF] Successfully extracted ${wordCount} words from text-based PDF`
-      );
       return {
         success: true,
         text,
@@ -125,10 +115,6 @@ async function extractFromPDF(
     }
 
     // If we got little or no text, this might be a scanned PDF - try OCR fallback
-    debugLog(
-      `📄 [PDF] Got only ${wordCount} words, attempting OCR fallback for scanned PDF`
-    );
-
     try {
       // Try to use Marker OCR on the PDF buffer directly
       const ocrResult = await runMarkerOCR(
@@ -143,9 +129,6 @@ async function extractFromPDF(
         ocrResult.text &&
         ocrResult.text.length > text.length
       ) {
-        debugLog(
-          `✅ [PDF OCR] Successfully extracted text from scanned PDF using OCR`
-        );
         return {
           success: true,
           text: ocrResult.text,
@@ -162,7 +145,7 @@ async function extractFromPDF(
         };
       }
     } catch (ocrError) {
-      debugLog(`❌ [PDF OCR] OCR fallback failed:`, ocrError);
+      // OCR fallback failed, will use regular extraction
     }
 
     // Return the regular extraction result even if minimal

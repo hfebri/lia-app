@@ -20,16 +20,8 @@ export default function SignInPage() {
 
   // Redirect to home if already authenticated
   useEffect(() => {
-    console.log("[SIGNIN] 📊 Auth state:", {
-      isLoading,
-      isAuthenticated,
-    });
-
     if (!isLoading && isAuthenticated) {
-      console.log("[SIGNIN] ✅ User already authenticated - redirecting to /");
       router.push("/");
-    } else if (!isLoading && !isAuthenticated) {
-      console.log("[SIGNIN] 👤 Not authenticated - showing sign in page");
     }
   }, [isAuthenticated, isLoading, router]);
 

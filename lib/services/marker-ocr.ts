@@ -123,7 +123,6 @@ export class MarkerOCRService {
       const cacheKey = MarkerOCRService.getCacheKey(fileUrl, options);
       const cachedResult = MarkerOCRService.getCachedResult(cacheKey);
       if (cachedResult) {
-        console.log(`[Marker OCR] Cache hit for ${fileUrl.substring(0, 50)}...`);
         return cachedResult;
       }
     }
@@ -144,7 +143,6 @@ export class MarkerOCRService {
         disable_image_extraction: options.disable_image_extraction ?? false,
       };
 
-      console.log(`[Marker OCR] Processing file: ${fileUrl.substring(0, 50)}... (mode: ${input.mode})`);
       const output = await this.client.run("datalab-to/marker", {
         input,
       });
@@ -155,7 +153,6 @@ export class MarkerOCRService {
       if (!options.skip_cache) {
         const cacheKey = MarkerOCRService.getCacheKey(fileUrl, options);
         MarkerOCRService.setCachedResult(cacheKey, result);
-        console.log(`[Marker OCR] Cached result for ${fileUrl.substring(0, 50)}...`);
       }
 
       return result;
@@ -174,7 +171,6 @@ export class MarkerOCRService {
    */
   static clearCache(): void {
     this.cache.clear();
-    console.log("[Marker OCR] Cache cleared");
   }
 
   /**

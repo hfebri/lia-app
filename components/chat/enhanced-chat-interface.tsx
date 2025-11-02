@@ -486,17 +486,6 @@ export function EnhancedChatInterface({
       filesToProcess.push(file);
     }
 
-    console.log("[CHAT] Preparing to send message", {
-      model: selectedModel,
-      filesQueued: filesToProcess.map((file) => ({
-        name: file.name,
-        type: file.type,
-        size: file.size,
-        hasData: !!(file as any).data,
-        hasUrl: !!(file as any).url,
-      })),
-    });
-
     // Clear input immediately to show user the message was received
     setInputValue("");
     setAttachedFiles([]);

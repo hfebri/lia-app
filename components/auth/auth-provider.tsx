@@ -97,7 +97,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchUserProfile = useCallback(
     async (email: string, activeSession?: Session | null) => {
-      if (DEBUG) console.log("[AUTH-PROVIDER] 🔄 Fetching user profile for:", email);
       setIsFetchingUser(true);
 
       // Create AbortController for this request
@@ -120,10 +119,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (response.ok) {
           const userData = await response.json();
-          if (DEBUG) console.log("[AUTH-PROVIDER] ✅ User profile fetched:", {
-            email: userData.email,
-            hasCompletedOnboarding: userData.hasCompletedOnboarding,
-          });
           setUser(userData);
 
           // Save to cache
@@ -136,7 +131,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             null;
 
           if (sessionToCache?.user) {
-            if (DEBUG) console.log("[AUTH-PROVIDER] 💾 Saving user to cache");
             saveUserToCache({
               user: userData,
               timestamp: Date.now(),
@@ -175,7 +169,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Always reset loading states, no matter what happens
         setIsFetchingUser(false);
         setIsLoading(false);
-        if (DEBUG) console.log("[AUTH-PROVIDER] ✅ Fetch user profile complete");
       }
     },
     [supabase]
@@ -184,16 +177,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Get initial session
     const getInitialSession = async () => {
-      if (DEBUG) console.log("[AUTH-PROVIDER] 🚀 Getting initial session...");
       try {
         // Try cache first for instant load
         const cachedUser = loadUserFromCache();
         if (cachedUser) {
-          console.log("[AUTH-PROVIDER] 📦 Cached user found:", cachedUser.user.email);
           setUser(cachedUser.user);
           setIsLoading(false); // Immediate render with cached data
-        } else {
-          console.log("[AUTH-PROVIDER] 📦 No cached user found");
         }
 
         // Then validate session
@@ -208,12 +197,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(null);
           clearUserCache();
         } else if (session?.user) {
-          console.log("[AUTH-PROVIDER] ✅ Supabase session found for:", session.user.email);
           setSession(session);
 
           // Check if cached user matches session
           if (!cachedUser || cachedUser.sessionId !== session.user.id) {
-            console.log("[AUTH-PROVIDER] 🔄 Cache miss or different session - fetching fresh data");
             // Fetch fresh user data if cache miss or different session
             // Wrap in try/catch to ensure errors don't break the flow
             try {
@@ -229,12 +216,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               setUser(null);
               clearUserCache();
             }
-          } else {
-            console.log("[AUTH-PROVIDER] ✅ Using cached user data");
           }
           // else: use cached data, already set above
         } else {
-          console.log("[AUTH-PROVIDER] ❌ No Supabase session found");
           // No session, clear cache
           clearUserCache();
           setUser(null);
@@ -247,7 +231,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } finally {
         // CRITICAL: Always set loading to false to prevent infinite loading screen
         setIsLoading(false);
-        console.log("[AUTH-PROVIDER] ✅ Initial session check complete");
       }
     };
 
@@ -257,13 +240,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("[AUTH-PROVIDER] 🔔 Auth state changed:", event, session?.user?.email);
-
       try {
         setSession(session);
 
         if (session?.user) {
-          console.log("[AUTH-PROVIDER] ✅ Session exists - fetching user profile");
           try {
             const success = await fetchUserProfile(session.user.email!, session);
             if (!success) {
@@ -277,7 +257,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             clearUserCache();
           }
         } else {
-          console.log("[AUTH-PROVIDER] ❌ No session - clearing user data");
           setUser(null);
           clearUserCache(); // Clear cache on logout
         }

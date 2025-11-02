@@ -102,7 +102,6 @@ export class AnthropicProvider implements AIProvider {
       // https://console.anthropic.com → Privacy Settings → Enable Web Search
       let extraHeaders: Record<string, string> = {};
       if (enable_web_search) {
-        console.log("[Anthropic] Enabling web search tool (max 5 searches)");
         requestParams.tools = [
           {
             type: "web_search_20250305",
@@ -194,7 +193,6 @@ export class AnthropicProvider implements AIProvider {
       // IMPORTANT: Requires organization to enable web search in Anthropic Console
       let extraHeaders: Record<string, string> = {};
       if (enable_web_search) {
-        console.log("[Anthropic Stream] Enabling web search tool (max 5 searches)");
         requestParams.tools = [
           {
             type: "web_search_20250305",

@@ -77,7 +77,6 @@ export async function compressImageIfNeeded(
   // IMPORTANT: Skip animated formats - canvas rendering destroys animation
   // GIFs, animated WebP, and APNG will collapse to first frame if processed
   if (isAnimatedImageFormat(file.type)) {
-    console.log(`[Image Compression] Skipping animated format: ${file.name} (${file.type})`);
     return file;
   }
 

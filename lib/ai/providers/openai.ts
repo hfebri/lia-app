@@ -139,18 +139,9 @@ export class OpenAIProvider implements AIProvider {
         };
       }
 
-      console.log("[OpenAI] Using Responses API with web_search tool");
-      console.log("[OpenAI] Request params:", JSON.stringify(requestParams, null, 2));
-
       // Call Responses API
       // Note: The OpenAI SDK might not have types for this yet
       const response = await (this.client as any).responses.create(requestParams);
-
-      console.log("[OpenAI] Response received:", {
-        hasOutputText: !!response.output_text,
-        outputLength: response.output_text?.length,
-        usage: response.usage,
-      });
 
       // Extract content from response
       const content = response.output_text || "";
@@ -223,8 +214,6 @@ export class OpenAIProvider implements AIProvider {
       // Check if Responses API supports streaming
       // If web_search is enabled, we may need to fallback to non-streaming
       if (enable_web_search) {
-        console.log("[OpenAI] Web search enabled - checking if Responses API supports streaming");
-
         // Try streaming with Responses API
         try {
           yield* this.generateStreamWithResponsesAPI(messages, options);
@@ -232,7 +221,6 @@ export class OpenAIProvider implements AIProvider {
         } catch (error: any) {
           // If streaming not supported, fallback to non-streaming
           if (error.message?.includes("streaming") || error.code === "stream_not_supported") {
-            console.log("[OpenAI] Responses API doesn't support streaming, falling back to non-streaming");
             const response = await this.generateResponseWithResponsesAPI(messages, options);
 
             // Yield the full content as a single chunk
@@ -361,28 +349,14 @@ export class OpenAIProvider implements AIProvider {
         };
       }
 
-      console.log("[OpenAI] Streaming with Responses API and web_search tool");
-      console.log("[OpenAI] Stream request params:", JSON.stringify(requestParams, null, 2));
-
       // Call Responses API with streaming
       // IMPORTANT: Must use responses.stream() not responses.create({stream: true})
       const stream = await (this.client as any).responses.stream(requestParams);
 
-      console.log("[OpenAI] Stream started, waiting for events...");
-
       // Stream chunks - Responses API structure
-      let eventCount = 0;
       for await (const chunk of stream) {
-        eventCount++;
-
-        // Log first few chunks to understand structure
-        if (eventCount <= 5) {
-          console.log("[OpenAI] Chunk:", JSON.stringify(chunk, null, 2));
-        }
-
         // Handle different chunk types based on Responses API
         if (chunk.type === "response.output_text.delta" && chunk.delta) {
-          console.log(`[OpenAI] Text delta: ${chunk.delta.length} chars`);
           yield {
             content: chunk.delta,
             isComplete: false,
@@ -391,7 +365,6 @@ export class OpenAIProvider implements AIProvider {
           // Some chunks have item.text or item.content
           const text = chunk.item.text || chunk.item.content;
           if (text) {
-            console.log(`[OpenAI] Text from item: ${text.length} chars`);
             yield {
               content: text,
               isComplete: false,
@@ -399,8 +372,6 @@ export class OpenAIProvider implements AIProvider {
           }
         } else if (chunk.response && chunk.type === "response.completed") {
           // Stream completed
-          console.log("[OpenAI] Stream completed");
-
           yield {
             content: "",
             isComplete: true,
@@ -413,8 +384,6 @@ export class OpenAIProvider implements AIProvider {
           break;
         }
       }
-
-      console.log("[OpenAI] Stream finished");
     } catch (error) {
       console.error("[OpenAI] Responses API streaming error:", error);
       console.error("[OpenAI] Stream error details:", JSON.stringify(error, null, 2));

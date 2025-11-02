@@ -249,12 +249,6 @@ export function useAiChat(options: UseAiChatOptions = {}) {
       );
 
       // Debug logging to verify uniqueKey preservation
-      if (process.env.DEBUG_FILE_CONTEXT === 'true' || process.env.NEXT_PUBLIC_DEBUG_FILE_CONTEXT === 'true') {
-        console.log('[Context Builder] Truncation debug:', {
-          originalFiles: filesWithIndex.map(f => ({ name: f.name, uniqueKey: f.uniqueKey })),
-          truncatedFiles: truncated.map(t => ({ name: t.name, uniqueKey: t.uniqueKey, hasKey: !!t.uniqueKey })),
-        });
-      }
 
       // IMPORTANT: truncateFileContent reorders by recency, can't use index
       // Use uniqueKey instead of name to handle duplicate filenames correctly
@@ -312,17 +306,6 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     }
 
     // Log context building decision for debugging
-    if (process.env.DEBUG_FILE_CONTEXT === 'true' || process.env.NEXT_PUBLIC_DEBUG_FILE_CONTEXT === 'true') {
-      console.log('[Context Builder]', {
-        totalFiles: allFiles.length,
-        referencedFiles,
-        filesUsingSummary: allFiles.filter(f => f.summary && !referencedFiles.includes(f.name)).length,
-        filesUsingFullContent: allFiles.filter(f => !f.summary || referencedFiles.includes(f.name)).length,
-        originalTokens: totalTokens,
-        finalTokens,
-        truncated: totalTokens > maxFileTokens,
-      });
-    }
 
     return `\n\n[CONVERSATION CONTEXT - Available Files]\n${context}\n[END CONVERSATION CONTEXT]\n\n`;
   }, [state.messages, detectFileReferences]);
@@ -683,8 +666,6 @@ export function useAiChat(options: UseAiChatOptions = {}) {
                           });
                           return { ...prev, messages: updatedMessages };
                         });
-
-                        console.log(`[Background OCR] Completed for ${fileName}, text stored for follow-ups`);
                       }
                     })
                     .catch((err) => {

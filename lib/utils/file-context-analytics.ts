@@ -79,11 +79,6 @@ export class FileContextAnalytics {
 
     // Persist to sessionStorage
     this.saveToStorage();
-
-    // Log if debug mode is enabled
-    if (this.isDebugMode()) {
-      console.log(`[File Context Analytics] ${type}:`, data);
-    }
   }
 
   /**
@@ -195,20 +190,6 @@ export class FileContextAnalytics {
   }
 
   /**
-   * Check if debug mode is enabled
-   */
-  private isDebugMode(): boolean {
-    // Check if DEBUG_FILE_CONTEXT is set in environment or localStorage
-    if (typeof window !== "undefined") {
-      return (
-        localStorage.getItem("DEBUG_FILE_CONTEXT") === "true" ||
-        window.location.search.includes("debug_file_context=true")
-      );
-    }
-    return process.env.DEBUG_FILE_CONTEXT === "true";
-  }
-
-  /**
    * Save events to sessionStorage
    */
   private saveToStorage(): void {
@@ -255,47 +236,6 @@ export class FileContextAnalytics {
         );
       }
     }
-  }
-
-  /**
-   * Print debug summary to console
-   */
-  printDebugSummary(): void {
-    const summarizationMetrics = this.getSummarizationMetrics();
-    const contextMetrics = this.getContextMetrics();
-
-    console.log("\n=== File Context Debug Summary ===");
-    console.log("\nSummarization:");
-    console.log(
-      `  Total requests: ${summarizationMetrics.totalRequests}`
-    );
-    console.log(
-      `  Success rate: ${summarizationMetrics.successCount}/${summarizationMetrics.totalRequests} (${((summarizationMetrics.successCount / summarizationMetrics.totalRequests) * 100 || 0).toFixed(1)}%)`
-    );
-    console.log(
-      `  Average latency: ${summarizationMetrics.averageLatency}ms`
-    );
-    console.log(
-      `  Average compression: ${summarizationMetrics.averageCompressionRatio}%`
-    );
-    console.log(
-      `  Total tokens saved: ${summarizationMetrics.totalTokensSaved.toLocaleString()}`
-    );
-
-    console.log("\nContext:");
-    console.log(
-      `  Average size: ${contextMetrics.averageContextSize.toLocaleString()} tokens`
-    );
-    console.log(
-      `  Max size: ${contextMetrics.maxContextSize.toLocaleString()} tokens`
-    );
-    console.log(
-      `  Truncation events: ${contextMetrics.truncationCount}`
-    );
-    console.log(
-      `  File reference hit rate: ${contextMetrics.fileReferenceHitRate}%`
-    );
-    console.log("\n===================================\n");
   }
 }
 

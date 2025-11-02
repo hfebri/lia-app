@@ -3,13 +3,6 @@
 import type { AIMessage, AIResponse } from "./types";
 import type { FileMetadata } from "@/lib/services/client-file-processor";
 
-const isDev = process.env.NODE_ENV !== "production";
-const debugLog = (...args: unknown[]) => {
-  if (isDev) {
-    console.log(...args);
-  }
-};
-
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant" | "system";
@@ -104,34 +97,6 @@ export class ChatService {
       files: msg.files, // Include files for multimodal support
     }));
 
-    // DEBUG: Log what we're sending to the API
-    debugLog("🚀 FRONTEND DEBUG - Sending to API (non-streaming):");
-    debugLog("- Messages count:", aiMessages.length);
-    debugLog("- Model:", model);
-
-    // Debug each message separately
-    aiMessages.forEach((msg, index) => {
-      debugLog(`Message ${index + 1}:`, {
-        role: msg.role,
-        contentLength: msg.content.length,
-        hasFiles: !!msg.files,
-        filesCount: msg.files?.length || 0,
-      });
-
-      if (msg.files && msg.files.length > 0) {
-        debugLog(
-          `  📎 Files in message ${index + 1}:`,
-          msg.files.map((f) => ({
-            name: f.name,
-            type: f.type,
-            size: f.size,
-            hasData: !!f.data,
-            dataLength: f.data?.length || 0,
-          }))
-        );
-      }
-    });
-
     const response = await fetch(`${this.baseUrl}/chat`, {
       method: "POST",
       headers: {
@@ -199,19 +164,6 @@ export class ChatService {
       files: msg.files, // Include files for multimodal support
     }));
 
-    // Add system instruction to debug log if present
-    if (systemInstruction) {
-      debugLog(
-        "🎯 System instruction:",
-        systemInstruction.substring(0, 100) + "..."
-      );
-    }
-
-    debugLog("🚀 CHAT-SERVICE - About to make streaming fetch request");
-    debugLog("- URL:", `${this.baseUrl}/chat`);
-    debugLog("- Messages count:", aiMessages.length);
-    debugLog("- Model:", model);
-
     const response = await fetch(`${this.baseUrl}/chat`, {
       method: "POST",
       headers: {
@@ -234,12 +186,6 @@ export class ChatService {
       }),
     });
 
-    debugLog(
-      "✅ CHAT-SERVICE - Fetch response received:",
-      response.status,
-      response.statusText
-    );
-
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(`HTTP ${response.status}: ${errorText}`);
@@ -249,8 +195,6 @@ export class ChatService {
     if (!reader) {
       throw new Error("No response body available");
     }
-
-    debugLog("🔄 CHAT-SERVICE - Starting streaming loop...");
 
     const decoder = new TextDecoder();
     let buffer = "";

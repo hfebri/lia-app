@@ -170,7 +170,6 @@ export async function summarizeFileContent(
 
   // Skip summarization if content is below threshold
   if (originalTokens < SUMMARIZATION_THRESHOLD_TOKENS) {
-    console.log(`[File Summarizer] Skipped: ${fileName} (${originalTokens} tokens < ${SUMMARIZATION_THRESHOLD_TOKENS} threshold)`);
     return {
       summary: content,
       originalTokens,
@@ -222,14 +221,6 @@ export async function summarizeFileContent(
     const summaryTokens = estimateTokenCount(summary);
     const compressionRatio = ((1 - summaryTokens / originalTokens) * 100).toFixed(1);
     const latency = Date.now() - startTime;
-
-    console.log(`[File Summarizer] Success:`, {
-      fileName,
-      originalTokens,
-      summaryTokens,
-      compressionRatio: `${compressionRatio}%`,
-      latency: `${latency}ms`,
-    });
 
     return {
       summary,

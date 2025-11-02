@@ -571,7 +571,6 @@ export async function calculateMetricsForAllUsers(date?: Date): Promise<void> {
   for (const { userId } of activeUsers) {
     try {
       await calculateDailySnapshot(userId, targetDate);
-      console.log(`[Productivity] Calculated snapshot for user ${userId}`);
     } catch (error) {
       console.error(
         `[Productivity] Error calculating snapshot for user ${userId}:`,
@@ -588,7 +587,6 @@ export async function calculateMetricsForAllUsers(date?: Date): Promise<void> {
     for (const { userId } of activeUsers) {
       try {
         await calculateAndStoreMetrics(userId, "week", weekStart, targetDate);
-        console.log(`[Productivity] Calculated weekly metrics for user ${userId}`);
       } catch (error) {
         console.error(
           `[Productivity] Error calculating weekly metrics for user ${userId}:`,
@@ -611,9 +609,6 @@ export async function calculateMetricsForAllUsers(date?: Date): Promise<void> {
     for (const { userId } of activeUsers) {
       try {
         await calculateAndStoreMetrics(userId, "month", monthStart, targetDate);
-        console.log(
-          `[Productivity] Calculated monthly metrics for user ${userId}`
-        );
       } catch (error) {
         console.error(
           `[Productivity] Error calculating monthly metrics for user ${userId}:`,

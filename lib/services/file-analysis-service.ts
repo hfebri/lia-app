@@ -1,12 +1,6 @@
 import type { AIProviderName } from "../ai/types";
 import Replicate from "replicate";
 
-const isDev = process.env.NODE_ENV !== "production";
-const debugLog = (...args: unknown[]) => {
-  if (isDev) {
-    console.log(...args);
-  }
-};
 
 export interface FileAnalysisResult {
   extractedText: string;
@@ -52,22 +46,12 @@ export class FileAnalysisService {
     provider: AIProviderName,
     model: string
   ): Promise<FileAnalysisResult[]> {
-    debugLog(`🔍 FILE ANALYSIS DEBUG - Analyzing ${files.length} files:`);
-    debugLog(`- Provider: ${provider}`);
-    debugLog(`- Model: ${model}`);
-    debugLog(
-      `- Files:`,
-      files.map((f) => `${f.name} (${f.type})`)
-    );
-
     const results: FileAnalysisResult[] = [];
 
     for (const file of files) {
-      debugLog(`\n📁 Processing file: ${file.name} (${file.type})`);
       try {
         let result: FileAnalysisResult;
         if (provider === "openai") {
-          debugLog(`✅ OpenAI provider - handling all files natively`);
           // OpenAI handles all files natively - no preprocessing needed
           result = {
             extractedText: "",
@@ -75,9 +59,6 @@ export class FileAnalysisService {
             success: true,
           };
         } else if (this.isImageFile(file)) {
-          debugLog(
-            `✅ ${provider.toUpperCase()} + Image - handling natively`
-          );
           // All providers handle image files natively
           result = {
             extractedText: "",
@@ -88,15 +69,6 @@ export class FileAnalysisService {
           };
         } else {
           // Use selected model to extract content for all non-Gemini, non-image files
-          debugLog(`🔧 Using Marker OCR for processing document`);
-          debugLog(`📊 File analysis details:`);
-          debugLog(`  - File name: ${file.name}`);
-          debugLog(`  - File type: ${file.type}`);
-          debugLog(`  - File size: ${file.size} bytes`);
-          debugLog(`  - Is image file: ${this.isImageFile(file)}`);
-          debugLog(`  - Is document file: ${this.isDocumentFile(file)}`);
-          debugLog(`  - Using Marker OCR`);
-          debugLog(`🚀 Starting Marker model processing...`);
           result = await this.analyzeFileWithMarker(file);
         }
 
@@ -319,21 +291,6 @@ ${content}
       "application/vnd.ms-powerpoint", // .ppt
     ];
     const isDocument = documentTypes.includes(file.type.toLowerCase());
-
-    debugLog(
-      `🔍 [FILE TYPE CHECK] Checking if ${file.name} (${file.type}) is a document...`
-    );
-    debugLog(
-      `📋 [FILE TYPE CHECK] Supported document types: ${documentTypes.join(
-        ", "
-      )}`
-    );
-    debugLog(
-      `✅ [FILE TYPE CHECK] Result: ${
-        isDocument ? "DOCUMENT" : "NOT A DOCUMENT"
-      }`
-    );
-
     return isDocument;
   }
 }

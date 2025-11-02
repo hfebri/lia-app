@@ -87,13 +87,13 @@ export function TypingIndicator({
   return (
     <div className={cn("flex items-center gap-3 p-4", className)}>
       {/* Loading GIF */}
-      <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center">
+      <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-foreground dark:bg-background">
         <Image
           src="/loading-white.gif"
           alt="Loading"
           width={32}
           height={32}
-          className="dark:invert-0 invert"
+          className=""
           unoptimized
         />
       </div>
