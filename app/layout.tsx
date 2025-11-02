@@ -5,6 +5,7 @@ import { AuthProvider } from "@/components/auth/auth-provider";
 import { ConversationsProvider } from "@/components/providers/conversations-provider";
 import { ToastProvider } from "@/components/providers/toast-provider";
 import { ThemeProvider } from "@/components/providers/theme-provider";
+import { VersionMigrationProvider } from "@/components/providers/version-migration-provider";
 import { ErrorBoundary } from "@/components/shared/error-boundary";
 
 const geistSans = Geist({
@@ -45,21 +46,23 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <ErrorBoundary>
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="system"
-            enableSystem
-            disableTransitionOnChange
-          >
-            <AuthProvider>
-              <ConversationsProvider>
-                {children}
-                <ToastProvider />
-              </ConversationsProvider>
-            </AuthProvider>
-          </ThemeProvider>
-        </ErrorBoundary>
+        <VersionMigrationProvider>
+          <ErrorBoundary>
+            <ThemeProvider
+              attribute="class"
+              defaultTheme="system"
+              enableSystem
+              disableTransitionOnChange
+            >
+              <AuthProvider>
+                <ConversationsProvider>
+                  {children}
+                  <ToastProvider />
+                </ConversationsProvider>
+              </AuthProvider>
+            </ThemeProvider>
+          </ErrorBoundary>
+        </VersionMigrationProvider>
       </body>
     </html>
   );
