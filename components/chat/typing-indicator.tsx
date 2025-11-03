@@ -21,16 +21,16 @@ interface TypingIndicatorProps {
 }
 
 const STATUS_MESSAGES = {
-  thinking: "Noted ya, aku lagi mikir dulu biar stay on brief...",
-  processing: "Aku lagi prosesin datanya, nanti aku jump in lagi...",
-  reading: "Hold on, aku mau tap in baca materinya dulu...",
-  searching: "Sebentar, aku lagi tap in hunting insight yang relevan...",
-  analyzing: "Aku lagi breaking down angkanya biar nggak miss...",
-  preparing: "Jawabannya aku draft dulu biar ready di-share...",
-  generating: "Aku lagi ngetik versi yang cakep, bentar lagi drop...",
-  finalizing: "Almost done, aku polish dulu baru aku share...",
-  "processing-files": "Aku lagi scan file-nya dulu ya, stay tuned...",
-  "scanning-images": "Aku lagi baca image-nya, bentar ya nge-extract info...",
+  thinking: "Thinking through the request...",
+  processing: "Processing the information...",
+  reading: "Reviewing the materials...",
+  searching: "Searching for relevant details...",
+  analyzing: "Analyzing the data...",
+  preparing: "Preparing the response...",
+  generating: "Drafting the reply...",
+  finalizing: "Finalizing the answer...",
+  "processing-files": "Reviewing the uploaded files...",
+  "scanning-images": "Scanning the images for details...",
 };
 
 const STATUS_CYCLE = [
