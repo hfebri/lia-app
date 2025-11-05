@@ -303,10 +303,10 @@ export async function POST(request: NextRequest) {
               model,
               provider,
               temperature: extended_thinking ? 1 : 0.7, // Must be 1 when extended thinking is enabled
-              max_tokens: extended_thinking ? Math.max(thinking_budget_tokens + 2048, 12288) : 8192, // Must be > thinking_budget_tokens
+              max_tokens: extended_thinking ? Math.max((thinking_budget_tokens || 1024) + 2048, 12288) : 8192, // Must be > thinking_budget_tokens
               system_prompt: combinedSystemPrompt,
               extended_thinking,
-              thinking_budget_tokens,
+              thinking_budget_tokens: thinking_budget_tokens || 1024,
               max_image_resolution,
               reasoning_effort,
               enable_web_search,
@@ -378,10 +378,10 @@ export async function POST(request: NextRequest) {
         model,
         provider,
         temperature: extended_thinking ? 1 : 0.7, // Must be 1 when extended thinking is enabled
-        max_tokens: extended_thinking ? Math.max(thinking_budget_tokens + 2048, 12288) : 8192, // Must be > thinking_budget_tokens
+        max_tokens: extended_thinking ? Math.max((thinking_budget_tokens || 1024) + 2048, 12288) : 8192, // Must be > thinking_budget_tokens
         system_prompt: combinedSystemPrompt,
         extended_thinking,
-        thinking_budget_tokens,
+        thinking_budget_tokens: thinking_budget_tokens || 1024,
         max_image_resolution,
         reasoning_effort,
         enable_web_search,

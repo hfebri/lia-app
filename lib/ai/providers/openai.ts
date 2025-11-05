@@ -180,22 +180,22 @@ export class OpenAIProvider implements AIProvider {
   ): Array<{
     role: "system" | "user" | "assistant";
     content: Array<
-      | { type: "text"; text: string }
-      | { type: "input_image"; image_url: { url: string } }
+      | { type: "input_text"; text: string }
+      | { type: "input_image"; image_url: string }
     >;
   }> {
     const formattedInput: Array<{
       role: "system" | "user" | "assistant";
       content: Array<
-        | { type: "text"; text: string }
-        | { type: "input_image"; image_url: { url: string } }
+        | { type: "input_text"; text: string }
+        | { type: "input_image"; image_url: string }
       >;
     }> = [];
 
     if (systemPrompt) {
       formattedInput.push({
         role: "system",
-        content: [{ type: "text", text: systemPrompt }],
+        content: [{ type: "input_text", text: systemPrompt }],
       });
     }
 
@@ -206,18 +206,21 @@ export class OpenAIProvider implements AIProvider {
       }
 
       const contentParts: Array<
-        | { type: "text"; text: string }
-        | { type: "input_image"; image_url: { url: string } }
+        | { type: "input_text"; text: string }
+        | { type: "input_image"; image_url: string }
       > = [];
 
+      // All text content uses input_text, regardless of role
+      // output_text is only for response output, not request input
       if (message.content && message.content.trim().length > 0) {
         contentParts.push({
-          type: "text",
+          type: "input_text",
           text: message.content,
         });
       }
 
-      if (message.files && message.files.length > 0) {
+      // Only user messages can have file attachments
+      if (message.role === "user" && message.files && message.files.length > 0) {
         for (const file of message.files) {
           const isImage = this.isImageFile(file.type);
           if (isImage) {
@@ -230,19 +233,17 @@ export class OpenAIProvider implements AIProvider {
             if (imageUrl) {
               contentParts.push({
                 type: "input_image",
-                image_url: {
-                  url: imageUrl,
-                },
+                image_url: imageUrl,
               });
             } else {
               contentParts.push({
-                type: "text",
+                type: "input_text",
                 text: `[Attached image: ${file.name || "image"}]`,
               });
             }
           } else {
             contentParts.push({
-              type: "text",
+              type: "input_text",
               text: `[Attached file: ${file.name || "file"} (${file.type})]`,
             });
           }
@@ -269,7 +270,7 @@ export class OpenAIProvider implements AIProvider {
     if (formattedInput.length === 0) {
       formattedInput.push({
         role: "user",
-        content: [{ type: "text", text: "" }],
+        content: [{ type: "input_text", text: "" }],
       });
     }
 

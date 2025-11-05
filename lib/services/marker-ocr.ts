@@ -198,6 +198,13 @@ export class MarkerOCRService {
       "image/jpeg",
       "image/jpg",
       "image/webp",
+      "image/gif",
+      "image/bmp",
+      "image/svg+xml",
+      "image/tiff",
+      "image/avif",
+      "image/heic",
+      "image/heif",
     ];
 
     return supportedTypes.includes(mimeType);
@@ -217,6 +224,13 @@ export class MarkerOCRService {
       "image/jpeg": ".jpg",
       "image/jpg": ".jpg",
       "image/webp": ".webp",
+      "image/gif": ".gif",
+      "image/bmp": ".bmp",
+      "image/svg+xml": ".svg",
+      "image/tiff": ".tiff",
+      "image/avif": ".avif",
+      "image/heic": ".heic",
+      "image/heif": ".heif",
     };
 
     return mimeToExt[mimeType] || null;
