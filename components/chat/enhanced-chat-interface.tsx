@@ -45,6 +45,7 @@ import {
   Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toastError, toastSuccess } from "@/components/providers/toast-provider";
 
 interface EnhancedChatInterfaceProps {
   className?: string;
@@ -68,6 +69,7 @@ export function EnhancedChatInterface({
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [tempTitle, setTempTitle] = useState("");
   const [preventModelOverride, setPreventModelOverride] = useState(false);
+  const [convertingFileKey, setConvertingFileKey] = useState<string | null>(null);
 
   // Ref for auto-scrolling to bottom
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -647,6 +649,61 @@ export function EnhancedChatInterface({
     setAttachedFiles([]);
     setSelectedFiles((prev) => [...prev, ...filesFromClipboard]);
   };
+
+  const handleConvertSrtToDocx = useCallback(
+    async (file: File) => {
+      const signature = `${file.name}-${file.size}-${file.lastModified}`;
+
+      try {
+        setConvertingFileKey(signature);
+
+        const formData = new FormData();
+        formData.append("file", file, file.name);
+
+        const response = await fetch("/api/files/convert/srt-to-docx", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!response.ok) {
+          let message = "Failed to convert subtitle.";
+          try {
+            const errorData = await response.json();
+            if (errorData?.error) {
+              message = errorData.error;
+            }
+          } catch (jsonError) {
+            console.debug("Conversion error payload not JSON:", jsonError);
+          }
+          throw new Error(message);
+        }
+
+        const blob = await response.blob();
+        const downloadUrl = URL.createObjectURL(blob);
+        const baseName = file.name.replace(/\.[^/.]+$/, "") || "subtitle";
+        const link = document.createElement("a");
+        link.href = downloadUrl;
+        link.download = `${baseName}.docx`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(downloadUrl);
+
+        toastSuccess("Word file ready", "We saved the converted captions to your downloads.");
+      } catch (error) {
+        console.error("SRT to DOCX conversion failed:", error);
+        toastError(
+          "Conversion failed",
+          error instanceof Error ? error.message : "Please try again in a moment."
+        );
+      } finally {
+        setConvertingFileKey((current) =>
+          current === signature ? null : current
+        );
+      }
+    },
+    [toastError, toastSuccess]
+  );
 
   const handleFileRemove = (index: number) => {
     setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
@@ -1270,6 +1327,12 @@ export function EnhancedChatInterface({
                         file.type === "image/bmp" ||
                         file.type === "image/svg+xml";
                       const isPDF = file.type === "application/pdf";
+                      const extension = file.name.split(".").pop()?.toLowerCase();
+                      const isSrtFile =
+                        extension === "srt" ||
+                        (file.type && file.type.toLowerCase().includes("subrip"));
+                      const fileSignature = `${file.name}-${file.size}-${file.lastModified}`;
+                      const isConverting = convertingFileKey === fileSignature;
                       const imageUrl =
                         isImage && isPreviewableImage
                           ? URL.createObjectURL(file)
@@ -1301,6 +1364,28 @@ export function EnhancedChatInterface({
                             <FileText className="h-4 w-4 text-muted-foreground" />
                           )}
                           <span className="max-w-32 truncate">{file.name}</span>
+
+                          {isSrtFile && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleConvertSrtToDocx(file)}
+                              disabled={isConverting}
+                              className="h-7 gap-1 px-2 text-xs"
+                            >
+                              {isConverting ? (
+                                <>
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                  Converting
+                                </>
+                              ) : (
+                                <>
+                                  <FileText className="h-3 w-3" />
+                                  Word
+                                </>
+                              )}
+                            </Button>
+                          )}
 
                           <Button
                             variant="ghost"
@@ -1354,7 +1439,7 @@ export function EnhancedChatInterface({
                       };
                     }
                   }}
-                  accept=".pdf,.doc,.docx,.pptx,.ppt,.txt,.rtf,.csv,.md,.xls,.xlsx,.xlsm,.odt,.ods,.odp,.jpg,.jpeg,.png,.gif,.bmp,.webp,.svg,.tiff,.tif,.heic,.heif,.avif"
+                  accept=".pdf,.doc,.docx,.pptx,.ppt,.txt,.rtf,.csv,.md,.srt,.xls,.xlsx,.xlsm,.odt,.ods,.odp,.jpg,.jpeg,.png,.gif,.bmp,.webp,.svg,.tiff,.tif,.heic,.heif,.avif"
                   multiple={true}
                 />
                 <Button

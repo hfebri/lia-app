@@ -4,6 +4,7 @@
  */
 
 import { AIFileAttachment, FILE_LIMITS, FileTypeUtils } from "@/lib/ai/types";
+import { DEFAULT_FILE_CONFIG, getFileExtension } from "./file-validation";
 
 export interface FileData {
   data: string; // base64 encoded data
@@ -274,12 +275,26 @@ export function validateFile(file: File): {
   isValid: boolean;
   error?: string;
 } {
+  const mimeType = (file.type || "").toLowerCase();
+  const extension = getFileExtension(file.name).toLowerCase();
+
   // Check file type
-  if (!FILE_LIMITS.allowedMimeTypes.includes(file.type as any)) {
-    return {
-      isValid: false,
-      error: `File type "${file.type}" is not supported`,
-    };
+  if (!FILE_LIMITS.allowedMimeTypes.includes(mimeType as any)) {
+    const isGenericMime =
+      !mimeType ||
+      mimeType === "application/octet-stream" ||
+      mimeType === "binary/octet-stream";
+
+    const extensionAllowed = DEFAULT_FILE_CONFIG.allowedExtensions.includes(
+      extension
+    );
+
+    if (!isGenericMime || !extensionAllowed) {
+      return {
+        isValid: false,
+        error: `File type "${file.type || extension || "unknown"}" is not supported`,
+      };
+    }
   }
 
   // Check individual file size

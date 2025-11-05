@@ -131,6 +131,8 @@ export async function GET() {
           "text/plain",
           "text/csv",
           "application/rtf",
+          "application/x-subrip",
+          "text/x-subrip",
 
           // Images
           "image/jpeg",
@@ -171,6 +173,7 @@ export async function GET() {
           ".txt",
           ".csv",
           ".rtf",
+          ".srt",
           ".jpg",
           ".jpeg",
           ".png",

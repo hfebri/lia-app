@@ -13,6 +13,11 @@ import { Button } from "@/components/ui/button";
 const PATCH_NOTES_STORAGE_KEY = "lia-patch-notes-2025-11-05-dismissed";
 const NOTES: Array<{ title: string; description: string }> = [
   {
+    title: "Turn subtitles into Word files",
+    description:
+      "Upload .srt caption files in chat and download a ready-to-edit Word document in one click.",
+  },
+  {
     title: "Share any image without fuss",
     description: "Paste screenshots or drop in photos just work.",
   },

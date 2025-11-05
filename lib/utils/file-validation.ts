@@ -27,6 +27,8 @@ export const DEFAULT_FILE_CONFIG: FileValidationConfig = {
     "text/plain",
     "text/csv",
     "application/rtf",
+    "application/x-subrip",
+    "text/x-subrip",
 
     // Images
     "image/jpeg",
@@ -68,6 +70,7 @@ export const DEFAULT_FILE_CONFIG: FileValidationConfig = {
     ".txt",
     ".csv",
     ".rtf",
+    ".srt",
 
     // Images
     ".jpg",
@@ -110,8 +113,9 @@ export function validateFile(
   file: File,
   config: FileValidationConfig = DEFAULT_FILE_CONFIG
 ): FileValidationResult {
-  const { name, size, type } = file;
-  const extension = getFileExtension(name);
+  const { name, size } = file;
+  const type = (file.type || "").toLowerCase();
+  const extension = getFileExtension(name).toLowerCase();
 
   // Check file size
   if (size > config.maxFileSize) {
@@ -125,7 +129,12 @@ export function validateFile(
   }
 
   // Check MIME type
-  if (type && !config.allowedMimeTypes.includes(type)) {
+  const isGenericMime =
+    !type ||
+    type === "application/octet-stream" ||
+    type === "binary/octet-stream";
+
+  if (!isGenericMime && !config.allowedMimeTypes.includes(type)) {
     return {
       isValid: false,
       error: `File type "${type}" is not allowed`,
@@ -134,7 +143,7 @@ export function validateFile(
   }
 
   // Check file extension as fallback
-  if (!config.allowedExtensions.includes(extension.toLowerCase())) {
+  if (!config.allowedExtensions.includes(extension)) {
     return {
       isValid: false,
       error: `File extension "${extension}" is not allowed`,

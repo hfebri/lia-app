@@ -132,6 +132,8 @@ export async function POST(request: NextRequest) {
         "text/markdown",
         "text/rtf",
         "application/rtf",
+        "application/x-subrip",
+        "text/x-subrip",
         // Microsoft Office (via Marker OCR)
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // .xlsx

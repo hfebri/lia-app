@@ -77,6 +77,7 @@ export function FileUpload({
     ".doc",
     ".docx",
     ".txt",
+    ".srt",
     ".jpg",
     ".jpeg",
     ".png",
