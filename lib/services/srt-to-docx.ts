@@ -190,7 +190,7 @@ export async function convertSrtToDocx({
   const sectionChildren: Array<Paragraph | Table> = [
     new Paragraph({
       text: "Subtitle Transcript",
-      heading: HeadingLevel.HEADING1,
+      heading: HeadingLevel.HEADING_1,
     }),
   ];
 

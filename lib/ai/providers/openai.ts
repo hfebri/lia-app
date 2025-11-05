@@ -613,7 +613,9 @@ export class OpenAIProvider implements AIProvider {
         }
         return null;
       })
-      .filter((tool): tool is Record<string, unknown> => tool !== null);
+      .filter(
+        (tool): tool is NonNullable<typeof tool> => tool !== null
+      );
 
     return responsesTools.length > 0 ? responsesTools : undefined;
   }

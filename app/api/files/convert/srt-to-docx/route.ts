@@ -50,7 +50,9 @@ export async function POST(request: NextRequest) {
     const downloadName = `${baseName}.docx`.replace(/["\r\n]/g, "_");
     const encodedFileName = encodeURIComponent(downloadName);
 
-    return new Response(buffer, {
+    const body = new Uint8Array(buffer);
+
+    return new Response(body, {
       status: 200,
       headers: {
         "Content-Type": DOCX_MIME,
