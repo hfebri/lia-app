@@ -22,6 +22,11 @@ const NOTES: Array<{ title: string; description: string }> = [
     description: "Paste screenshots or drop in photos just work.",
   },
   {
+    title: "Copy AI answers instantly",
+    description:
+      "Hover any assistant reply to reveal a copy button and grab the full response to your clipboard.",
+  },
+  {
     title: "Status messages now speak plainly",
     description:
       "The activity line uses clear language so you can tell at a glance if LIA is thinking, reading files, or writing.",
@@ -73,12 +78,12 @@ export function PatchNotesModal() {
         }
       }}
     >
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-md max-h-[80vh] flex flex-col">
+        <DialogHeader className="shrink-0">
           <DialogTitle>What’s new this week</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-3 text-sm text-muted-foreground">
+        <div className="space-y-3 text-sm text-muted-foreground overflow-y-auto pr-1">
           {NOTES.map((note) => (
             <div key={note.title}>
               <h3 className="text-sm font-medium text-foreground">
@@ -89,7 +94,7 @@ export function PatchNotesModal() {
           ))}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="shrink-0">
           <Button onClick={dismiss}>Sounds good</Button>
         </DialogFooter>
       </DialogContent>
