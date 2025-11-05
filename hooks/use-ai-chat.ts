@@ -91,7 +91,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     extendedThinking: false,
     webSearch: false,
     thinkingMode: false,
-    reasoningEffort: "medium",
+    reasoningEffort: getSavedModel() === "gpt-5-pro" ? "high" : "medium",
     currentConversationId: null,
     currentConversationModel: null,
     systemInstruction: "",
@@ -118,11 +118,20 @@ export function useAiChat(options: UseAiChatOptions = {}) {
       const filteredModels = modelsData.models.filter(
         (model: any) => !model.id.toLowerCase().includes('gemini')
       );
-      setState((prev) => ({
-        ...prev,
-        availableModels: filteredModels,
-        selectedModel: prev.selectedModel || modelsData.defaultModel,
-      }));
+      setState((prev) => {
+        const newSelectedModel =
+          prev.selectedModel || modelsData.defaultModel;
+
+        return {
+          ...prev,
+          availableModels: filteredModels,
+          selectedModel: newSelectedModel,
+          reasoningEffort:
+            newSelectedModel === "gpt-5-pro"
+              ? "high"
+              : prev.reasoningEffort,
+        };
+      });
     } catch (error) {
       setState((prev) => ({
         ...prev,
@@ -1252,7 +1261,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
           extendedThinking: false,
           webSearch: false,
           thinkingMode: false,
-          reasoningEffort: "medium",
+          reasoningEffort: modelId === "gpt-5-pro" ? "high" : "medium",
         }));
       } else {
         // If same model, just update the model-specific settings
@@ -1264,7 +1273,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
           extendedThinking: false,
           webSearch: false,
           thinkingMode: false,
-          reasoningEffort: "medium",
+          reasoningEffort: modelId === "gpt-5-pro" ? "high" : "medium",
         }));
       }
     },
@@ -1299,7 +1308,8 @@ export function useAiChat(options: UseAiChatOptions = {}) {
   const setReasoningEffort = useCallback((effort: ReasoningEffort) => {
     setState((prev) => ({
       ...prev,
-      reasoningEffort: effort,
+      reasoningEffort:
+        prev.selectedModel === "gpt-5-pro" ? "high" : effort,
     }));
   }, []);
 
@@ -1415,7 +1425,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
       // Reset model-specific settings when switching models
       extendedThinking: false,
       thinkingMode: false,
-      reasoningEffort: "medium",
+      reasoningEffort: modelId === "gpt-5-pro" ? "high" : "medium",
     }));
   }, []);
 

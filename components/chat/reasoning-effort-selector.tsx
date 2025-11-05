@@ -18,6 +18,7 @@ interface ReasoningEffortSelectorProps {
   onValueChange: (value: ReasoningEffort) => void;
   disabled?: boolean;
   className?: string;
+  disabledTooltip?: string;
 }
 
 const reasoningEffortOptions: Array<{
@@ -57,6 +58,7 @@ export function ReasoningEffortSelector({
   onValueChange,
   disabled = false,
   className,
+  disabledTooltip,
 }: ReasoningEffortSelectorProps) {
   const currentOption = reasoningEffortOptions.find(
     (option) => option.value === value
@@ -75,6 +77,7 @@ export function ReasoningEffortSelector({
             variant="outline"
             size="sm"
             disabled={disabled}
+            title={disabled ? disabledTooltip : undefined}
             className="h-8 px-3 font-normal justify-between min-w-[120px]"
           >
             <span className={cn("capitalize", currentOption?.color)}>

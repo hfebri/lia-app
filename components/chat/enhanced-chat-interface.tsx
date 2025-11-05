@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import {
+  useEffect,
+  useState,
+  useCallback,
+  useRef,
+  type ClipboardEvent as ReactClipboardEvent,
+} from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useAiChat } from "@/hooks/use-ai-chat";
 import { useConversations } from "@/hooks/use-conversations";
@@ -156,6 +162,8 @@ export function EnhancedChatInterface({
       });
     },
   });
+
+  const isGpt5Pro = selectedModel === "gpt-5-pro";
 
   // Load models and files on mount
   useEffect(() => {
@@ -524,6 +532,122 @@ export function EnhancedChatInterface({
     }
   };
 
+  const handlePaste = async (
+    event: ReactClipboardEvent<HTMLTextAreaElement>
+  ) => {
+    const clipboardData = event.clipboardData;
+    if (!clipboardData) {
+      return;
+    }
+
+    const items = Array.from(clipboardData.items || []);
+    const imageItems = items.filter((item) => item.type.startsWith("image/"));
+
+    if (imageItems.length === 0) {
+      return;
+    }
+
+    event.preventDefault();
+
+    const filesFromClipboard: File[] = [];
+
+    imageItems.forEach((item, index) => {
+      const file = item.getAsFile();
+      if (!file) {
+        return;
+      }
+
+      const extension = (() => {
+        switch (file.type) {
+          case "image/jpeg":
+          case "image/jpg":
+            return "jpg";
+          case "image/png":
+            return "png";
+          case "image/gif":
+            return "gif";
+          case "image/webp":
+            return "webp";
+          case "image/bmp":
+            return "bmp";
+          case "image/svg+xml":
+            return "svg";
+          case "image/tiff":
+            return "tiff";
+          case "image/avif":
+            return "avif";
+          case "image/heic":
+            return "heic";
+          case "image/heif":
+            return "heif";
+          default:
+            return file.type.split("/")[1] || "png";
+        }
+      })();
+
+      const originalName = file.name?.trim();
+      let fileName =
+        originalName && originalName.length > 0
+          ? originalName
+          : `clipboard-image-${Date.now()}-${index}`;
+
+      if (!fileName.toLowerCase().includes(".")) {
+        fileName = `${fileName}.${extension}`;
+      }
+
+      const normalizedFile =
+        file.name === fileName
+          ? file
+          : new File([file], fileName, {
+              type: file.type,
+              lastModified: file.lastModified,
+            });
+
+      filesFromClipboard.push(normalizedFile);
+    });
+
+    if (filesFromClipboard.length === 0) {
+      return;
+    }
+
+    const plainText = clipboardData.getData("text/plain");
+
+    if (plainText) {
+      const target = event.target as HTMLTextAreaElement;
+      const start = target.selectionStart ?? inputValue.length;
+      const end = target.selectionEnd ?? inputValue.length;
+      const newValue =
+        inputValue.slice(0, start) + plainText + inputValue.slice(end);
+
+      handleInputChange(newValue);
+
+      requestAnimationFrame(() => {
+        if (textareaRef.current) {
+          const cursor = start + plainText.length;
+          textareaRef.current.selectionStart = cursor;
+          textareaRef.current.selectionEnd = cursor;
+        }
+      });
+    }
+
+    const { validateMultipleFiles } = await import("@/lib/utils/file-processing");
+    const allFiles = [...selectedFiles, ...filesFromClipboard];
+    const validation = validateMultipleFiles(allFiles);
+
+    if (!validation.isValid) {
+      const errorMessage = validation.errors
+        .map((e) =>
+          e.fileName === "general" ? e.error : `${e.fileName}: ${e.error}`
+        )
+        .join("\n");
+      alert(`File validation failed:\n\n${errorMessage}`);
+      return;
+    }
+
+    setAttachedFiles([]);
+    setSelectedFiles((prev) => [...prev, ...filesFromClipboard]);
+  };
+
   const handleFileRemove = (index: number) => {
     setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
   };
@@ -727,7 +851,12 @@ export function EnhancedChatInterface({
                 <ReasoningEffortSelector
                   value={reasoningEffort}
                   onValueChange={setReasoningEffort}
-                  disabled={isLoading || isStreaming}
+                  disabled={isLoading || isStreaming || isGpt5Pro}
+                  disabledTooltip={
+                    isGpt5Pro
+                      ? "GPT-5 Pro requires high reasoning effort"
+                      : undefined
+                  }
                 />
               )}
 
@@ -877,7 +1006,12 @@ export function EnhancedChatInterface({
                 <ReasoningEffortSelector
                   value={reasoningEffort}
                   onValueChange={setReasoningEffort}
-                  disabled={isLoading || isStreaming}
+                  disabled={isLoading || isStreaming || isGpt5Pro}
+                  disabledTooltip={
+                    isGpt5Pro
+                      ? "GPT-5 Pro requires high reasoning effort"
+                      : undefined
+                  }
                 />
               )}
 
@@ -1127,8 +1261,19 @@ export function EnhancedChatInterface({
                   <div className="flex flex-wrap gap-2">
                     {selectedFiles.map((file, index) => {
                       const isImage = file.type.startsWith("image/");
+                      const isPreviewableImage =
+                        file.type === "image/jpeg" ||
+                        file.type === "image/jpg" ||
+                        file.type === "image/png" ||
+                        file.type === "image/gif" ||
+                        file.type === "image/webp" ||
+                        file.type === "image/bmp" ||
+                        file.type === "image/svg+xml";
                       const isPDF = file.type === "application/pdf";
-                      const imageUrl = isImage ? URL.createObjectURL(file) : null;
+                      const imageUrl =
+                        isImage && isPreviewableImage
+                          ? URL.createObjectURL(file)
+                          : null;
 
                       return (
                         <div
@@ -1209,7 +1354,7 @@ export function EnhancedChatInterface({
                       };
                     }
                   }}
-                  accept=".pdf,.doc,.docx,.pptx,.ppt,.txt,.rtf,.csv,.md,.xls,.xlsx,.xlsm,.odt,.ods,.odp,.jpg,.jpeg,.png,.gif,.bmp,.webp,.svg"
+                  accept=".pdf,.doc,.docx,.pptx,.ppt,.txt,.rtf,.csv,.md,.xls,.xlsx,.xlsm,.odt,.ods,.odp,.jpg,.jpeg,.png,.gif,.bmp,.webp,.svg,.tiff,.tif,.heic,.heif,.avif"
                   multiple={true}
                 />
                 <Button
@@ -1234,6 +1379,7 @@ export function EnhancedChatInterface({
                     value={inputValue}
                     onChange={(e) => handleInputChange(e.target.value)}
                     onKeyDown={handleKeyPress}
+                    onPaste={handlePaste}
                     placeholder={
                       !isAuthenticated
                         ? "Please sign in to chat..."

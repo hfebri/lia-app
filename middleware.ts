@@ -57,7 +57,14 @@ export async function middleware(request: NextRequest) {
     pathname.endsWith(".jpg") ||
     pathname.endsWith(".jpeg") ||
     pathname.endsWith(".gif") ||
-    pathname.endsWith(".svg")
+    pathname.endsWith(".svg") ||
+    pathname.endsWith(".webp") ||
+    pathname.endsWith(".bmp") ||
+    pathname.endsWith(".tiff") ||
+    pathname.endsWith(".tif") ||
+    pathname.endsWith(".avif") ||
+    pathname.endsWith(".heic") ||
+    pathname.endsWith(".heif")
   ) {
     return supabaseResponse;
   }

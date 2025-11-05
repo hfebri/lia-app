@@ -120,6 +120,10 @@ export async function POST(request: NextRequest) {
         "image/webp",
         "image/bmp",
         "image/svg+xml",
+        "image/tiff",
+        "image/avif",
+        "image/heic",
+        "image/heif",
         // PDFs
         "application/pdf", // Claude: native, OpenAI: OCR fallback
         // Text files

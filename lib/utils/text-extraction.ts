@@ -61,6 +61,9 @@ export async function extractTextFromFile(
       case "image/webp":
       case "image/bmp":
       case "image/tiff":
+      case "image/avif":
+      case "image/heic":
+      case "image/heif":
         return await extractFromImage(buffer, mimeType, filename);
 
       default:

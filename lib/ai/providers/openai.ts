@@ -30,6 +30,7 @@ export class OpenAIProvider implements AIProvider {
     "gpt-5-nano",
     "gpt-5-pro",
   ];
+  private static readonly RESPONSES_ONLY_MODELS = new Set(["gpt-5-pro"]);
   private client: OpenAI;
 
   constructor(apiKey: string) {
@@ -53,9 +54,11 @@ export class OpenAIProvider implements AIProvider {
         enable_web_search,
       } = options;
 
+      const requiresResponsesAPI = this.shouldUseResponsesAPI(model, options);
+
       // Use Responses API if web_search is enabled
       // The Responses API supports hosted tools like web_search
-      if (enable_web_search) {
+      if (enable_web_search || requiresResponsesAPI) {
         return await this.generateResponseWithResponsesAPI(messages, options);
       }
 
@@ -128,8 +131,12 @@ export class OpenAIProvider implements AIProvider {
         model,
         input,
         max_output_tokens: max_tokens,
-        tools: [{ type: "web_search" }], // Hosted tools use simple type format
       };
+
+      const tools = this.getResponsesApiTools(options, messages);
+      if (tools) {
+        requestParams.tools = tools;
+      }
 
       // Add reasoning effort if provided
       // Note: Responses API uses nested reasoning.effort, not reasoning_effort
@@ -170,30 +177,103 @@ export class OpenAIProvider implements AIProvider {
   private formatInputForResponsesAPI(
     messages: AIMessage[],
     systemPrompt?: string
-  ): string {
-    let input = "";
+  ): Array<{
+    role: "system" | "user" | "assistant";
+    content: Array<
+      | { type: "text"; text: string }
+      | { type: "input_image"; image_url: { url: string } }
+    >;
+  }> {
+    const formattedInput: Array<{
+      role: "system" | "user" | "assistant";
+      content: Array<
+        | { type: "text"; text: string }
+        | { type: "input_image"; image_url: { url: string } }
+      >;
+    }> = [];
 
-    // Add system prompt if provided
     if (systemPrompt) {
-      input += `System: ${systemPrompt}\n\n`;
+      formattedInput.push({
+        role: "system",
+        content: [{ type: "text", text: systemPrompt }],
+      });
     }
 
-    // Add conversation history
     for (const message of messages) {
-      const role = message.role === "assistant" ? "Assistant" : "User";
-      input += `${role}: ${message.content}\n\n`;
+      // Skip duplicate system messages if a system prompt was provided separately
+      if (message.role === "system" && systemPrompt) {
+        continue;
+      }
 
-      // Add file context if present
+      const contentParts: Array<
+        | { type: "text"; text: string }
+        | { type: "input_image"; image_url: { url: string } }
+      > = [];
+
+      if (message.content && message.content.trim().length > 0) {
+        contentParts.push({
+          type: "text",
+          text: message.content,
+        });
+      }
+
       if (message.files && message.files.length > 0) {
         for (const file of message.files) {
-          if (file.url) {
-            input += `[Attached file: ${file.name || file.url}]\n`;
+          const isImage = this.isImageFile(file.type);
+          if (isImage) {
+            const imageUrl =
+              (file as any).url ||
+              (file.data
+                ? `data:${file.type};base64,${file.data}`
+                : null);
+
+            if (imageUrl) {
+              contentParts.push({
+                type: "input_image",
+                image_url: {
+                  url: imageUrl,
+                },
+              });
+            } else {
+              contentParts.push({
+                type: "text",
+                text: `[Attached image: ${file.name || "image"}]`,
+              });
+            }
+          } else {
+            contentParts.push({
+              type: "text",
+              text: `[Attached file: ${file.name || "file"} (${file.type})]`,
+            });
           }
         }
       }
+
+      if (contentParts.length === 0) {
+        continue;
+      }
+
+      const role: "system" | "user" | "assistant" =
+        message.role === "assistant"
+          ? "assistant"
+          : message.role === "system"
+          ? "system"
+          : "user";
+
+      formattedInput.push({
+        role,
+        content: contentParts,
+      });
     }
 
-    return input.trim();
+    if (formattedInput.length === 0) {
+      formattedInput.push({
+        role: "user",
+        content: [{ type: "text", text: "" }],
+      });
+    }
+
+    return formattedInput;
   }
 
   /**
@@ -211,9 +291,11 @@ export class OpenAIProvider implements AIProvider {
         enable_web_search,
       } = options;
 
+      const requiresResponsesAPI = this.shouldUseResponsesAPI(model, options);
+
       // Check if Responses API supports streaming
-      // If web_search is enabled, we may need to fallback to non-streaming
-      if (enable_web_search) {
+      // If web_search is enabled or model requires responses API, use responses API
+      if (enable_web_search || requiresResponsesAPI) {
         // Try streaming with Responses API
         try {
           yield* this.generateStreamWithResponsesAPI(messages, options);
@@ -338,8 +420,12 @@ export class OpenAIProvider implements AIProvider {
         model,
         input,
         max_output_tokens: max_tokens,
-        tools: [{ type: "web_search" }],
       };
+
+      const tools = this.getResponsesApiTools(options, messages);
+      if (tools) {
+        requestParams.tools = tools;
+      }
 
       // Add reasoning effort if provided
       // Note: Responses API uses nested reasoning.effort, not reasoning_effort
@@ -477,6 +563,58 @@ export class OpenAIProvider implements AIProvider {
    */
   private isImageFile(mimeType: string): boolean {
     return mimeType.startsWith("image/");
+  }
+
+  /**
+   * Determine if the Responses API should be used for the given model/options
+   */
+  private shouldUseResponsesAPI(
+    model?: string,
+    _options: AIGenerationOptions = {}
+  ): boolean {
+    if (!model) {
+      return false;
+    }
+    return OpenAIProvider.RESPONSES_ONLY_MODELS.has(model);
+  }
+
+  /**
+   * Map enabled tools into the format expected by the Responses API
+   */
+  private getResponsesApiTools(
+    options: AIGenerationOptions = {},
+    messages?: AIMessage[]
+  ): any[] | undefined {
+    const enabledTools = getEnabledTools({
+      enable_web_search: options.enable_web_search,
+      enable_file_search: options.enable_file_search,
+      hasDocuments: messages ? this.hasDocuments(messages) : false,
+    });
+
+    if (enabledTools.length === 0) {
+      return undefined;
+    }
+
+    const responsesTools = enabledTools
+      .map((tool) => {
+        if (tool.type === "custom" && tool.custom?.name) {
+          return { type: tool.custom.name };
+        }
+        if (tool.type === "function" && tool.function?.name) {
+          return {
+            type: "function",
+            function: {
+              name: tool.function.name,
+              description: tool.function.description,
+              parameters: tool.function.parameters,
+            },
+          };
+        }
+        return null;
+      })
+      .filter((tool): tool is Record<string, unknown> => tool !== null);
+
+    return responsesTools.length > 0 ? responsesTools : undefined;
   }
 
   /**

@@ -74,8 +74,8 @@ export function SystemInstructionButton({
           )}
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[600px]">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <Settings2 className="h-5 w-5" />
             System Instructions
@@ -87,14 +87,14 @@ export function SystemInstructionButton({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-4 overflow-y-auto flex-1">
           <div className="space-y-2">
             <label className="text-sm font-medium">System Instruction</label>
             <Textarea
               value={tempInstruction}
               onChange={(e) => setTempInstruction(e.target.value)}
               placeholder="Enter system instructions... e.g., 'You are a helpful coding assistant. Always provide clear explanations and follow best practices.'"
-              className="min-h-[120px] resize-none"
+              className="min-h-[120px] max-h-[300px] overflow-y-auto resize-none"
               autoFocus
             />
             <p className="text-xs text-muted-foreground">
@@ -122,7 +122,7 @@ export function SystemInstructionButton({
           </div>
         </div>
 
-        <DialogFooter className="gap-2">
+        <DialogFooter className="gap-2 flex-shrink-0">
           <div className="flex-1">
             {tempInstruction.trim() && (
               <Button

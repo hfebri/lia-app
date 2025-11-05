@@ -275,6 +275,10 @@ ${content}
       "image/webp",
       "image/bmp",
       "image/svg+xml",
+      "image/tiff",
+      "image/avif",
+      "image/heic",
+      "image/heif",
     ];
     return imageTypes.includes(file.type.toLowerCase());
   }

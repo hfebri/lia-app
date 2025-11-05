@@ -34,6 +34,11 @@ export const DEFAULT_FILE_CONFIG: FileValidationConfig = {
     "image/gif",
     "image/webp",
     "image/svg+xml",
+    "image/bmp",
+    "image/tiff",
+    "image/avif",
+    "image/heic",
+    "image/heif",
 
     // Audio
     "audio/mpeg",
@@ -71,6 +76,12 @@ export const DEFAULT_FILE_CONFIG: FileValidationConfig = {
     ".gif",
     ".webp",
     ".svg",
+    ".bmp",
+    ".tiff",
+    ".tif",
+    ".avif",
+    ".heic",
+    ".heif",
 
     // Audio
     ".mp3",
