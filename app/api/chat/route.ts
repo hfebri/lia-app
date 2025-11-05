@@ -302,8 +302,8 @@ export async function POST(request: NextRequest) {
             const stream = aiService.generateStream(aiMessages, {
               model,
               provider,
-              temperature: 0.7,
-              max_tokens: 8192,
+              temperature: extended_thinking ? 1 : 0.7, // Must be 1 when extended thinking is enabled
+              max_tokens: extended_thinking ? Math.max(thinking_budget_tokens + 2048, 12288) : 8192, // Must be > thinking_budget_tokens
               system_prompt: combinedSystemPrompt,
               extended_thinking,
               thinking_budget_tokens,
@@ -377,8 +377,8 @@ export async function POST(request: NextRequest) {
       const response = await aiService.generateResponse(aiMessages, {
         model,
         provider,
-        temperature: 0.7,
-        max_tokens: 8192,
+        temperature: extended_thinking ? 1 : 0.7, // Must be 1 when extended thinking is enabled
+        max_tokens: extended_thinking ? Math.max(thinking_budget_tokens + 2048, 12288) : 8192, // Must be > thinking_budget_tokens
         system_prompt: combinedSystemPrompt,
         extended_thinking,
         thinking_budget_tokens,
