@@ -78,8 +78,12 @@ export function useUserAnalytics(params: UseUserAnalyticsParams = {}): UseUserAn
       const queryParams = new URLSearchParams();
       queryParams.append("period", period);
 
-      if (userId) {
+      // Always send userId parameter - use empty string for "all users"
+      if (userId !== null && userId !== undefined) {
         queryParams.append("userId", userId);
+      } else if (userId === null) {
+        // Explicitly send empty string to indicate "all users" mode
+        queryParams.append("userId", "");
       }
 
       if (startDate && endDate) {

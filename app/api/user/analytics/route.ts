@@ -18,16 +18,35 @@ export async function GET(request: NextRequest) {
     const endDateParam = searchParams.get("endDate");
 
     // Determine which user's analytics to fetch
-    let targetUserId = currentUserId;
-    if (requestedUserId && requestedUserId !== currentUserId) {
-      // Check if user is admin
-      if (user?.role !== "admin") {
-        return NextResponse.json(
-          { success: false, error: "Admin access required to view other users' analytics" },
-          { status: 403 }
-        );
+    let targetUserId: string | null = currentUserId;
+
+    // Check if userId parameter was sent
+    if (searchParams.has("userId")) {
+      const userIdValue = requestedUserId?.trim();
+
+      // Empty string or no value means "all users"
+      if (!userIdValue || userIdValue === "") {
+        // Check if user is admin
+        if (user?.role !== "admin") {
+          return NextResponse.json(
+            { success: false, error: "Admin access required to view all users' analytics" },
+            { status: 403 }
+          );
+        }
+        targetUserId = null; // null means fetch all users
+      } else if (userIdValue !== currentUserId) {
+        // Specific user ID provided (different from current user)
+        if (user?.role !== "admin") {
+          return NextResponse.json(
+            { success: false, error: "Admin access required to view other users' analytics" },
+            { status: 403 }
+          );
+        }
+        targetUserId = userIdValue;
+      } else {
+        // Same as current user
+        targetUserId = currentUserId;
       }
-      targetUserId = requestedUserId;
     }
 
     // Calculate date range
@@ -55,7 +74,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Check cache first (include all params in cache key)
-    const cacheKey = `${targetUserId}_${period}_${startDateParam || 'none'}_${endDateParam || 'none'}`;
+    const cacheKey = `${targetUserId || 'all-users'}_${period}_${startDateParam || 'none'}_${endDateParam || 'none'}`;
     const cached = analyticsCache.get(cacheKey);
     if (cached && (Date.now() - cached.timestamp) < CACHE_DURATION) {
       return NextResponse.json({
@@ -64,18 +83,24 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Get user's conversations for analytics
+    // Get conversations for analytics
     // Use higher limits when filtering by date range for accuracy
     const conversationLimit = (startDateParam && endDateParam) ? 100 : 20;
     const processLimit = (startDateParam && endDateParam) ? 20 : 5;
 
-    const conversations = await ConversationService.getUserConversations(
-      targetUserId,
-      {
-        page: 1,
-        limit: conversationLimit,
-      }
-    );
+    // Fetch conversations based on whether we're showing all users or a specific user
+    const conversations = targetUserId === null
+      ? await ConversationService.getAllConversations({
+          page: 1,
+          limit: conversationLimit,
+        })
+      : await ConversationService.getUserConversations(
+          targetUserId,
+          {
+            page: 1,
+            limit: conversationLimit,
+          }
+        );
 
     // Filter conversations by date range
     const filteredConversations = conversations.conversations.filter((conv) => {

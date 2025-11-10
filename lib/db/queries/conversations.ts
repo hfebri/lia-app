@@ -318,6 +318,60 @@ export async function getRecentConversations(
   });
 }
 
+// Get all conversations with pagination (for admin analytics)
+export async function getAllConversationsWithLastMessage(
+  params: PaginationParams = {}
+): Promise<{
+  conversations: ConversationWithLastMessage[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}> {
+  const { page = 1, limit = 20, sortOrder = "desc" } = params;
+  const offset = (page - 1) * limit;
+
+  // Get conversations across all users
+  const conversationsList = await db
+    .select()
+    .from(conversations)
+    .orderBy(
+      sortOrder === "asc"
+        ? asc(conversations.updatedAt)
+        : desc(conversations.updatedAt)
+    )
+    .limit(limit)
+    .offset(offset);
+
+  // Transform to include last message and message count
+  const conversationsWithLastMessage: ConversationWithLastMessage[] =
+    conversationsList.map((conv) => {
+      const messages = (conv.messages as any) || [];
+      const messageCount = Array.isArray(messages) ? messages.length : 0;
+      const lastMessage =
+        messageCount > 0 ? messages[messages.length - 1] : undefined;
+
+      return {
+        ...conv,
+        lastMessage,
+        messageCount,
+      };
+    });
+
+  // Get total count
+  const totalCount = await db
+    .select({ count: count() })
+    .from(conversations);
+
+  return {
+    conversations: conversationsWithLastMessage,
+    total: totalCount[0].count,
+    page,
+    limit,
+    totalPages: Math.ceil(totalCount[0].count / limit),
+  };
+}
+
 // Search conversations by title
 export async function searchConversations(
   userId: string,

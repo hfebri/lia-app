@@ -5,6 +5,7 @@ import {
   getConversationById,
   getConversationWithMessages,
   getConversationsWithLastMessage,
+  getAllConversationsWithLastMessage,
   updateConversationTitle,
   getConversationsCountByUser,
   searchConversations,
@@ -109,6 +110,13 @@ export class ConversationService {
     params: PaginationParams = {}
   ) {
     return getConversationsWithLastMessage(userId, params);
+  }
+
+  // Get all conversations (for admin analytics)
+  static async getAllConversations(
+    params: PaginationParams = {}
+  ) {
+    return getAllConversationsWithLastMessage(params);
   }
 
   // Update conversation
