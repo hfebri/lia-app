@@ -31,12 +31,46 @@ export class OpenAIProvider implements AIProvider {
     "gpt-5-pro",
   ];
   private static readonly RESPONSES_ONLY_MODELS = new Set(["gpt-5-pro"]);
+
+  // Model-specific API MAXIMUM token limits (what the API allows)
+  // Used for clamping to prevent 400 errors
+  private static readonly MODEL_API_LIMITS = {
+    "gpt-5-pro": 128000,    // API supports 128k
+    "gpt-5": 8192,          // API documented limit: 8192
+    "gpt-5-mini": 8192,     // API documented limit: 8192
+    "gpt-5-nano": 8192,     // API documented limit: 8192
+  } as const;
+
+  // Practical defaults (what we actually request by default)
+  private static readonly DEFAULT_MAX_TOKENS = 8192;
+
   private client: OpenAI;
 
   constructor(apiKey: string) {
     this.client = new OpenAI({
       apiKey,
+      // CRITICAL: GPT-5 Pro can take 5+ minutes to respond with Responses API
+      // Default timeout is 10 minutes, but we set it explicitly
+      timeout: 10 * 60 * 1000, // 10 minutes in milliseconds
+      maxRetries: 2, // Retry on network errors
     });
+  }
+
+  /**
+   * Get maximum tokens for a specific model
+   * If requestedTokens is provided, clamps it to the model's API limit
+   * Otherwise, returns a practical default
+   */
+  private getMaxTokensForModel(model: string, requestedTokens?: number): number {
+    const apiLimit = OpenAIProvider.MODEL_API_LIMITS[model as keyof typeof OpenAIProvider.MODEL_API_LIMITS] || 8192;
+
+    if (requestedTokens !== undefined) {
+      // Clamp requested tokens to API limit to prevent 400 errors
+      return Math.min(requestedTokens, apiLimit);
+    }
+
+    // No specific request: use safe default
+    return OpenAIProvider.DEFAULT_MAX_TOKENS;
   }
 
   /**
@@ -49,10 +83,13 @@ export class OpenAIProvider implements AIProvider {
     try {
       const {
         model = "gpt-5",
-        max_tokens = 8192,
+        max_tokens,
         system_prompt,
         enable_web_search,
       } = options;
+
+      // Clamp max_tokens to model's API limit
+      const clampedMaxTokens = this.getMaxTokensForModel(model, max_tokens);
 
       const requiresResponsesAPI = this.shouldUseResponsesAPI(model, options);
 
@@ -77,7 +114,7 @@ export class OpenAIProvider implements AIProvider {
       const completionParams: any = {
         model,
         messages: formattedMessages,
-        max_completion_tokens: max_tokens, // GPT-5 uses max_completion_tokens
+        max_completion_tokens: clampedMaxTokens, // GPT-5 uses max_completion_tokens, clamped to API limit
         tools: tools.length > 0 ? tools : undefined,
       };
 
@@ -117,9 +154,12 @@ export class OpenAIProvider implements AIProvider {
     try {
       const {
         model = "gpt-5",
-        max_tokens = 8192,
+        max_tokens,
         system_prompt,
       } = options;
+
+      // Clamp max_tokens to model's API limit
+      const clampedMaxTokens = this.getMaxTokensForModel(model, max_tokens);
 
       // Format input for Responses API
       // Responses API expects a single input string, not a messages array
@@ -130,7 +170,7 @@ export class OpenAIProvider implements AIProvider {
       const requestParams: any = {
         model,
         input,
-        max_output_tokens: max_tokens,
+        max_output_tokens: clampedMaxTokens, // Clamped to API limit
       };
 
       const tools = this.getResponsesApiTools(options, messages);
@@ -181,6 +221,7 @@ export class OpenAIProvider implements AIProvider {
     role: "system" | "user" | "assistant";
     content: Array<
       | { type: "input_text"; text: string }
+      | { type: "output_text"; text: string }
       | { type: "input_image"; image_url: string }
     >;
   }> {
@@ -188,6 +229,7 @@ export class OpenAIProvider implements AIProvider {
       role: "system" | "user" | "assistant";
       content: Array<
         | { type: "input_text"; text: string }
+        | { type: "output_text"; text: string }
         | { type: "input_image"; image_url: string }
       >;
     }> = [];
@@ -207,16 +249,17 @@ export class OpenAIProvider implements AIProvider {
 
       const contentParts: Array<
         | { type: "input_text"; text: string }
+        | { type: "output_text"; text: string }
         | { type: "input_image"; image_url: string }
       > = [];
 
-      // All text content uses input_text, regardless of role
-      // output_text is only for response output, not request input
+      // CRITICAL: Assistant messages use output_text (previous AI responses)
+      // User/system messages use input_text (user inputs)
       if (message.content && message.content.trim().length > 0) {
         contentParts.push({
-          type: "input_text",
+          type: message.role === "assistant" ? "output_text" : "input_text",
           text: message.content,
-        });
+        } as any);
       }
 
       // Only user messages can have file attachments
@@ -287,10 +330,13 @@ export class OpenAIProvider implements AIProvider {
     try {
       const {
         model = "gpt-5",
-        max_tokens = 8192,
+        max_tokens,
         system_prompt,
         enable_web_search,
       } = options;
+
+      // Clamp max_tokens to model's API limit
+      const clampedMaxTokens = this.getMaxTokensForModel(model, max_tokens);
 
       const requiresResponsesAPI = this.shouldUseResponsesAPI(model, options);
 
@@ -338,7 +384,7 @@ export class OpenAIProvider implements AIProvider {
       const streamParams: any = {
         model,
         messages: formattedMessages,
-        max_completion_tokens: max_tokens, // GPT-5 uses max_completion_tokens
+        max_completion_tokens: clampedMaxTokens, // GPT-5 uses max_completion_tokens, clamped to API limit
         tools: tools.length > 0 ? tools : undefined,
         stream: true,
       };
@@ -383,6 +429,8 @@ export class OpenAIProvider implements AIProvider {
           yield {
             content: "",
             isComplete: true,
+            isTruncated: finishReason === "length", // Flag if response was cut off
+            stopReason: finishReason,                // Include finish reason ("length", "stop", "content_filter")
             usage: {
               prompt_tokens: promptTokens,
               completion_tokens: completionTokens,
@@ -408,9 +456,12 @@ export class OpenAIProvider implements AIProvider {
     try {
       const {
         model = "gpt-5",
-        max_tokens = 8192,
+        max_tokens,
         system_prompt,
       } = options;
+
+      // Clamp max_tokens to model's API limit
+      const clampedMaxTokens = this.getMaxTokensForModel(model, max_tokens);
 
       // Format input for Responses API
       const input = this.formatInputForResponsesAPI(messages, system_prompt);
@@ -420,7 +471,7 @@ export class OpenAIProvider implements AIProvider {
       const requestParams: any = {
         model,
         input,
-        max_output_tokens: max_tokens,
+        max_output_tokens: clampedMaxTokens, // Clamped to API limit
       };
 
       const tools = this.getResponsesApiTools(options, messages);
@@ -458,10 +509,13 @@ export class OpenAIProvider implements AIProvider {
             };
           }
         } else if (chunk.response && chunk.type === "response.completed") {
-          // Stream completed
+          // Stream completed - check for stop reason
+          const finishReason = chunk.response.finish_reason || chunk.response.output?.finish_reason;
           yield {
             content: "",
             isComplete: true,
+            isTruncated: finishReason === "length", // Flag if response was cut off
+            stopReason: finishReason,                // Include finish reason
             usage: {
               prompt_tokens: chunk.response.usage?.prompt_tokens || 0,
               completion_tokens: chunk.response.usage?.completion_tokens || 0,
@@ -471,10 +525,31 @@ export class OpenAIProvider implements AIProvider {
           break;
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("[OpenAI] Responses API streaming error:", error);
       console.error("[OpenAI] Stream error details:", JSON.stringify(error, null, 2));
-      throw error;
+
+      // Check if this is a timeout/socket error (common with GPT-5 Pro)
+      const isSocketError = error?.cause?.cause?.code === 'UND_ERR_SOCKET' ||
+                           error?.message === 'terminated' ||
+                           error?.code === 'ECONNRESET';
+
+      if (isSocketError && options.model === 'gpt-5-pro') {
+        // GPT-5 Pro timeout - provide helpful error message
+        const timeoutError = new Error(
+          'GPT-5 Pro response timed out. This model can take 5+ minutes but platform limits are: ' +
+          'Netlify Free/Pro (26s), Vercel Hobby (10s), Vercel Pro (60s). ' +
+          'Solutions: (1) Use gpt-5 instead for faster responses, (2) Upgrade to Enterprise tier, or ' +
+          '(3) Reduce reasoning complexity by lowering max_output_tokens.'
+        ) as AIError;
+        timeoutError.provider = this.name;
+        timeoutError.model = options.model;
+        timeoutError.code = 'PLATFORM_TIMEOUT';
+        timeoutError.details = error;
+        throw timeoutError;
+      }
+
+      throw this.handleError(error, options.model);
     }
   }
 

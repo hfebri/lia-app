@@ -357,6 +357,8 @@ export function AiChatInterface({ className }: AiChatInterfaceProps) {
                           content={message.content}
                           model={message.model}
                           usage={message.usage}
+                          isTruncated={message.metadata?.isTruncated}
+                          stopReason={message.metadata?.stopReason}
                           timestamp={message.timestamp}
                           onRegenerate={() => {
                             // TODO: Implement regenerate
@@ -366,6 +368,11 @@ export function AiChatInterface({ className }: AiChatInterfaceProps) {
                           }}
                           onFeedback={(feedback) => {
                             // TODO: Implement feedback
+                          }}
+                          onContinue={() => {
+                            // Send "continue" message to resume generation
+                            // TODO: Wire this up properly
+                            console.log("Continue clicked - implement continuation");
                           }}
                         />
                       </div>

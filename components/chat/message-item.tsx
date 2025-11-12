@@ -26,11 +26,13 @@ import {
 interface MessageItemProps {
   message: Message;
   isStreaming?: boolean;
+  onContinue?: () => void;
 }
 
 export function MessageItem({
   message,
   isStreaming = false,
+  onContinue,
 }: MessageItemProps) {
   const isUser = message.role === "user";
   const isAssistant = message.role === "assistant";
@@ -244,6 +246,29 @@ export function MessageItem({
                   style={{ animationDelay: "0.4s" }}
                 />
               </span>
+            )}
+
+            {/* Truncation Warning - Show for assistant messages only */}
+            {isAssistant && message.metadata?.isTruncated && (
+              <div className="mt-3 flex items-center gap-2 p-2 rounded-md bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800">
+                <Badge variant="outline" className="bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700">
+                  ⚠️ Response Truncated
+                </Badge>
+                <span className="text-xs text-yellow-700 dark:text-yellow-300 flex-1">
+                  Response was cut off due to length limit
+                  {message.metadata.stopReason && message.metadata.stopReason !== "max_tokens" && ` (${message.metadata.stopReason})`}
+                </span>
+                {onContinue && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={onContinue}
+                    className="ml-auto h-7 text-xs border-yellow-300 dark:border-yellow-700 hover:bg-yellow-100 dark:hover:bg-yellow-900"
+                  >
+                    Continue
+                  </Button>
+                )}
+              </div>
             )}
           </div>
         </div>

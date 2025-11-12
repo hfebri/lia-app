@@ -6,8 +6,93 @@ import { LIA_SYSTEM_INSTRUCTION } from "@/lib/constants/ai-models";
 
 // Configure runtime and timeout for this route
 export const runtime = 'nodejs'; // Use Node.js runtime (not Edge) for better timeout support
-export const maxDuration = 300; // Max execution time: Hobby=10s, Pro=60s, Enterprise=300s
-// NOTE: GPT-5 Pro can take 5+ minutes to respond due to extended reasoning
+export const maxDuration = 300; // Max execution time (platform-dependent)
+// PLATFORM TIMEOUT LIMITS:
+// - Netlify Free/Pro: 26 seconds max (GPT-5 Pro will timeout)
+// - Netlify Enterprise: Custom timeouts available
+// - Vercel Hobby: 10s, Pro: 60s, Enterprise: 300s
+// IMPORTANT: GPT-5 Pro requires extended timeouts - use gpt-5 on free/pro tiers
+
+// Token limit configuration based on actual API capabilities and plan requirements
+const TOKEN_LIMITS = {
+  // Model-specific NORMAL mode output tokens (balanced for cost/latency)
+  NORMAL: {
+    // Claude models - use conservative defaults for normal mode
+    'claude-sonnet-4-5-20250929': 16384,
+    'claude-sonnet-4.5': 16384,
+    'claude-sonnet-4-5': 16384,
+    'claude-sonnet-4': 16384,
+    'claude-haiku-4-5-20250110': 8192,    // Keep Haiku fast & cheap
+    'claude-haiku-4-5-20251001': 8192,
+    'claude-haiku-4.5': 8192,
+    'claude-haiku-4-5': 8192,
+    'claude-haiku-3.5': 8192,
+    'claude-opus-4-1-20250805': 16384,
+    'claude-opus-4.1': 16384,
+    'claude-opus-4-1': 16384,
+    'claude-opus-4': 16384,
+    'claude-opus-3': 8192,
+
+    // OpenAI models - conservative in normal mode
+    'gpt-5-pro': 16384,
+    'gpt-5': 8192,
+    'gpt-5-mini': 8192,
+    'gpt-5-nano': 8192,
+  } as Record<string, number>,
+
+  // Model-specific EXTENDED thinking mode output tokens (enable 32k reasoning)
+  EXTENDED: {
+    // Claude models - Sonnet/Opus can handle 32k+ for extended thinking
+    'claude-sonnet-4-5-20250929': 32768,  // API max: 64k - can do 32k
+    'claude-sonnet-4.5': 32768,
+    'claude-sonnet-4-5': 32768,
+    'claude-sonnet-4': 32768,
+    'claude-haiku-4-5-20250110': 8192,    // Haiku stays at 8k (not designed for long reasoning)
+    'claude-haiku-4-5-20251001': 8192,
+    'claude-haiku-4.5': 8192,
+    'claude-haiku-4-5': 8192,
+    'claude-haiku-3.5': 8192,
+    'claude-opus-4-1-20250805': 32768,    // API max: 400k - can do 32k
+    'claude-opus-4.1': 32768,
+    'claude-opus-4-1': 32768,
+    'claude-opus-4': 32768,
+    'claude-opus-3': 8192,
+
+    // OpenAI models - Pro can handle 32k+, others stay conservative
+    'gpt-5-pro': 32768,           // Pro is designed for extended thinking
+    'gpt-5': 8192,                // Standard model stays at 8k
+    'gpt-5-mini': 8192,           // Mini stays at 8k
+    'gpt-5-nano': 8192,           // Nano stays at 8k
+  } as Record<string, number>,
+
+  // Fallback defaults
+  DEFAULT_NORMAL: 8192,         // Safe default for unknown models
+  DEFAULT_EXTENDED: 32768,      // Extended thinking target
+} as const;
+
+/**
+ * Get max tokens for a specific model, respecting API limits and extended thinking
+ *
+ * Normal mode: Conservative limits (8k-16k) for cost/latency balance
+ * Extended mode: Higher limits (32k) for Sonnet/Opus/GPT-5 Pro to enable deep reasoning
+ */
+function getMaxTokensForModel(model: string, extended_thinking: boolean, thinking_budget_tokens: number): number {
+  if (extended_thinking) {
+    // Extended thinking: use model's extended limit (32k for capable models)
+    const modelExtendedLimit = TOKEN_LIMITS.EXTENDED[model] || TOKEN_LIMITS.DEFAULT_EXTENDED;
+
+    // Honor thinking_budget_tokens if provided and higher than default
+    const requestedTokens = (thinking_budget_tokens || 1024) + 2048;
+    const extendedTokens = Math.max(requestedTokens, TOKEN_LIMITS.DEFAULT_EXTENDED);
+
+    // Cap to model's extended limit (e.g., 32k for Sonnet/Opus/Pro, 8k for Haiku/Mini)
+    return Math.min(extendedTokens, modelExtendedLimit);
+  }
+
+  // Normal mode: use conservative model-specific limit
+  const modelNormalLimit = TOKEN_LIMITS.NORMAL[model] || TOKEN_LIMITS.DEFAULT_NORMAL;
+  return modelNormalLimit;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -305,7 +390,7 @@ export async function POST(request: NextRequest) {
               model,
               provider,
               temperature: extended_thinking ? 1 : 0.7, // Must be 1 when extended thinking is enabled
-              max_tokens: extended_thinking ? Math.max((thinking_budget_tokens || 1024) + 2048, 12288) : 8192, // Must be > thinking_budget_tokens
+              max_tokens: getMaxTokensForModel(model, extended_thinking, thinking_budget_tokens || 1024),
               system_prompt: combinedSystemPrompt,
               extended_thinking,
               thinking_budget_tokens: thinking_budget_tokens || 1024,
@@ -316,24 +401,44 @@ export async function POST(request: NextRequest) {
             });
 
             let isFirstChunk = true;
-            for await (const chunk of stream) {
-              const data = JSON.stringify({
-                content: chunk.content,
-                isComplete: chunk.isComplete,
-                usage: chunk.usage,
-                // Include file validation warnings in first chunk
-                ...(isFirstChunk && fileValidationWarnings.length > 0 ? {
-                  fileValidationWarnings
-                } : {}),
-              });
+            let lastChunkTime = Date.now();
 
-              controller.enqueue(encoder.encode(`data: ${data}\n\n`));
-              isFirstChunk = false;
-
-              if (chunk.isComplete) {
-                controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
-                break;
+            // Keep-alive heartbeat for long-running requests (GPT-5 Pro)
+            // Send a ping every 20 seconds to prevent socket timeout
+            const heartbeatInterval = setInterval(() => {
+              const timeSinceLastChunk = Date.now() - lastChunkTime;
+              if (timeSinceLastChunk > 20000) {
+                // Send keep-alive comment (ignored by SSE parsers)
+                controller.enqueue(encoder.encode(': keep-alive\n\n'));
               }
+            }, 20000);
+
+            try {
+              for await (const chunk of stream) {
+                lastChunkTime = Date.now();
+
+                const data = JSON.stringify({
+                  content: chunk.content,
+                  isComplete: chunk.isComplete,
+                  isTruncated: chunk.isTruncated,
+                  stopReason: chunk.stopReason,
+                  usage: chunk.usage,
+                  // Include file validation warnings in first chunk
+                  ...(isFirstChunk && fileValidationWarnings.length > 0 ? {
+                    fileValidationWarnings
+                  } : {}),
+                });
+
+                controller.enqueue(encoder.encode(`data: ${data}\n\n`));
+                isFirstChunk = false;
+
+                if (chunk.isComplete) {
+                  controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
+                  break;
+                }
+              }
+            } finally {
+              clearInterval(heartbeatInterval);
             }
           } catch (error) {
             // Send error as a complete message with typing animation
@@ -380,7 +485,7 @@ export async function POST(request: NextRequest) {
         model,
         provider,
         temperature: extended_thinking ? 1 : 0.7, // Must be 1 when extended thinking is enabled
-        max_tokens: extended_thinking ? Math.max((thinking_budget_tokens || 1024) + 2048, 12288) : 8192, // Must be > thinking_budget_tokens
+        max_tokens: getMaxTokensForModel(model, extended_thinking, thinking_budget_tokens || 1024),
         system_prompt: combinedSystemPrompt,
         extended_thinking,
         thinking_budget_tokens: thinking_budget_tokens || 1024,
@@ -394,6 +499,8 @@ export async function POST(request: NextRequest) {
         success: true,
         data: {
           content: response.content,
+          isTruncated: response.isTruncated,
+          stopReason: response.stopReason,
           model: response.model,
           provider: response.provider,
           usage: response.usage,

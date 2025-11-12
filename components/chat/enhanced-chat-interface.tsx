@@ -60,6 +60,7 @@ export function EnhancedChatInterface({
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [attachedFiles, setAttachedFiles] = useState<FileItem[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [showAutoConvertWarning, setShowAutoConvertWarning] = useState(false);
   const [currentConversationId, setCurrentConversationId] = useState<
     string | null
   >(null);
@@ -172,6 +173,15 @@ export function EnhancedChatInterface({
     loadModels();
     refreshFiles();
   }, [loadModels, refreshFiles]);
+
+  // Show auto-convert warning when input exceeds 10,000 characters
+  useEffect(() => {
+    if (inputValue.length > 10000) {
+      setShowAutoConvertWarning(true);
+    } else {
+      setShowAutoConvertWarning(false);
+    }
+  }, [inputValue]);
 
   // Handle global "new chat" navigation signal via query param
   useEffect(() => {
@@ -1165,10 +1175,20 @@ export function EnhancedChatInterface({
                           role: message.role,
                           conversationId: "temp-conversation",
                           timestamp: new Date(),
+                          model: message.model,
+                          usage: message.usage,
                           metadata: {
                             model: message.model,
+                            isTruncated: message.metadata?.isTruncated,
+                            stopReason: message.metadata?.stopReason,
+                            usage: message.usage,
                           },
                         }}
+                        onContinue={
+                          message.role === "assistant" && message.metadata?.isTruncated
+                            ? () => sendMessage("Please continue from where you left off.")
+                            : undefined
+                        }
                       />
                     );
                   })}
@@ -1459,6 +1479,34 @@ export function EnhancedChatInterface({
                 </Button>
 
                 <div className="flex-1 min-w-0">
+                  {/* Auto-convert warning */}
+                  {showAutoConvertWarning && (
+                    <div className="mb-2 flex items-center gap-2 p-2 rounded-md bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
+                      <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                      <span className="text-xs text-blue-700 dark:text-blue-300 flex-1">
+                        Text is {inputValue.length.toLocaleString()} characters. Will be auto-converted to a .txt file when sent.
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          // Manually convert to file now
+                          const textFile = new File(
+                            [inputValue],
+                            'long-message.txt',
+                            { type: 'text/plain' }
+                          );
+                          setSelectedFiles((prev) => [...prev, textFile]);
+                          setInputValue('Please analyze the attached text.');
+                          setShowAutoConvertWarning(false);
+                        }}
+                        className="h-6 text-xs border-blue-300 dark:border-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900"
+                      >
+                        Convert Now
+                      </Button>
+                    </div>
+                  )}
+
                   <Textarea
                     ref={textareaRef}
                     value={inputValue}

@@ -25,6 +25,8 @@ interface UseAiChatState {
   reasoningEffort: ReasoningEffort;
   currentConversationId: string | null; // Track current conversation
   currentConversationModel: string | null; // Track model used in current conversation
+  lastResponseWasTruncated: boolean; // Track if last response was truncated
+  lastStopReason: string | null; // Track why the response stopped
   systemInstruction: string; // System instruction for conversation
 }
 
@@ -94,6 +96,8 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     reasoningEffort: getSavedModel() === "gpt-5-pro" ? "high" : "medium",
     currentConversationId: null,
     currentConversationModel: null,
+    lastResponseWasTruncated: false,
+    lastStopReason: null,
     systemInstruction: "",
   });
 
@@ -339,6 +343,37 @@ export function useAiChat(options: UseAiChatOptions = {}) {
   // Send a message with streaming response
   const sendMessage = useCallback(
     async (content: string, files?: File[], stream: boolean = true) => {
+      // AUTO-CONVERT: Long text → .txt file (mimic Claude.ai behavior)
+      console.log('[useAiChat] Message length:', content.length, 'characters');
+      if (content.length > 10000) {
+        console.log('[useAiChat] AUTO-CONVERT triggered - converting to .txt file');
+        const currentFileCount = files?.length || 0;
+
+        // Check if we're already at the file limit
+        if (currentFileCount >= 10) {
+          console.error('[useAiChat] AUTO-CONVERT blocked - already at file limit');
+          setState((prev) => ({
+            ...prev,
+            error: "Cannot send long message: already at max file limit (10 files). Please reduce attached files to send this message.",
+          }));
+          return;
+        }
+
+        // Create a .txt file from the long message
+        const textFile = new File(
+          [content],
+          'long-message.txt',
+          { type: 'text/plain' }
+        );
+
+        // Add to files array (we've already verified we're under the limit)
+        files = files ? [...files, textFile] : [textFile];
+
+        // Replace message with short instruction
+        content = 'Please analyze the attached text.';
+        console.log('[useAiChat] AUTO-CONVERT complete - text file created, message replaced');
+      }
+
       // Validate message
       const validation = chatService.current.validateMessage(content);
       if (!validation.isValid) {
@@ -1025,6 +1060,11 @@ export function useAiChat(options: UseAiChatOptions = {}) {
 
             // Create or update assistant message when complete
             if (chunk.isComplete) {
+              // Check if response was truncated
+              if (chunk.isTruncated) {
+                console.log("[useAiChat] Response was truncated:", chunk.stopReason);
+              }
+
               // Only create message if there's content
               if (accumulatedContent.trim()) {
                 const assistantMessage = chatService.current.createMessage(
@@ -1033,6 +1073,12 @@ export function useAiChat(options: UseAiChatOptions = {}) {
                   {
                     model: state.selectedModel,
                     usage: chunk.usage,
+                    metadata: {
+                      model: state.selectedModel,
+                      isTruncated: chunk.isTruncated,
+                      stopReason: chunk.stopReason,
+                      usage: chunk.usage,
+                    },
                   }
                 );
 
@@ -1044,6 +1090,8 @@ export function useAiChat(options: UseAiChatOptions = {}) {
                   streamingContent: "",
                   isLoading: false,
                   isStreaming: false,
+                  lastResponseWasTruncated: chunk.isTruncated || false,
+                  lastStopReason: chunk.stopReason || null,
                 }));
 
                 // Save both messages to database after streaming is complete
@@ -1135,12 +1183,23 @@ export function useAiChat(options: UseAiChatOptions = {}) {
             }
           }
 
+          // Check if response was truncated
+          if (response.isTruncated) {
+            console.log("[useAiChat] Non-streaming response was truncated:", response.stopReason);
+          }
+
           const assistantMessage = chatService.current.createMessage(
             "assistant",
             response.content,
             {
               model: response.model,
               usage: response.usage,
+              metadata: {
+                model: response.model,
+                isTruncated: response.isTruncated,
+                stopReason: response.stopReason,
+                usage: response.usage,
+              },
             }
           );
 
@@ -1149,6 +1208,8 @@ export function useAiChat(options: UseAiChatOptions = {}) {
             messages: [...prev.messages, assistantMessage].slice(-maxMessages),
             isLoading: false,
             isProcessingFiles: false, // Ensure file processing state is cleared
+            lastResponseWasTruncated: response.isTruncated || false,
+            lastStopReason: response.stopReason || null,
           }));
 
           // Save both messages to database after AI response is received

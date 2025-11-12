@@ -4,10 +4,23 @@ export interface Message {
   role: "user" | "assistant";
   timestamp: Date;
   conversationId: string;
+  model?: string;
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
   metadata?: {
     model?: string;
     tokens?: number;
     finish_reason?: string;
+    isTruncated?: boolean;
+    stopReason?: string;
+    usage?: {
+      prompt_tokens: number;
+      completion_tokens: number;
+      total_tokens: number;
+    };
   };
   files?: Array<{
     name: string;

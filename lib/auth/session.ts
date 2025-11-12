@@ -15,6 +15,8 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
       error,
     } = await supabase.auth.getSession();
 
+    // Don't try to refresh server-side - the server client can't write cookies
+    // to the browser. Refresh must happen client-side or in middleware/route handlers.
     if (error || !session?.user?.email) {
       return null;
     }

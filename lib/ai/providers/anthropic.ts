@@ -38,6 +38,29 @@ export class AnthropicProvider implements AIProvider {
     "claude-haiku-4-5-20251001",
     "claude-opus-4-1-20250805",
   ];
+
+  // Model-specific API MAXIMUM token limits (what the API allows)
+  // Used for clamping to prevent errors
+  private static readonly MODEL_API_LIMITS = {
+    "claude-sonnet-4-5-20250929": 64000,
+    "claude-sonnet-4.5": 64000,
+    "claude-sonnet-4-5": 64000,
+    "claude-sonnet-4": 64000,
+    "claude-haiku-4-5-20251001": 800000,
+    "claude-haiku-4-5-20250110": 800000,
+    "claude-haiku-4.5": 800000,
+    "claude-haiku-4-5": 800000,
+    "claude-haiku-3.5": 80000,
+    "claude-opus-4-1-20250805": 400000,
+    "claude-opus-4.1": 400000,
+    "claude-opus-4-1": 400000,
+    "claude-opus-4": 400000,
+    "claude-opus-3": 80000,
+  } as Record<string, number>;
+
+  // Practical default (what we actually request by default)
+  private static readonly DEFAULT_MAX_TOKENS = 8192;
+
   private client: Anthropic;
 
   constructor(apiKey: string) {
@@ -46,6 +69,23 @@ export class AnthropicProvider implements AIProvider {
       // NOTE: Beta headers for web search are added per-request (see generateResponse/generateStream)
       // because they're only needed when enable_web_search is true
     });
+  }
+
+  /**
+   * Get maximum tokens for a specific model
+   * If requestedTokens is provided, clamps it to the model's API limit
+   * Otherwise, returns a practical default
+   */
+  private getMaxTokensForModel(model: string, requestedTokens?: number): number {
+    const apiLimit = AnthropicProvider.MODEL_API_LIMITS[model] || 64000;
+
+    if (requestedTokens !== undefined) {
+      // Clamp requested tokens to API limit to prevent errors
+      return Math.min(requestedTokens, apiLimit);
+    }
+
+    // No specific request: use safe default
+    return AnthropicProvider.DEFAULT_MAX_TOKENS;
   }
 
   /**
@@ -58,7 +98,7 @@ export class AnthropicProvider implements AIProvider {
     try {
       const {
         model = "claude-sonnet-4-5-20250929",
-        max_tokens = 8192,
+        max_tokens,
         temperature = 1,
         top_p,
         system_prompt,
@@ -67,6 +107,9 @@ export class AnthropicProvider implements AIProvider {
         enable_web_search,
       } = options;
 
+      // Clamp max_tokens to model's API limit
+      const clampedMaxTokens = this.getMaxTokensForModel(model, max_tokens);
+
       // Format messages for Anthropic API
       const formattedMessages = this.formatMessages(messages);
 
@@ -74,7 +117,7 @@ export class AnthropicProvider implements AIProvider {
       const requestParams: Anthropic.MessageCreateParams = {
         model,
         messages: formattedMessages,
-        max_tokens,
+        max_tokens: clampedMaxTokens, // Clamped to API limit
         temperature,
       };
 
@@ -149,7 +192,7 @@ export class AnthropicProvider implements AIProvider {
     try {
       const {
         model = "claude-sonnet-4-5-20250929",
-        max_tokens = 8192,
+        max_tokens,
         temperature = 1,
         top_p,
         system_prompt,
@@ -158,6 +201,9 @@ export class AnthropicProvider implements AIProvider {
         enable_web_search,
       } = options;
 
+      // Clamp max_tokens to model's API limit
+      const clampedMaxTokens = this.getMaxTokensForModel(model, max_tokens);
+
       // Format messages for Anthropic API
       const formattedMessages = this.formatMessages(messages);
 
@@ -165,7 +211,7 @@ export class AnthropicProvider implements AIProvider {
       const requestParams: Anthropic.MessageCreateParams = {
         model,
         messages: formattedMessages,
-        max_tokens,
+        max_tokens: clampedMaxTokens, // Clamped to API limit
         temperature,
         stream: true,
       };
@@ -212,6 +258,7 @@ export class AnthropicProvider implements AIProvider {
       let totalTokens = 0;
       let promptTokens = 0;
       let completionTokens = 0;
+      let stopReason: string | undefined; // Track stop reason for truncation detection
 
       // Stream chunks
       for await (const event of stream) {
@@ -226,11 +273,20 @@ export class AnthropicProvider implements AIProvider {
           };
         }
 
+        // Capture stop reason from message_delta
+        if (event.type === "message_delta" && "delta" in event) {
+          if (event.delta.stop_reason) {
+            stopReason = event.delta.stop_reason;
+          }
+        }
+
         // Handle message completion with usage stats
         if (event.type === "message_stop") {
           yield {
             content: "",
             isComplete: true,
+            isTruncated: stopReason === "max_tokens", // Flag if response was cut off
+            stopReason,                                 // Include stop reason for debugging
             usage: {
               prompt_tokens: promptTokens,
               completion_tokens: completionTokens,

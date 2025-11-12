@@ -7,6 +7,7 @@ import {
   useState,
   useMemo,
   useCallback,
+  useRef,
 } from "react";
 import { createClient } from "../../lib/supabase/client";
 import type { Session } from "@supabase/supabase-js";
@@ -28,6 +29,8 @@ interface UserCache {
   timestamp: number;
   sessionId: string;
 }
+
+type ProfileFetchResult = "success" | "not_found" | "inactive" | "transient";
 
 // Cache utility functions
 function loadUserFromCache(): UserCache | null {
@@ -75,9 +78,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isFetchingUser, setIsFetchingUser] = useState(false);
+  const [lastFetchResult, setLastFetchResult] = useState<ProfileFetchResult | null>(null);
 
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
+
+  // Refresh mutex to prevent concurrent refresh attempts
+  const isRefreshingRef = useRef(false);
 
   const abortControllerRef = useCallback(() => {
     let controller: AbortController | null = null;
@@ -96,7 +103,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])();
 
   const fetchUserProfile = useCallback(
-    async (email: string, activeSession?: Session | null) => {
+    async (email: string, activeSession?: Session | null): Promise<ProfileFetchResult> => {
       setIsFetchingUser(true);
 
       // Create AbortController for this request
@@ -119,7 +126,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (response.ok) {
           const userData = await response.json();
+
+          // Check if user is inactive (hard failure - force logout)
+          if (!userData?.isActive) {
+            console.warn("[AUTH-PROVIDER] ⚠️ User profile inactive - will force logout");
+            setUser(null);
+            clearUserCache();
+            setLastFetchResult("inactive");
+            await supabase.auth.signOut().catch(() => {});
+            return "inactive";
+          }
+
           setUser(userData);
+          setLastFetchResult("success");
 
           // Save to cache
           const sessionToCache =
@@ -137,32 +156,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               sessionId: sessionToCache.user.id,
             });
           }
-          return true;
-        } else {
-          console.error("[AUTH-PROVIDER] ❌ Failed to fetch user profile:", response.status, response.statusText);
+          return "success";
+        }
+
+        console.error(
+          "[AUTH-PROVIDER] ❌ Failed to fetch user profile:",
+          response.status,
+          response.statusText
+        );
+
+        // Only clear user and force logout on hard failures (404)
+        if (response.status === 404) {
+          console.warn("[AUTH-PROVIDER] ⚠️ User not found in DB (404) - will sign out");
           setUser(null);
           clearUserCache();
-          // If user not found in DB, sign them out from Supabase too
-          if (response.status === 404) {
-            console.warn("[AUTH-PROVIDER] ⚠️ User not found in DB (404) - signing out");
-            await supabase.auth.signOut().catch(() => {
-              // Ignore signOut errors in cleanup
-            });
-          }
-          return false;
+          setLastFetchResult("not_found");
+          await supabase.auth.signOut().catch(() => {
+            // Ignore signOut errors in cleanup
+          });
+          return "not_found";
         }
+
+        // For all other errors (5xx, 401, network issues, etc), keep existing user
+        console.warn(
+          "[AUTH-PROVIDER] ⚠️ Transient error - keeping existing user state"
+        );
+        setLastFetchResult("transient");
+        return "transient";
       } catch (error: any) {
         // Handle all errors: network failures, timeouts, aborts, JSON parsing, etc.
         if (error.name === "AbortError") {
-          console.warn("[AUTH-PROVIDER] ⚠️ User profile fetch was aborted");
+          console.warn(
+            "[AUTH-PROVIDER] ⚠️ User profile fetch was aborted - keeping existing user"
+          );
         } else if (error.message?.includes("timeout")) {
-          console.error("[AUTH-PROVIDER] ❌ User profile fetch timed out - server may be down");
+          console.error(
+            "[AUTH-PROVIDER] ❌ User profile fetch timed out - keeping existing user"
+          );
         } else {
-          console.error("[AUTH-PROVIDER] ❌ Error fetching user profile:", error);
+          console.error(
+            "[AUTH-PROVIDER] ❌ Error fetching user profile - keeping existing user:",
+            error
+          );
         }
-        setUser(null);
-        clearUserCache();
-        return false;
+
+        // CRITICAL: Keep existing user on transient errors (network, timeout, abort)
+        // Don't clear user or cache - keep last known good state
+        setLastFetchResult("transient");
+        return "transient";
       } finally {
         clearTimeout(timeoutId);
         abortControllerRef.set(null);
@@ -177,6 +218,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Get initial session
     const getInitialSession = async () => {
+      let shouldStayLoading = false; // Track if we need to keep loading state
+
       try {
         // Try cache first for instant load
         const cachedUser = loadUserFromCache();
@@ -201,23 +244,61 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
           // Check if cached user matches session
           if (!cachedUser || cachedUser.sessionId !== session.user.id) {
-            // Fetch fresh user data if cache miss or different session
-            // Wrap in try/catch to ensure errors don't break the flow
-            try {
-              const success = await fetchUserProfile(session.user.email!, session);
-              if (!success) {
-                console.warn("[AUTH-PROVIDER] ⚠️ Profile fetch failed during initial session");
-                setUser(null);
-                clearUserCache();
-              }
-            } catch (profileError) {
-              console.error("[AUTH-PROVIDER] ❌ Failed to fetch user profile in getInitialSession:", profileError);
-              // Don't throw - allow the finally block to run
+            // CRITICAL: Cache is for a different session (User A vs User B)
+            // We MUST clear stale cache immediately before fetching
+            if (cachedUser && cachedUser.sessionId !== session.user.id) {
+              console.warn(
+                "[AUTH-PROVIDER] ⚠️ Session ID mismatch - clearing stale cache from previous user"
+              );
+              setUser(null); // Clear stale user from UI immediately
+              clearUserCache();
+              setIsLoading(true); // Ensure loading state is active for fresh fetch
+            }
+
+            // Fetch fresh user data for the current session
+            const result = await fetchUserProfile(session.user.email!, session);
+
+            // Handle fetch results
+            if (result === "not_found" || result === "inactive") {
+              console.warn(
+                `[AUTH-PROVIDER] ⚠️ Fatal error during initial session (${result}) - clearing user`
+              );
               setUser(null);
               clearUserCache();
+              // Can exit loading - this is a fatal error, not recoverable
+            } else if (result === "transient") {
+              // CRITICAL: On transient error, we MUST keep loading state
+              // to prevent boot loop to /signin
+              console.warn(
+                "[AUTH-PROVIDER] ⚠️ Transient error during initial session - scheduling retry"
+              );
+
+              // Schedule a retry after a short delay
+              setTimeout(async () => {
+                console.log("[AUTH-PROVIDER] 🔄 Retrying profile fetch after transient error...");
+                const retryResult = await fetchUserProfile(session.user.email!, session);
+
+                if (retryResult === "success") {
+                  console.log("[AUTH-PROVIDER] ✅ Profile fetch retry succeeded");
+                  setIsLoading(false);
+                } else if (retryResult === "not_found" || retryResult === "inactive") {
+                  console.warn("[AUTH-PROVIDER] ⚠️ Profile fetch retry failed with fatal error");
+                  setUser(null);
+                  clearUserCache();
+                  setIsLoading(false);
+                } else {
+                  // Still transient - give up and clear loading after one retry
+                  console.warn("[AUTH-PROVIDER] ⚠️ Profile fetch retry still failing - clearing loading state");
+                  setIsLoading(false);
+                }
+              }, 2000); // Retry after 2 seconds
+
+              // Signal to finally block to keep isLoading true for now
+              shouldStayLoading = true;
             }
+            // If result === "success", user is already set by fetchUserProfile
           }
-          // else: use cached data, already set above
+          // else: use cached data (session matches), already set above
         } else {
           // No session, clear cache
           clearUserCache();
@@ -229,8 +310,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(null);
         clearUserCache();
       } finally {
-        // CRITICAL: Always set loading to false to prevent infinite loading screen
-        setIsLoading(false);
+        // CRITICAL: Only set loading to false if we're not waiting for retry
+        // If shouldStayLoading is true, we have a valid session but transient error
+        // Keep loading state so protected routes don't boot-loop to /signin
+        if (!shouldStayLoading) {
+          setIsLoading(false);
+        } else {
+          console.log("[AUTH-PROVIDER] 🔄 Keeping loading state - waiting for profile retry");
+        }
       }
     };
 
@@ -244,26 +331,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(session);
 
         if (session?.user) {
-          try {
-            const success = await fetchUserProfile(session.user.email!, session);
-            if (!success) {
-              console.warn("[AUTH-PROVIDER] ⚠️ Profile fetch failed during auth change");
-              setUser(null);
-              clearUserCache();
-            }
-          } catch (profileError) {
-            console.error("[AUTH-PROVIDER] ❌ Failed to fetch user profile in auth state change:", profileError);
+          const result = await fetchUserProfile(session.user.email!, session);
+
+          // Only clear user on fatal errors (not_found, inactive)
+          // Keep existing user on transient errors
+          if (result === "not_found" || result === "inactive") {
+            console.warn(
+              `[AUTH-PROVIDER] ⚠️ Fatal error during auth state change (${result}) - clearing user`
+            );
             setUser(null);
             clearUserCache();
+          } else if (result === "transient") {
+            console.warn(
+              "[AUTH-PROVIDER] ⚠️ Transient error during auth state change - keeping existing user"
+            );
+            // Keep existing user state
           }
+          // If result === "success", user is already set by fetchUserProfile
         } else {
           setUser(null);
           clearUserCache(); // Clear cache on logout
         }
       } catch (error) {
         console.error("[AUTH-PROVIDER] ❌ Error in auth state change handler:", error);
-        setUser(null);
-        clearUserCache();
+        // Don't clear user on errors - fetchUserProfile handles clearing on fatal errors
+        // Clearing here would wipe user on any transient error
       } finally {
         // Always reset loading state
         setIsLoading(false);
@@ -389,14 +481,113 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {}
   }, [supabase, fetchUserProfile]);
 
+  // Safe refresh with mutex to prevent race conditions
+  const refreshSessionSafely = useCallback(async () => {
+    if (isRefreshingRef.current) {
+      console.log('[AUTH-PROVIDER] 🔒 Refresh already in progress, skipping...');
+      return;
+    }
+
+    isRefreshingRef.current = true;
+    try {
+      console.log('[AUTH-PROVIDER] 🔄 Refreshing session...');
+      const { data: { session: refreshedSession }, error } = await supabase.auth.refreshSession();
+
+      if (error) {
+        console.error('[AUTH-PROVIDER] ❌ Failed to refresh session:', error.message);
+
+        // If refresh fails, check if we still have a valid session
+        const { data: { session: currentSession } } = await supabase.auth.getSession();
+        if (!currentSession) {
+          console.warn('[AUTH-PROVIDER] ⚠️ No valid session after refresh failure - forcing logout');
+          await forceLogout();
+        }
+        return;
+      }
+
+      if (refreshedSession) {
+        console.log('[AUTH-PROVIDER] ✅ Session refreshed successfully');
+        setSession(refreshedSession);
+
+        // Update user cache with fresh session
+        if (refreshedSession.user?.email && user) {
+          saveUserToCache({
+            user,
+            timestamp: Date.now(),
+            sessionId: refreshedSession.user.id,
+          });
+        }
+      }
+    } catch (error) {
+      console.error('[AUTH-PROVIDER] ❌ Error during session refresh:', error);
+    } finally {
+      isRefreshingRef.current = false;
+    }
+  }, [supabase, user, forceLogout]);
+
   // Check for authentication issues and auto-logout
-  // Only logout if we're NOT currently fetching the user profile
+  // Only logout if we're NOT currently fetching AND the last failure was fatal (not transient)
   useEffect(() => {
-    if (!isLoading && !isFetchingUser && session && !user) {
-      console.warn("⚠️ Session exists but user not found - forcing logout");
+    // Only force logout if:
+    // 1. Not currently loading/fetching
+    // 2. Session exists but user is null
+    // 3. Last fetch result was a FATAL error (not_found or inactive), NOT transient
+    const shouldForceLogout =
+      !isLoading &&
+      !isFetchingUser &&
+      session &&
+      !user &&
+      (lastFetchResult === "not_found" || lastFetchResult === "inactive");
+
+    if (shouldForceLogout) {
+      console.warn(
+        `[AUTH-PROVIDER] ⚠️ Session exists but user not found due to fatal error (${lastFetchResult}) - forcing logout`
+      );
       forceLogout();
     }
-  }, [isLoading, isFetchingUser, session, user, forceLogout]);
+  }, [isLoading, isFetchingUser, session, user, lastFetchResult, forceLogout]);
+
+  // Supabase automatically refreshes tokens 1/6 of the way before expiry
+  // For 1-hour tokens, Supabase refreshes at 50 minutes automatically
+  // We just need to handle visibility changes to refresh when tab becomes active
+  useEffect(() => {
+    if (!session) return;
+
+    console.log('[AUTH-PROVIDER] ⏰ Setting up visibility-based token refresh');
+
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'visible') {
+        try {
+          const { data: { session: currentSession } } = await supabase.auth.getSession();
+
+          if (currentSession) {
+            // Check if token is close to expiry (within 5 minutes)
+            const expiresAt = currentSession.expires_at;
+            if (expiresAt) {
+              const timeUntilExpiry = (expiresAt * 1000) - Date.now();
+              const FIVE_MINUTES = 5 * 60 * 1000;
+
+              if (timeUntilExpiry < FIVE_MINUTES) {
+                console.log('[AUTH-PROVIDER] 🔄 Tab became active, refreshing session (token expiring soon)');
+
+                // Use the shared refresh function to avoid race conditions
+                await refreshSessionSafely();
+              }
+            }
+          }
+        } catch (error) {
+          console.error('[AUTH-PROVIDER] ❌ Error checking session on visibility change:', error);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      console.log('[AUTH-PROVIDER] 🛑 Visibility-based token refresh stopped');
+    };
+  }, [supabase, session, refreshSessionSafely]);
 
   // Memoize the context value to prevent unnecessary re-renders
   const value: AuthContextType = useMemo(

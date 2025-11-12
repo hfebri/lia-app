@@ -23,6 +23,8 @@ export interface ChatMessage {
   metadata?: {
     files?: FileMetadata[]; // NEW: Persistent file metadata with extracted text
     model?: string;
+    isTruncated?: boolean;
+    stopReason?: string;
     usage?: {
       prompt_tokens: number;
       completion_tokens: number;
@@ -34,6 +36,8 @@ export interface ChatMessage {
 export interface StreamingChatResponse {
   content: string;
   isComplete: boolean;
+  isTruncated?: boolean;
+  stopReason?: string;
   usage?: {
     prompt_tokens: number;
     completion_tokens: number;
@@ -258,6 +262,8 @@ export class ChatService {
               // Only yield if there's actual content or if it's the completion marker
               const content = parsed.content || "";
               const isComplete = parsed.isComplete || false;
+              const isTruncated = parsed.isTruncated;
+              const stopReason = parsed.stopReason;
               const fileValidationWarnings = parsed.fileValidationWarnings;
 
               if (isComplete) {
@@ -280,6 +286,8 @@ export class ChatService {
                       ? ""
                       : content,
                   isComplete,
+                  isTruncated,
+                  stopReason,
                   usage: parsed.usage,
                   fileValidationWarnings,
                 };
@@ -347,12 +355,8 @@ export class ChatService {
       return { isValid: false, error: "Message content cannot be empty" };
     }
 
-    if (content.length > 10000) {
-      return {
-        isValid: false,
-        error: "Message content is too long (max 10,000 characters)",
-      };
-    }
+    // Length validation removed - auto-convert to .txt file handles long messages
+    // See hooks/use-ai-chat.ts for auto-conversion logic
 
     return { isValid: true };
   }

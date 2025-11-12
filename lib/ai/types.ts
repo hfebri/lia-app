@@ -34,6 +34,8 @@ export interface AIMessage {
 export interface AIStreamChunk {
   content: string;
   isComplete: boolean;
+  isTruncated?: boolean;        // Was response cut off due to max_tokens?
+  stopReason?: string;           // Why did it stop? ("max_tokens", "stop_sequence", "end_turn", "length", "stop", "content_filter")
   usage?: {
     prompt_tokens: number;
     completion_tokens: number;
@@ -43,6 +45,8 @@ export interface AIStreamChunk {
 
 export interface AIResponse {
   content: string;
+  isTruncated?: boolean;        // Was response cut off due to max_tokens?
+  stopReason?: string;           // Why did it stop?
   usage?: {
     prompt_tokens: number;
     completion_tokens: number;

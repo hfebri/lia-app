@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { authFetchJSON } from "@/lib/utils/auth-fetch";
 
 interface PopularTopic {
   topic: string;
@@ -91,12 +92,10 @@ export function useUserAnalytics(params: UseUserAnalyticsParams = {}): UseUserAn
         queryParams.append("endDate", endDate.toISOString().split("T")[0]);
       }
 
-      const response = await fetch(`/api/user/analytics?${queryParams.toString()}`);
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.message || "Failed to fetch analytics");
-      }
+      // Use authFetchJSON which handles 401 and auto-refreshes session
+      const result = await authFetchJSON<{ success: boolean; data: UserAnalytics; message?: string }>(
+        `/api/user/analytics?${queryParams.toString()}`
+      );
 
       if (!result.success) {
         throw new Error(result.message || "Failed to fetch analytics");
