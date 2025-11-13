@@ -14,8 +14,9 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Settings2, X } from "lucide-react";
+import { Settings2, X, Sparkles, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toastError, toastSuccess } from "@/components/providers/toast-provider";
 
 interface SystemInstructionButtonProps {
   systemInstruction: string;
@@ -32,6 +33,8 @@ export function SystemInstructionButton({
 }: SystemInstructionButtonProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [tempInstruction, setTempInstruction] = useState(systemInstruction);
+  const [isEnhancing, setIsEnhancing] = useState(false);
+  const [enhancedSuggestion, setEnhancedSuggestion] = useState("");
 
   const handleSave = () => {
     onSystemInstructionChange(tempInstruction);
@@ -40,11 +43,50 @@ export function SystemInstructionButton({
 
   const handleCancel = () => {
     setTempInstruction(systemInstruction);
+    setEnhancedSuggestion("");
     setIsOpen(false);
   };
 
   const handleClear = () => {
     setTempInstruction("");
+    setEnhancedSuggestion("");
+  };
+
+  const handleEnhance = async () => {
+    if (!tempInstruction.trim()) {
+      toastError("Please enter some text to enhance");
+      return;
+    }
+
+    setIsEnhancing(true);
+    setEnhancedSuggestion("");
+
+    try {
+      const response = await fetch("/api/ai/enhance-prompt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: tempInstruction }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to enhance prompt");
+      }
+
+      const data = await response.json();
+      setEnhancedSuggestion(data.enhancedPrompt);
+      toastSuccess("Prompt enhanced successfully!");
+    } catch (error) {
+      console.error("Enhancement error:", error);
+      toastError(error instanceof Error ? error.message : "Failed to enhance prompt");
+    } finally {
+      setIsEnhancing(false);
+    }
+  };
+
+  const handleUseSuggestion = () => {
+    setTempInstruction(enhancedSuggestion);
+    setEnhancedSuggestion("");
   };
 
   const hasInstruction = systemInstruction.trim().length > 0;
@@ -89,7 +131,28 @@ export function SystemInstructionButton({
 
         <div className="space-y-4 overflow-y-auto flex-1">
           <div className="space-y-2">
-            <label className="text-sm font-medium">System Instruction</label>
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium">System Instruction</label>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleEnhance}
+                disabled={isEnhancing || !tempInstruction.trim()}
+                className="h-7 text-xs"
+              >
+                {isEnhancing ? (
+                  <>
+                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                    Enhancing...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-3 w-3 mr-1" />
+                    Enhance
+                  </>
+                )}
+              </Button>
+            </div>
             <Textarea
               value={tempInstruction}
               onChange={(e) => setTempInstruction(e.target.value)}
@@ -101,6 +164,42 @@ export function SystemInstructionButton({
               {tempInstruction.length} characters
             </p>
           </div>
+
+          {/* Enhanced Suggestion */}
+          {enhancedSuggestion && (
+            <div className="space-y-2 p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-blue-700 dark:text-blue-300 flex items-center gap-1">
+                  <Sparkles className="h-3 w-3" />
+                  Enhanced Suggestion
+                </label>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleUseSuggestion}
+                    className="h-7 text-xs border-blue-300 dark:border-blue-700"
+                  >
+                    Use This
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setEnhancedSuggestion("")}
+                    className="h-7 w-7 p-0"
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
+              <div className="text-sm text-blue-900 dark:text-blue-100 whitespace-pre-wrap bg-white dark:bg-blue-900/20 p-3 rounded border border-blue-200 dark:border-blue-700">
+                {enhancedSuggestion}
+              </div>
+              <p className="text-xs text-blue-600 dark:text-blue-400">
+                {enhancedSuggestion.length} characters
+              </p>
+            </div>
+          )}
 
           <div className="bg-muted/30 p-3 rounded-lg">
             <h4 className="text-sm font-medium mb-2">Example Instructions:</h4>
