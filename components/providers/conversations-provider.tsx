@@ -87,7 +87,7 @@ function saveToCache(data: ConversationCache): void {
       CACHE_KEY,
       JSON.stringify({
         ...data,
-        conversations: sortConversationsList(data.conversations),
+        conversations: sortConversationsList(data.conversations), // No previous needed for cache save
       })
     );
   } catch (error) {
@@ -110,8 +110,25 @@ const getComparableDate = (value?: string | Date | null) => {
   return Number.isNaN(date.getTime()) ? 0 : date.getTime();
 };
 
-const sortConversationsList = (items: Conversation[]): Conversation[] => {
-  return [...items].sort((a, b) => {
+// Helper to check if two conversation arrays are deeply equal (same conversations in same order)
+const areConversationsEqual = (a: Conversation[], b: Conversation[]): boolean => {
+  if (a.length !== b.length) return false;
+
+  for (let i = 0; i < a.length; i++) {
+    if (a[i].id !== b[i].id ||
+        a[i].title !== b[i].title ||
+        a[i].isFavorite !== b[i].isFavorite ||
+        a[i].updatedAt !== b[i].updatedAt ||
+        a[i].favoritedAt !== b[i].favoritedAt) {
+      return false;
+    }
+  }
+
+  return true;
+};
+
+const sortConversationsList = (items: Conversation[], previousSorted?: Conversation[]): Conversation[] => {
+  const sorted = [...items].sort((a, b) => {
     const aFav = Boolean(a.isFavorite);
     const bFav = Boolean(b.isFavorite);
 
@@ -128,6 +145,13 @@ const sortConversationsList = (items: Conversation[]): Conversation[] => {
 
     return bTime - aTime;
   });
+
+  // Return previous reference if sorting didn't actually change anything
+  if (previousSorted && areConversationsEqual(sorted, previousSorted)) {
+    return previousSorted;
+  }
+
+  return sorted;
 };
 
 export function ConversationsProvider({
@@ -189,13 +213,13 @@ export function ConversationsProvider({
           throw new Error(result.message || "Failed to load conversations");
         }
 
+        const newConversations = page === 1
+          ? result.data
+          : [...prev.conversations, ...result.data];
+
         setState((prev) => ({
           ...prev,
-          conversations: sortConversationsList(
-            page === 1
-              ? result.data
-              : [...prev.conversations, ...result.data]
-          ),
+          conversations: sortConversationsList(newConversations, prev.conversations),
           isLoading: false,
           hasMore: result.pagination.page < result.pagination.totalPages,
           currentPage: result.pagination.page,
@@ -276,7 +300,7 @@ export function ConversationsProvider({
           const updated = sortConversationsList([
             newConversation,
             ...prev.conversations,
-          ]);
+          ], prev.conversations);
 
           // Immediately save to cache
           if (user) {
@@ -338,7 +362,8 @@ export function ConversationsProvider({
           conversations: sortConversationsList(
             prev.conversations.map((conv) =>
               conv.id === conversationId ? updatedConversation : conv
-            )
+            ),
+            prev.conversations
           ),
         }));
 
@@ -376,7 +401,8 @@ export function ConversationsProvider({
 
       setState((prev) => {
         const updated = sortConversationsList(
-          prev.conversations.filter((conv) => conv.id !== conversationId)
+          prev.conversations.filter((conv) => conv.id !== conversationId),
+          prev.conversations
         );
 
         // Immediately save to cache
@@ -446,7 +472,8 @@ export function ConversationsProvider({
                     : null,
                 }
               : conv
-          )
+          ),
+          prev.conversations
         ),
       }));
 
@@ -468,7 +495,8 @@ export function ConversationsProvider({
           conversations: sortConversationsList(
             prev.conversations.map((conv) =>
               conv.id === conversationId ? result.data : conv
-            )
+            ),
+            prev.conversations
           ),
         }));
       } catch (error) {
@@ -477,7 +505,8 @@ export function ConversationsProvider({
           conversations: sortConversationsList(
             prev.conversations.map((conv) =>
               conv.id === conversationId ? previousSnapshot : conv
-            )
+            ),
+            prev.conversations
           ),
           error:
             error instanceof Error
@@ -529,7 +558,7 @@ export function ConversationsProvider({
           // Load from cache immediately
           setState((prev) => ({
             ...prev,
-            conversations: sortConversationsList(cached.conversations),
+            conversations: sortConversationsList(cached.conversations, prev.conversations),
             isLoading: false,
           }));
 

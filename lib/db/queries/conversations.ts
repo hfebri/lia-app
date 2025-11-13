@@ -200,15 +200,23 @@ export async function getConversationsByUserId(
 
   const orderBy = sortOrder === "asc" ? asc(sortColumn) : desc(sortColumn);
 
+  // Build sort expression that matches client-side logic
+  const dateSortColumn = sql`CASE
+    WHEN ${conversations.isFavorite} = true
+    THEN COALESCE(${conversations.favoritedAt}, ${conversations.updatedAt})
+    ELSE ${conversations.updatedAt}
+  END`;
+
   const [conversationList, totalCount] = await Promise.all([
     db
       .select()
       .from(conversations)
       .where(eq(conversations.userId, userId))
       .orderBy(
-        desc(conversations.isFavorite),
-        desc(conversations.favoritedAt),
-        orderBy
+        desc(conversations.isFavorite), // Favorites first
+        sortBy === "updatedAt" || sortBy === "createdAt" || sortBy === "favoritedAt"
+          ? (sortOrder === "asc" ? asc(dateSortColumn) : desc(dateSortColumn))
+          : orderBy // Use custom sort if specified
       )
       .limit(limit)
       .offset(offset),
@@ -242,16 +250,22 @@ export async function getConversationsWithLastMessage(
   const offset = (page - 1) * limit;
 
   // Get conversations
+  // Sort order: favorites first, then by date descending
+  // For favorites, use favoritedAt if available, otherwise updatedAt
+  // For non-favorites, use updatedAt
+  const sortColumn = sql`CASE
+    WHEN ${conversations.isFavorite} = true
+    THEN COALESCE(${conversations.favoritedAt}, ${conversations.updatedAt})
+    ELSE ${conversations.updatedAt}
+  END`;
+
   const conversationsList = await db
     .select()
     .from(conversations)
     .where(eq(conversations.userId, userId))
     .orderBy(
-      desc(conversations.isFavorite),
-      desc(conversations.favoritedAt),
-      sortOrder === "asc"
-        ? asc(conversations.updatedAt)
-        : desc(conversations.updatedAt)
+      desc(conversations.isFavorite), // Favorites first
+      sortOrder === "asc" ? asc(sortColumn) : desc(sortColumn) // Then by date
     )
     .limit(limit)
     .offset(offset);
