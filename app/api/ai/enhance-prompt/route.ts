@@ -63,6 +63,16 @@ Return ONLY the enhanced system instruction, without any preamble, explanation, 
     });
   } catch (error) {
     console.error("[enhance-prompt] Error:", error);
+
+    // Handle authentication errors specifically
+    if (error instanceof Error && error.message === "Authentication required") {
+      return NextResponse.json(
+        { error: "Unauthorized - please sign in" },
+        { status: 401 }
+      );
+    }
+
+    // All other errors are server errors
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "Failed to enhance prompt"

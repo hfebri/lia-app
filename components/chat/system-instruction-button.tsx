@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -35,6 +35,12 @@ export function SystemInstructionButton({
   const [tempInstruction, setTempInstruction] = useState(systemInstruction);
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [enhancedSuggestion, setEnhancedSuggestion] = useState("");
+
+  // Sync tempInstruction when systemInstruction prop changes (conversation switch)
+  useEffect(() => {
+    setTempInstruction(systemInstruction);
+    setEnhancedSuggestion(""); // Clear any stale suggestions
+  }, [systemInstruction]);
 
   const handleSave = () => {
     onSystemInstructionChange(tempInstruction);
