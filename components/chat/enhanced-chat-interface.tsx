@@ -1484,7 +1484,7 @@ export function EnhancedChatInterface({
                     <div className="mb-2 flex items-center gap-2 p-2 rounded-md bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
                       <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />
                       <span className="text-xs text-blue-700 dark:text-blue-300 flex-1">
-                        Text is {inputValue.length.toLocaleString()} characters. Will be auto-converted to a .txt file when sent.
+                        Text is {inputValue.length.toLocaleString()} characters. Click &quot;Convert Now&quot; to attach as file, then add your prompt.
                       </span>
                       <Button
                         variant="outline"
@@ -1497,7 +1497,7 @@ export function EnhancedChatInterface({
                             { type: 'text/plain' }
                           );
                           setSelectedFiles((prev) => [...prev, textFile]);
-                          setInputValue('Please analyze the attached text.');
+                          setInputValue(''); // Clear input - user will type their prompt
                           setShowAutoConvertWarning(false);
                         }}
                         className="h-6 text-xs border-blue-300 dark:border-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900"

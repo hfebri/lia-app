@@ -369,19 +369,22 @@ export function useAiChat(options: UseAiChatOptions = {}) {
         // Add to files array (we've already verified we're under the limit)
         files = files ? [...files, textFile] : [textFile];
 
-        // Replace message with short instruction
-        content = 'Please analyze the attached text.';
-        console.log('[useAiChat] AUTO-CONVERT complete - text file created, message replaced');
+        // Clear the content - file will be sent with empty message
+        // User's original text is preserved in the file
+        content = '';
+        console.log('[useAiChat] AUTO-CONVERT complete - text file created, message cleared');
       }
 
-      // Validate message
-      const validation = chatService.current.validateMessage(content);
-      if (!validation.isValid) {
-        setState((prev) => ({
-          ...prev,
-          error: validation.error || "Invalid message",
-        }));
-        return;
+      // Validate message (skip if we have files - files alone are valid)
+      if (!files || files.length === 0) {
+        const validation = chatService.current.validateMessage(content);
+        if (!validation.isValid) {
+          setState((prev) => ({
+            ...prev,
+            error: validation.error || "Invalid message",
+          }));
+          return;
+        }
       }
 
       // Process files client-side FIRST before creating message
