@@ -3,10 +3,15 @@
 import { AdminGuard } from "@/components/auth/admin-guard";
 import { AnalyticsCharts } from "@/components/admin/analytics-charts";
 import { UsageMetrics } from "@/components/admin/usage-metrics";
+import { ModelUsageFilters } from "@/components/admin/model-usage-filters";
+import { ModelUsageTable } from "@/components/admin/model-usage-table";
+import { ModelUsageCharts } from "@/components/admin/model-usage-charts";
 import { useAnalytics } from "@/hooks/use-analytics";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useModelUsage } from "@/hooks/use-model-usage";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LoadingSpinner } from "@/components/shared/loading";
 import {
   BarChart3,
@@ -16,8 +21,9 @@ import {
   TrendingUp,
   AlertTriangle,
   CheckCircle,
+  Cpu,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function AdminAnalyticsPage() {
   const {
@@ -30,11 +36,72 @@ export default function AdminAnalyticsPage() {
     refreshUsageMetrics,
   } = useAnalytics();
 
+  const {
+    userStats,
+    globalStats,
+    isLoading: isLoadingModelUsage,
+    error: modelUsageError,
+    filters: modelFilters,
+    setFilters: setModelFilters,
+    refresh: refreshModelUsage,
+  } = useModelUsage();
+
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [availableUsers, setAvailableUsers] = useState<
+    Array<{ id: string; name: string | null; email: string }>
+  >([]);
+  const [availableModels, setAvailableModels] = useState<
+    Array<{ id: string; name: string; provider: string }>
+  >([]);
+
+  // Fetch available users and models for filters
+  useEffect(() => {
+    async function fetchFilterOptions() {
+      try {
+        // Fetch users
+        const usersResponse = await fetch("/api/admin/users");
+        if (usersResponse.ok) {
+          const usersData = await usersResponse.json();
+          if (usersData.isSuccess && usersData.data) {
+            setAvailableUsers(
+              usersData.data.map((u: any) => ({
+                id: u.id,
+                name: u.name,
+                email: u.email,
+              }))
+            );
+          }
+        }
+
+        // Fetch models
+        const modelsResponse = await fetch("/api/ai/models");
+        if (modelsResponse.ok) {
+          const modelsData = await modelsResponse.json();
+          if (modelsData.success && modelsData.data?.models) {
+            setAvailableModels(
+              modelsData.data.models.map((m: any) => ({
+                id: m.id,
+                name: m.name,
+                provider: m.provider,
+              }))
+            );
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching filter options:", error);
+      }
+    }
+
+    fetchFilterOptions();
+  }, []);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await Promise.all([refreshAnalytics(), refreshUsageMetrics()]);
+    await Promise.all([
+      refreshAnalytics(),
+      refreshUsageMetrics(),
+      refreshModelUsage(),
+    ]);
     setIsRefreshing(false);
   };
 
@@ -260,6 +327,77 @@ export default function AdminAnalyticsPage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Model Usage Analytics - NEW SECTION */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center space-x-2">
+              <Cpu className="h-6 w-6 text-primary" />
+              <div>
+                <CardTitle>Model Usage Analytics</CardTitle>
+                <CardDescription>
+                  Track which AI models users prefer and usage patterns across
+                  different providers
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Filters */}
+            <ModelUsageFilters
+              filters={modelFilters}
+              onFilterChange={setModelFilters}
+              availableUsers={availableUsers}
+              availableModels={availableModels}
+            />
+
+            {/* Loading State */}
+            {isLoadingModelUsage && (
+              <div className="flex items-center justify-center py-12">
+                <LoadingSpinner />
+              </div>
+            )}
+
+            {/* Error State */}
+            {modelUsageError && !isLoadingModelUsage && (
+              <div className="flex items-center justify-center py-12">
+                <Card className="max-w-md mx-auto">
+                  <CardContent className="p-6 text-center">
+                    <div className="text-destructive mb-4">
+                      <AlertTriangle className="h-12 w-12 mx-auto mb-2" />
+                      <h3 className="text-lg font-semibold">
+                        Error Loading Model Usage
+                      </h3>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      {modelUsageError}
+                    </p>
+                    <Button onClick={refreshModelUsage}>
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Try Again
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {/* Content - Tabs */}
+            {!isLoadingModelUsage && !modelUsageError && (
+              <Tabs defaultValue="table" className="w-full">
+                <TabsList className="grid w-full max-w-md grid-cols-2">
+                  <TabsTrigger value="table">User Breakdown</TabsTrigger>
+                  <TabsTrigger value="charts">Visual Analytics</TabsTrigger>
+                </TabsList>
+                <TabsContent value="table" className="mt-6">
+                  <ModelUsageTable data={userStats} />
+                </TabsContent>
+                <TabsContent value="charts" className="mt-6">
+                  <ModelUsageCharts data={globalStats} />
+                </TabsContent>
+              </Tabs>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </AdminGuard>
   );

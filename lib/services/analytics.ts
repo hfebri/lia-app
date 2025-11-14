@@ -58,6 +58,35 @@ export interface PopularTopic {
   examples: string[];
 }
 
+export interface ModelUsageDetail {
+  model: string;
+  modelName: string; // Human-readable name
+  provider: string; // "openai" | "anthropic"
+  conversationCount: number;
+  messageCount: number;
+  lastUsed: Date;
+}
+
+export interface UserModelUsage {
+  userId: string;
+  userName: string | null;
+  email: string;
+  profileImage: string | null;
+  modelUsage: ModelUsageDetail[];
+  totalConversations: number;
+  totalMessages: number;
+}
+
+export interface GlobalModelUsage {
+  model: string;
+  modelName: string;
+  provider: string;
+  conversationCount: number;
+  messageCount: number;
+  uniqueUsers: number;
+  trend: { date: string; count: number }[];
+}
+
 /**
  * Get comprehensive analytics data
  */
@@ -537,4 +566,259 @@ function getMockUsageMetrics(): UsageMetrics {
     },
     growth: { messages: 15, conversations: 8, files: 23, users: 12 },
   };
+}
+
+// Model name mapping helper
+const MODEL_INFO: Record<
+  string,
+  { name: string; provider: "openai" | "anthropic" | "google" }
+> = {
+  "gpt-5-pro": { name: "GPT-5 Pro", provider: "openai" },
+  "gpt-5": { name: "GPT-5", provider: "openai" },
+  "gpt-5-mini": { name: "GPT-5 Mini", provider: "openai" },
+  "gpt-5-nano": { name: "GPT-5 Nano", provider: "openai" },
+  "openai/gpt-5-pro": { name: "GPT-5 Pro", provider: "openai" },
+  "openai/gpt-5": { name: "GPT-5", provider: "openai" },
+  "openai/gpt-5-mini": { name: "GPT-5 Mini", provider: "openai" },
+  "openai/gpt-5-nano": { name: "GPT-5 Nano", provider: "openai" },
+  "claude-sonnet-4-5-20250929": { name: "Claude Sonnet 4.5", provider: "anthropic" },
+  "claude-haiku-4-5-20251001": { name: "Claude Haiku 4.5", provider: "anthropic" },
+  "claude-opus-4-1-20250805": { name: "Claude Opus 4.1", provider: "anthropic" },
+  "anthropic/claude-sonnet-4-5-20250929": { name: "Claude Sonnet 4.5", provider: "anthropic" },
+  "anthropic/claude-haiku-4-5-20251001": { name: "Claude Haiku 4.5", provider: "anthropic" },
+  "anthropic/claude-opus-4-1-20250805": { name: "Claude Opus 4.1", provider: "anthropic" },
+  "anthropic/claude-4-sonnet": { name: "Claude 4 Sonnet", provider: "anthropic" },
+  "anthropic/claude-4.5-sonnet": { name: "Claude Sonnet 4.5", provider: "anthropic" },
+  "gemini-2.0-flash-exp": { name: "Gemini 2.0 Flash", provider: "google" },
+  "google/gemini-2.0-flash-exp": { name: "Gemini 2.0 Flash", provider: "google" },
+};
+
+function getModelInfo(modelId: string): {
+  name: string;
+  provider: "openai" | "anthropic" | "google";
+} {
+  // Check exact match first
+  if (MODEL_INFO[modelId]) {
+    return MODEL_INFO[modelId];
+  }
+
+  // Extract provider and model name from format like "openai/gpt-5" or "anthropic/claude-sonnet-4-5"
+  const [providerPrefix, ...modelParts] = modelId.split("/");
+  const modelName = modelParts.join("/");
+
+  // Determine provider from prefix or model name
+  let provider: "openai" | "anthropic" | "google";
+  if (providerPrefix === "openai" || modelId.includes("gpt")) {
+    provider = "openai";
+  } else if (providerPrefix === "anthropic" || modelId.includes("claude")) {
+    provider = "anthropic";
+  } else if (providerPrefix === "google" || modelId.includes("gemini")) {
+    provider = "google";
+  } else {
+    provider = "openai"; // Default fallback
+  }
+
+  // Try to create a friendly name
+  let name = modelId;
+  if (modelName) {
+    // Extract model variant (e.g., "gpt-5-pro" -> "GPT-5 Pro")
+    name = modelName
+      .split("-")
+      .map((part) => part.toUpperCase())
+      .join(" ");
+  }
+
+  return { name, provider };
+}
+
+/**
+ * Get per-user model usage statistics with optional filters
+ */
+export async function getUserModelUsageStats(
+  startDate?: Date,
+  endDate?: Date,
+  userId?: string,
+  modelId?: string
+): Promise<UserModelUsage[]> {
+  try {
+    // Build the base query
+    let query = db
+      .select({
+        userId: conversations.userId,
+        userName: users.name,
+        email: users.email,
+        profileImage: users.image,
+        aiModel: conversations.aiModel,
+        conversationCount: sql<number>`count(*)::int`,
+        messageCount: sql<number>`COALESCE(SUM(jsonb_array_length(${conversations.messages})), 0)::int`,
+        lastUsed: sql<Date>`MAX(${conversations.updatedAt})`,
+      })
+      .from(conversations)
+      .innerJoin(users, eq(conversations.userId, users.id))
+      .$dynamic();
+
+    // Apply filters
+    const conditions = [];
+
+    // IMPORTANT: Add filter to exclude conversations without aiModel
+    conditions.push(sql`${conversations.aiModel} IS NOT NULL AND ${conversations.aiModel} != ''`);
+
+    if (startDate) {
+      conditions.push(gte(conversations.createdAt, startDate));
+    }
+    if (endDate) {
+      conditions.push(lte(conversations.createdAt, endDate));
+    }
+    if (userId) {
+      conditions.push(eq(conversations.userId, userId));
+    }
+    if (modelId) {
+      conditions.push(eq(conversations.aiModel, modelId));
+    }
+
+    if (conditions.length > 0) {
+      query = query.where(sql`${sql.join(conditions, sql` AND `)}`);
+    }
+
+    // Group by user and model
+    const results = await query.groupBy(
+      conversations.userId,
+      users.name,
+      users.email,
+      users.image,
+      conversations.aiModel
+    );
+
+    // Transform results into UserModelUsage format
+    const userMap = new Map<string, UserModelUsage>();
+
+    for (const row of results) {
+      if (!userMap.has(row.userId)) {
+        userMap.set(row.userId, {
+          userId: row.userId,
+          userName: row.userName,
+          email: row.email,
+          profileImage: row.profileImage,
+          modelUsage: [],
+          totalConversations: 0,
+          totalMessages: 0,
+        });
+      }
+
+      const userStats = userMap.get(row.userId)!;
+      const modelInfo = getModelInfo(row.aiModel);
+
+      userStats.modelUsage.push({
+        model: row.aiModel,
+        modelName: modelInfo.name,
+        provider: modelInfo.provider,
+        conversationCount: row.conversationCount,
+        messageCount: row.messageCount,
+        lastUsed: new Date(row.lastUsed),
+      });
+
+      userStats.totalConversations += row.conversationCount;
+      userStats.totalMessages += row.messageCount;
+    }
+
+    return Array.from(userMap.values()).sort((a, b) =>
+      a.userName && b.userName
+        ? a.userName.localeCompare(b.userName)
+        : a.email.localeCompare(b.email)
+    );
+  } catch (error) {
+    console.error("Error fetching user model usage stats:", error);
+    return [];
+  }
+}
+
+/**
+ * Get global model usage statistics with optional filters
+ */
+export async function getGlobalModelUsageStats(
+  startDate?: Date,
+  endDate?: Date,
+  modelId?: string
+): Promise<GlobalModelUsage[]> {
+  try {
+    // Build the base query for overall stats
+    let query = db
+      .select({
+        aiModel: conversations.aiModel,
+        conversationCount: sql<number>`count(*)::int`,
+        messageCount: sql<number>`COALESCE(SUM(jsonb_array_length(${conversations.messages})), 0)::int`,
+        uniqueUsers: sql<number>`COUNT(DISTINCT ${conversations.userId})::int`,
+      })
+      .from(conversations)
+      .$dynamic();
+
+    // Apply filters
+    const conditions = [];
+    if (startDate) {
+      conditions.push(gte(conversations.createdAt, startDate));
+    }
+    if (endDate) {
+      conditions.push(lte(conversations.createdAt, endDate));
+    }
+    if (modelId) {
+      conditions.push(eq(conversations.aiModel, modelId));
+    }
+
+    if (conditions.length > 0) {
+      query = query.where(sql`${sql.join(conditions, sql` AND `)}`);
+    }
+
+    const results = await query.groupBy(conversations.aiModel);
+
+    // Get trend data (daily breakdown) for each model
+    const globalStats: GlobalModelUsage[] = [];
+
+    for (const row of results) {
+      const modelInfo = getModelInfo(row.aiModel);
+
+      // Get daily trend for this model
+      let trendQuery = db
+        .select({
+          date: sql<string>`DATE(${conversations.createdAt})`,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(conversations)
+        .where(eq(conversations.aiModel, row.aiModel))
+        .$dynamic();
+
+      const trendConditions = [eq(conversations.aiModel, row.aiModel)];
+      if (startDate) {
+        trendConditions.push(gte(conversations.createdAt, startDate));
+      }
+      if (endDate) {
+        trendConditions.push(lte(conversations.createdAt, endDate));
+      }
+
+      if (trendConditions.length > 1) {
+        trendQuery = trendQuery.where(sql`${sql.join(trendConditions, sql` AND `)}`);
+      }
+
+      const trendResults = await trendQuery
+        .groupBy(sql`DATE(${conversations.createdAt})`)
+        .orderBy(sql`DATE(${conversations.createdAt})`);
+
+      globalStats.push({
+        model: row.aiModel,
+        modelName: modelInfo.name,
+        provider: modelInfo.provider,
+        conversationCount: row.conversationCount,
+        messageCount: row.messageCount,
+        uniqueUsers: row.uniqueUsers,
+        trend: trendResults.map((t) => ({
+          date: t.date,
+          count: t.count,
+        })),
+      });
+    }
+
+    return globalStats.sort((a, b) => b.conversationCount - a.conversationCount);
+  } catch (error) {
+    console.error("Error fetching global model usage stats:", error);
+    return [];
+  }
 }

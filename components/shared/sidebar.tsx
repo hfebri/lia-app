@@ -33,6 +33,7 @@ import {
   Star,
   MoreVertical,
   TrendingUp,
+  Cpu,
 } from "lucide-react";
 import { SimpleThemeToggle } from "@/components/ui/theme-toggle";
 import {
@@ -106,6 +107,12 @@ const adminItems: NavItem[] = [
     title: "Dashboard",
     href: "/dashboard",
     icon: BarChart3,
+    adminOnly: true,
+  },
+  {
+    title: "Model Usage",
+    href: "/admin/model-usage",
+    icon: Cpu,
     adminOnly: true,
   },
   {
