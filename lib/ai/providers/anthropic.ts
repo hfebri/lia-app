@@ -51,10 +51,10 @@ export class AnthropicProvider implements AIProvider {
     "claude-haiku-4.5": 800000,
     "claude-haiku-4-5": 800000,
     "claude-haiku-3.5": 80000,
-    "claude-opus-4-1-20250805": 400000,
-    "claude-opus-4.1": 400000,
-    "claude-opus-4-1": 400000,
-    "claude-opus-4": 400000,
+    "claude-opus-4-1-20250805": 32000,
+    "claude-opus-4.1": 32000,
+    "claude-opus-4-1": 32000,
+    "claude-opus-4": 32000,
     "claude-opus-3": 80000,
   } as Record<string, number>;
 

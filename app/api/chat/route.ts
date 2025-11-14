@@ -52,10 +52,10 @@ const TOKEN_LIMITS = {
     'claude-haiku-4.5': 8192,
     'claude-haiku-4-5': 8192,
     'claude-haiku-3.5': 8192,
-    'claude-opus-4-1-20250805': 32768,    // API max: 400k - can do 32k
-    'claude-opus-4.1': 32768,
-    'claude-opus-4-1': 32768,
-    'claude-opus-4': 32768,
+    'claude-opus-4-1-20250805': 32000,    // API max: 32k for output tokens
+    'claude-opus-4.1': 32000,
+    'claude-opus-4-1': 32000,
+    'claude-opus-4': 32000,
     'claude-opus-3': 8192,
 
     // OpenAI models - Pro can handle 32k+, others stay conservative
