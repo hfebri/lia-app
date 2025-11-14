@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentSession } from "@/lib/auth/session";
+import { getCurrentUser } from "@/lib/auth/session";
 import {
   getUserModelUsageStats,
   getGlobalModelUsageStats,
@@ -8,15 +8,22 @@ import {
 // GET /api/admin/analytics/model-usage - Get model usage statistics
 export async function GET(request: NextRequest) {
   try {
-    const session = await getCurrentSession();
+    const user = await getCurrentUser();
+
+    // Require authentication
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: "Authentication required" },
+        { status: 401 }
+      );
+    }
 
     // Check if user is admin
     const isAdmin =
-      session?.user?.role === "admin" ||
-      session?.user?.email?.includes("admin");
+      user.role === "admin" ||
+      user.email?.includes("admin");
 
-    // For demo purposes, allow access if no session (development mode)
-    if (session && !isAdmin) {
+    if (!isAdmin) {
       return NextResponse.json(
         { success: false, error: "Admin access required" },
         { status: 403 }

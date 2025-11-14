@@ -213,17 +213,19 @@ export function ConversationsProvider({
           throw new Error(result.message || "Failed to load conversations");
         }
 
-        const newConversations = page === 1
-          ? result.data
-          : [...prev.conversations, ...result.data];
+        setState((prev) => {
+          const newConversations = page === 1
+            ? result.data
+            : [...prev.conversations, ...result.data];
 
-        setState((prev) => ({
-          ...prev,
-          conversations: sortConversationsList(newConversations, prev.conversations),
-          isLoading: false,
-          hasMore: result.pagination.page < result.pagination.totalPages,
-          currentPage: result.pagination.page,
-        }));
+          return {
+            ...prev,
+            conversations: sortConversationsList(newConversations, prev.conversations),
+            isLoading: false,
+            hasMore: result.pagination.page < result.pagination.totalPages,
+            currentPage: result.pagination.page,
+          };
+        });
 
         isRequestInProgressRef.current = false;
       } catch (error: any) {

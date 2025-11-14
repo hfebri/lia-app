@@ -12,6 +12,8 @@ const AVAILABLE_MODELS = [
     maxTokens: 8192,
     contextWindow: 32768,
     isDefault: false,
+    disabled: true,
+    disabledReason: "Under construction - Coming soon",
     capabilities: [
       "advanced-reasoning",
       "long-form",

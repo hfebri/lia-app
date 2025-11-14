@@ -171,32 +171,22 @@ export async function getAnalyticsData(
       count: 0, // totalFiles not available in schema yet
     }));
 
-    // Calculate user growth (mock data for now)
-    const userGrowth = dailyMetricsData.map((metric, index) => ({
+    // TODO: Calculate user growth from actual data
+    // newUsers field not available in schema yet
+    const userGrowth = dailyMetricsData.map((metric) => ({
       date: metric.date,
-      newUsers: Math.floor(Math.random() * 20) + 5, // newUsers not available in schema yet
-      totalUsers:
-        metric.totalUsers ||
-        totalUsers - (dailyMetricsData.length - index) * 10,
+      newUsers: 0, // TODO: Track new users in dailyMetrics table
+      totalUsers: metric.totalUsers || 0,
     }));
 
-    // Mock response time data
+    // TODO: Track response time in dailyMetrics table
     const responseTime = dailyMetricsData.map((metric) => ({
       date: metric.date,
-      avgTime: Math.random() * 2000 + 500, // Random response time between 500-2500ms
+      avgTime: 0, // TODO: Implement response time tracking
     }));
 
-    // Get popular topics (mock data for now)
-    const popularTopics = [
-      { topic: "AI Assistance", count: 1250 },
-      { topic: "Document Analysis", count: 890 },
-      { topic: "Programming Help", count: 675 },
-      { topic: "Data Processing", count: 543 },
-      { topic: "Content Writing", count: 432 },
-      { topic: "Research", count: 321 },
-      { topic: "Translation", count: 234 },
-      { topic: "Code Review", count: 189 },
-    ];
+    // Get popular topics from separate function
+    const popularTopics = await getPopularTopics();
 
     return {
       totalUsers,
@@ -213,8 +203,8 @@ export async function getAnalyticsData(
       responseTime,
     };
   } catch (error) {
-    // Return mock data on error
-    return getMockAnalyticsData();
+    console.error("Error fetching analytics data:", error);
+    throw error;
   }
 }
 
@@ -359,65 +349,25 @@ export async function getUsageMetrics(): Promise<UsageMetrics> {
       },
     };
   } catch (error) {
-    return getMockUsageMetrics();
+    console.error("Error fetching usage metrics:", error);
+    throw error;
   }
 }
 
 /**
  * Get popular topics with analysis
+ * TODO: Implement AI-based topic extraction from message content
  */
 export async function getPopularTopics(): Promise<PopularTopic[]> {
-  // This would ideally analyze message content using AI or keywords
-  // For now, return mock data
-  return [
-    {
-      topic: "AI Assistance",
-      count: 1250,
-      percentage: 35.2,
-      trend: "up",
-      examples: [
-        "How do I implement AI chat?",
-        "Best AI models for text analysis",
-        "AI integration guide",
-      ],
-    },
-    {
-      topic: "Document Analysis",
-      count: 890,
-      percentage: 25.1,
-      trend: "up",
-      examples: [
-        "Analyze PDF content",
-        "Extract text from documents",
-        "Document summarization",
-      ],
-    },
-    {
-      topic: "Programming Help",
-      count: 675,
-      percentage: 19.0,
-      trend: "stable",
-      examples: [
-        "React component help",
-        "Database query optimization",
-        "API design patterns",
-      ],
-    },
-    {
-      topic: "Data Processing",
-      count: 543,
-      percentage: 15.3,
-      trend: "down",
-      examples: ["CSV data analysis", "JSON transformation", "Data validation"],
-    },
-    {
-      topic: "Content Writing",
-      count: 432,
-      percentage: 12.2,
-      trend: "up",
-      examples: ["Blog post writing", "Email templates", "Marketing copy"],
-    },
-  ];
+  try {
+    // TODO: Analyze message content using AI or keywords to extract topics
+    // For now, return empty array until implemented
+    console.warn("getPopularTopics not yet implemented - returning empty array");
+    return [];
+  } catch (error) {
+    console.error("Error fetching popular topics:", error);
+    throw error;
+  }
 }
 
 /**
@@ -503,69 +453,6 @@ export async function updateDailyMetrics(
   } catch (error) {
     throw error;
   }
-}
-
-// Mock data functions for fallback
-function getMockAnalyticsData(): AnalyticsData {
-  const dates = Array.from({ length: 30 }, (_, i) => {
-    const date = new Date();
-    date.setDate(date.getDate() - (29 - i));
-    return date.toISOString().split("T")[0];
-  });
-
-  return {
-    totalUsers: 2543,
-    activeUsers: 1892,
-    totalConversations: 12456,
-    totalMessages: 89234,
-    totalFiles: 3456,
-    averageMessagesPerConversation: 7,
-    popularTopics: [
-      { topic: "AI Assistance", count: 1250 },
-      { topic: "Document Analysis", count: 890 },
-      { topic: "Programming Help", count: 675 },
-    ],
-    dailyActiveUsers: dates.map((date) => ({
-      date,
-      count: Math.floor(Math.random() * 200) + 50,
-    })),
-    messageVolume: dates.map((date) => ({
-      date,
-      count: Math.floor(Math.random() * 500) + 100,
-    })),
-    fileUploads: dates.map((date) => ({
-      date,
-      count: Math.floor(Math.random() * 50) + 10,
-    })),
-    userGrowth: dates.map((date, index) => ({
-      date,
-      newUsers: Math.floor(Math.random() * 20) + 5,
-      totalUsers: 2000 + index * 10,
-    })),
-    responseTime: dates.map((date) => ({
-      date,
-      avgTime: Math.random() * 1000 + 500,
-    })),
-  };
-}
-
-function getMockUsageMetrics(): UsageMetrics {
-  return {
-    today: { messages: 234, conversations: 45, files: 12, activeUsers: 89 },
-    thisWeek: {
-      messages: 1567,
-      conversations: 234,
-      files: 67,
-      activeUsers: 456,
-    },
-    thisMonth: {
-      messages: 6789,
-      conversations: 1234,
-      files: 234,
-      activeUsers: 1892,
-    },
-    growth: { messages: 15, conversations: 8, files: 23, users: 12 },
-  };
 }
 
 // Model name mapping helper

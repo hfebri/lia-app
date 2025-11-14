@@ -27,6 +27,8 @@ interface Model {
   maxTokens: number;
   contextWindow: number;
   isDefault: boolean;
+  disabled?: boolean;
+  disabledReason?: string;
   capabilities: string[];
   pricing: {
     input: number;
@@ -147,28 +149,38 @@ export function ModelSelector({
               .filter((model) => model.provider === "openai")
               .map((model) => {
                 const isSelected = model.id === selectedModel;
+                const isDisabled = model.disabled;
                 return (
                   <div
                     key={model.id}
                     onClick={() => {
-                      onModelChange(model.id);
-                      setOpen(false);
+                      if (!isDisabled) {
+                        onModelChange(model.id);
+                        setOpen(false);
+                      }
                     }}
                     className={cn(
-                      "p-2 rounded-md cursor-pointer hover:bg-accent transition-colors",
-                      isSelected && "bg-accent"
+                      "p-2 rounded-md transition-colors",
+                      !isDisabled && "cursor-pointer hover:bg-accent",
+                      isDisabled && "opacity-50 cursor-not-allowed",
+                      isSelected && !isDisabled && "bg-accent"
                     )}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex flex-col">
                         <span className="text-sm font-medium">{model.name}</span>
-                        {model.descriptor && (
+                        {model.descriptor && !isDisabled && (
                           <span className="text-xs text-muted-foreground">
                             {model.descriptor}
                           </span>
                         )}
+                        {isDisabled && model.disabledReason && (
+                          <span className="text-xs text-muted-foreground italic">
+                            {model.disabledReason}
+                          </span>
+                        )}
                       </div>
-                      {isSelected && (
+                      {isSelected && !isDisabled && (
                         <div className="h-2 w-2 bg-primary rounded-full" />
                       )}
                     </div>
@@ -192,28 +204,38 @@ export function ModelSelector({
               .filter((model) => model.provider === "anthropic")
               .map((model) => {
                 const isSelected = model.id === selectedModel;
+                const isDisabled = model.disabled;
                 return (
                   <div
                     key={model.id}
                     onClick={() => {
-                      onModelChange(model.id);
-                      setOpen(false);
+                      if (!isDisabled) {
+                        onModelChange(model.id);
+                        setOpen(false);
+                      }
                     }}
                     className={cn(
-                      "p-2 rounded-md cursor-pointer hover:bg-accent transition-colors",
-                      isSelected && "bg-accent"
+                      "p-2 rounded-md transition-colors",
+                      !isDisabled && "cursor-pointer hover:bg-accent",
+                      isDisabled && "opacity-50 cursor-not-allowed",
+                      isSelected && !isDisabled && "bg-accent"
                     )}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex flex-col">
                         <span className="text-sm font-medium">{model.name}</span>
-                        {model.descriptor && (
+                        {model.descriptor && !isDisabled && (
                           <span className="text-xs text-muted-foreground">
                             {model.descriptor}
                           </span>
                         )}
+                        {isDisabled && model.disabledReason && (
+                          <span className="text-xs text-muted-foreground italic">
+                            {model.disabledReason}
+                          </span>
+                        )}
                       </div>
-                      {isSelected && (
+                      {isSelected && !isDisabled && (
                         <div className="h-2 w-2 bg-primary rounded-full" />
                       )}
                     </div>

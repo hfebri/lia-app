@@ -16,7 +16,9 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
-// removed unused stats variable
+// TODO: Replace mock data with real data from analytics API
+// This page currently uses defaultAdminStats, recentActivity, and system status mock data
+// Should fetch real data using the analytics service similar to /admin/analytics page
 
 const recentActivity = [
   {
