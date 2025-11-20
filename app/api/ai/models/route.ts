@@ -173,6 +173,8 @@ const AVAILABLE_MODELS = [
     maxTokens: 8192,
     contextWindow: 200000,
     isDefault: false,
+    disabled: true,
+    disabledReason: "Under construction - Coming soon",
     capabilities: [
       "text-generation",
       "advanced-reasoning",
