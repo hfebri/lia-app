@@ -526,6 +526,11 @@ export async function POST(request: NextRequest) {
         userMessage = "Your message is too long. Please try reducing the amount of text or number of files attached.";
         statusCode = 400;
       }
+      // Overloaded errors (Anthropic server capacity)
+      else if (errorMsg.includes("overload")) {
+        userMessage = "The AI service is currently overloaded. Please try again in a few moments, or switch to a different model.";
+        statusCode = 529;
+      }
       // Rate limit errors
       else if (errorMsg.includes("rate limit") || errorMsg.includes("too many requests")) {
         userMessage = "You're sending messages too quickly. Please wait a moment and try again.";

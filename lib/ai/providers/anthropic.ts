@@ -456,9 +456,17 @@ export class AnthropicProvider implements AIProvider {
    * Handle errors and convert to AIError format
    */
   private handleError(error: any, model?: string): AIError {
-    const aiError = new Error(
-      error.message || "Unknown Anthropic API error"
-    ) as AIError;
+    // Create user-friendly error message based on error type
+    let errorMessage = error.message || "Unknown Anthropic API error";
+
+    // Handle specific Anthropic error types
+    if (error.error?.type === "overloaded_error") {
+      errorMessage = `Overloaded: The ${model || "Claude"} model is currently experiencing high demand. Please try again in a moment or use a different model.`;
+    } else if (error.error?.message) {
+      errorMessage = error.error.message;
+    }
+
+    const aiError = new Error(errorMessage) as AIError;
 
     aiError.provider = this.name;
     aiError.model = model;
