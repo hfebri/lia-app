@@ -10,7 +10,9 @@
     "db:generate": "npx drizzle-kit generate",
     "db:migrate": "npx drizzle-kit migrate",
     "db:studio": "npx drizzle-kit studio",
-    "db:seed": "tsx lib/db/seed.ts"
+    "db:seed": "tsx lib/db/seed.ts",
+    "db:dedupe": "tsx scripts/dedupe-daily-metrics.ts",
+    "db:check-duplicates": "tsx scripts/check-daily-metrics-duplicates.ts"
   },
   "dependencies": {
     "@anthropic-ai/claude-code": "^2.0.37",
@@ -69,6 +71,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@netlify/functions": "^5.1.0",
     "@tailwindcss/postcss": "^4.1.12",
     "@types/node": "^20",
     "@types/pdf-parse": "^1.1.5",

@@ -344,9 +344,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
   const sendMessage = useCallback(
     async (content: string, files?: File[], stream: boolean = true) => {
       // AUTO-CONVERT: Long text → .txt file (mimic Claude.ai behavior)
-      console.log('[useAiChat] Message length:', content.length, 'characters');
       if (content.length > 10000) {
-        console.log('[useAiChat] AUTO-CONVERT triggered - converting to .txt file');
         const currentFileCount = files?.length || 0;
 
         // Check if we're already at the file limit
@@ -372,7 +370,6 @@ export function useAiChat(options: UseAiChatOptions = {}) {
         // Clear the content - file will be sent with empty message
         // User's original text is preserved in the file
         content = '';
-        console.log('[useAiChat] AUTO-CONVERT complete - text file created, message cleared');
       }
 
       // Validate message (skip if we have files - files alone are valid)

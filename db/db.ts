@@ -11,7 +11,12 @@ if (!databaseUrl) {
 }
 
 function initializeDb(url: string) {
-  const client = postgres(url, { prepare: false });
+  const client = postgres(url, {
+    prepare: false,
+    max: 10, // Max number of connections in the pool
+    idle_timeout: 20, // Close idle connections after 20 seconds
+    max_lifetime: 60 * 30, // Close connections after 30 minutes
+  });
   return drizzlePostgres(client, { schema });
 }
 

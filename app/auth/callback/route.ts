@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { createOrUpdateUser } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { AUTH_CONFIG } from "@/lib/auth/config";
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
@@ -37,6 +38,14 @@ export async function GET(request: NextRequest) {
             cookiesToSet.push(...cookiesToSetParam);
           },
         },
+        // IMPORTANT: Use the same cookie options as the browser client
+        // This ensures PKCE verifier cookie is read with the correct name
+        cookieOptions: {
+          name: AUTH_CONFIG.cookies.name,
+          domain: AUTH_CONFIG.cookies.domain,
+          path: AUTH_CONFIG.cookies.path,
+          sameSite: AUTH_CONFIG.cookies.sameSite,
+        },
       }
     );
 
@@ -46,7 +55,7 @@ export async function GET(request: NextRequest) {
 
       if (error) {
         console.error("[AUTH-CALLBACK] Exchange failed:", error.message);
-        const errorUrl = new URL("/", redirectOrigin);
+        const errorUrl = new URL("/signin", redirectOrigin);
         errorUrl.searchParams.set("error", "callback_error");
         finalResponse = NextResponse.redirect(errorUrl);
 

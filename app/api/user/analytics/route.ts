@@ -85,8 +85,9 @@ export async function GET(request: NextRequest) {
 
     // Get conversations for analytics
     // Use higher limits when filtering by date range for accuracy
-    const conversationLimit = (startDateParam && endDateParam) ? 100 : 20;
-    const processLimit = (startDateParam && endDateParam) ? 20 : 5;
+    const conversationLimit = (startDateParam && endDateParam) ? 200 : 50;
+    // Process more conversations for accurate message/conversation ratio in charts
+    const messageProcessLimit = (startDateParam && endDateParam) ? 100 : 50;
 
     // Fetch conversations based on whether we're showing all users or a specific user
     const conversations = targetUserId === null
@@ -131,24 +132,37 @@ export async function GET(request: NextRequest) {
     > = {};
     const recentConversations = [];
 
-    // Process conversations in parallel for better performance
-    const conversationPromises = filteredConversations
-      .slice(0, processLimit)
-      .map(async (conversation) => {
-        try {
-          const messages = await ConversationService.getMessages(
-            conversation.id,
-            {
-              page: 1,
-              limit: 50,
-              sortOrder: "desc",
-            }
-          );
-          return { conversation, messages };
-        } catch (error) {
-          return { conversation, messages: { messages: [] } };
-        }
-      });
+    // First, count ALL conversations per day for accurate chart visualization
+    // This ensures the chart shows all days with activity, not just the processed subset
+    for (const conversation of filteredConversations) {
+      const convDate = new Date(conversation.createdAt);
+      const dateKey = convDate.toISOString().split("T")[0];
+      if (!dailyActivity[dateKey]) {
+        dailyActivity[dateKey] = { messages: 0, conversations: 0 };
+      }
+      dailyActivity[dateKey].conversations += 1;
+    }
+
+    // Process a subset of conversations for detailed message analysis
+    // Trade-off: We fetch messages from the first N conversations for performance,
+    // while conversation counts include ALL filtered conversations for accuracy.
+    // This means message bars represent a sample, but all conversation activity days are shown.
+    const conversationsToProcess = filteredConversations.slice(0, messageProcessLimit);
+    const conversationPromises = conversationsToProcess.map(async (conversation) => {
+      try {
+        const messages = await ConversationService.getMessages(
+          conversation.id,
+          {
+            page: 1,
+            limit: 50,
+            sortOrder: "desc",
+          }
+        );
+        return { conversation, messages };
+      } catch (error) {
+        return { conversation, messages: { messages: [] } };
+      }
+    });
 
     const conversationResults = await Promise.allSettled(conversationPromises);
 
@@ -181,9 +195,19 @@ export async function GET(request: NextRequest) {
               }
             }
           }
+
+          // Calculate daily activity for messages
+          const messageDate = new Date(message.createdAt);
+          if (messageDate >= startDate && messageDate <= endDate) {
+            const dateKey = messageDate.toISOString().split("T")[0];
+            if (!dailyActivity[dateKey]) {
+              dailyActivity[dateKey] = { messages: 0, conversations: 0 };
+            }
+            dailyActivity[dateKey].messages += 1;
+          }
         }
 
-        // Add to recent conversations with message data
+        // Add to recent conversations with message data (limit to first 5)
         if (recentConversations.length < 5) {
           const lastMessage = messages.messages[messages.messages.length - 1];
           recentConversations.push({
@@ -196,30 +220,11 @@ export async function GET(request: NextRequest) {
             updatedAt: conversation.updatedAt,
           });
         }
-
-        // Calculate daily activity for messages
-        for (const message of messages.messages) {
-          const messageDate = new Date(message.createdAt);
-          if (messageDate >= startDate && messageDate <= endDate) {
-            const dateKey = messageDate.toISOString().split("T")[0];
-            if (!dailyActivity[dateKey]) {
-              dailyActivity[dateKey] = { messages: 0, conversations: 0 };
-            }
-            dailyActivity[dateKey].messages += 1;
-          }
-        }
-
-        // Count conversations per day (already filtered by date range)
-        const convDate = new Date(conversation.createdAt);
-        const dateKey = convDate.toISOString().split("T")[0];
-        if (!dailyActivity[dateKey]) {
-          dailyActivity[dateKey] = { messages: 0, conversations: 0 };
-        }
-        dailyActivity[dateKey].conversations += 1;
       }
     }
 
-    const periodDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    // Add 1 to include both start and end dates (inclusive range)
+    const periodDays = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
 
     const trendsAnalysis = generateFastInsights(
       filteredConversations,
@@ -229,11 +234,13 @@ export async function GET(request: NextRequest) {
     );
     const messagesTrend = trendsAnalysis.messagesTrend;
 
-    // Generate activity chart data for the last 7 days
+    // Generate activity chart data based on the actual date range
     const chartData = [];
-    for (let i = 6; i >= 0; i--) {
-      const date = new Date();
-      date.setDate(date.getDate() - i);
+    const chartDays = Math.min(periodDays, 90); // Limit to 90 days for chart display
+
+    for (let i = chartDays - 1; i >= 0; i--) {
+      const date = new Date(endDate);
+      date.setDate(endDate.getDate() - i);
       const dateKey = date.toISOString().split("T")[0];
       const activity = dailyActivity[dateKey] || {
         messages: 0,

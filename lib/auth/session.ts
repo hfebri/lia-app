@@ -10,19 +10,19 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
   const supabase = await createServerClient();
 
   try {
+    // Use getUser() instead of getSession() for proper server-side authentication
+    // This validates the session with the Supabase Auth server
     const {
-      data: { session },
+      data: { user },
       error,
-    } = await supabase.auth.getSession();
+    } = await supabase.auth.getUser();
 
-    // Don't try to refresh server-side - the server client can't write cookies
-    // to the browser. Refresh must happen client-side or in middleware/route handlers.
-    if (error || !session?.user?.email) {
+    if (error || !user?.email) {
       return null;
     }
 
     // Get user data from our database
-    const dbUser = await getUserFromDatabase(session.user.email);
+    const dbUser = await getUserFromDatabase(user.email);
 
     if (!dbUser || !dbUser.isActive) {
       return null;

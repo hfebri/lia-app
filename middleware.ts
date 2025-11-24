@@ -1,6 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { PROTECTED_ROUTES, ADMIN_ROUTES } from "./lib/auth/config";
+import { PROTECTED_ROUTES, ADMIN_ROUTES, AUTH_CONFIG } from "./lib/auth/config";
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -26,6 +26,14 @@ export async function middleware(request: NextRequest) {
             supabaseResponse.cookies.set(name, value, options)
           );
         },
+      },
+      // IMPORTANT: Use the same cookie options as browser and server clients
+      // This ensures session cookies are read with the correct name
+      cookieOptions: {
+        name: AUTH_CONFIG.cookies.name,
+        domain: AUTH_CONFIG.cookies.domain,
+        path: AUTH_CONFIG.cookies.path,
+        sameSite: AUTH_CONFIG.cookies.sameSite,
       },
     }
   );

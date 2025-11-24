@@ -8,6 +8,11 @@
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
+# Function settings
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
 # Headers for caching static assets
 [[headers]]
   for = "/_next/static/*"

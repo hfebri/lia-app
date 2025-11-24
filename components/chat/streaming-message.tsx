@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Markdown } from "@/components/ui/markdown";
@@ -47,36 +46,8 @@ export function StreamingMessage({
   onStop,
   className,
 }: StreamingMessageProps) {
-  const [displayedContent, setDisplayedContent] = useState("");
-  const [currentIndex, setCurrentIndex] = useState(0);
-
-  // Typing animation effect
-  useEffect(() => {
-    // If not streaming, show all content immediately
-    if (!isStreaming) {
-      setDisplayedContent(content);
-      setCurrentIndex(content.length);
-      return;
-    }
-
-    // While streaming, show typing animation
-    if (currentIndex < content.length) {
-      const timer = setTimeout(() => {
-        setDisplayedContent(content.slice(0, currentIndex + 1));
-        setCurrentIndex(currentIndex + 1);
-      }, 10); // Adjust speed as needed
-
-      return () => clearTimeout(timer);
-    }
-  }, [content, currentIndex, isStreaming]);
-
-  // Reset when new stream starts (content becomes shorter)
-  useEffect(() => {
-    if (content.length < displayedContent.length) {
-      setDisplayedContent(content);
-      setCurrentIndex(content.length);
-    }
-  }, [content, displayedContent.length]);
+  // Typing animation removed - show content immediately
+  const displayedContent = content;
 
   return (
     <div

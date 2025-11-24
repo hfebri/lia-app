@@ -19,10 +19,16 @@ export const AUTH_CONFIG = {
   // Cookie options
   cookies: {
     name: "supabase-auth-token",
-    lifetime: 60 * 60 * 24 * 7, // 7 days
+    lifetime: 60 * 60 * 24 * 30, // 30 days (extended from 7 days to reduce logout frequency)
     domain: undefined,
     path: "/",
     sameSite: "lax" as const,
+  },
+
+  // Token refresh settings
+  tokenRefresh: {
+    // Refresh more aggressively - 15 minutes before expiry instead of 5
+    earlyRefreshThreshold: 15 * 60 * 1000, // 15 minutes
   },
 } as const;
 

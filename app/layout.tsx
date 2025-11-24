@@ -8,6 +8,7 @@ import { ToastProvider } from "@/components/providers/toast-provider";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { VersionMigrationProvider } from "@/components/providers/version-migration-provider";
 import { ErrorBoundary } from "@/components/shared/error-boundary";
+import { SessionTracker } from "@/components/analytics/session-tracker";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -69,6 +70,7 @@ export default function RootLayout({
               disableTransitionOnChange
             >
               <AuthProvider>
+                <SessionTracker />
                 <ConversationsProvider>
                   {children}
                   <ToastProvider />

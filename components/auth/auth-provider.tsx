@@ -275,11 +275,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
               // Schedule a retry after a short delay
               setTimeout(async () => {
-                console.log("[AUTH-PROVIDER] 🔄 Retrying profile fetch after transient error...");
                 const retryResult = await fetchUserProfile(session.user.email!, session);
 
                 if (retryResult === "success") {
-                  console.log("[AUTH-PROVIDER] ✅ Profile fetch retry succeeded");
                   setIsLoading(false);
                 } else if (retryResult === "not_found" || retryResult === "inactive") {
                   console.warn("[AUTH-PROVIDER] ⚠️ Profile fetch retry failed with fatal error");
@@ -315,8 +313,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Keep loading state so protected routes don't boot-loop to /signin
         if (!shouldStayLoading) {
           setIsLoading(false);
-        } else {
-          console.log("[AUTH-PROVIDER] 🔄 Keeping loading state - waiting for profile retry");
         }
       }
     };
@@ -484,13 +480,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Safe refresh with mutex to prevent race conditions
   const refreshSessionSafely = useCallback(async () => {
     if (isRefreshingRef.current) {
-      console.log('[AUTH-PROVIDER] 🔒 Refresh already in progress, skipping...');
       return;
     }
 
     isRefreshingRef.current = true;
     try {
-      console.log('[AUTH-PROVIDER] 🔄 Refreshing session...');
       const { data: { session: refreshedSession }, error } = await supabase.auth.refreshSession();
 
       if (error) {
@@ -506,7 +500,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (refreshedSession) {
-        console.log('[AUTH-PROVIDER] ✅ Session refreshed successfully');
         setSession(refreshedSession);
 
         // Update user cache with fresh session
@@ -547,13 +540,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [isLoading, isFetchingUser, session, user, lastFetchResult, forceLogout]);
 
-  // Supabase automatically refreshes tokens 1/6 of the way before expiry
-  // For 1-hour tokens, Supabase refreshes at 50 minutes automatically
-  // We just need to handle visibility changes to refresh when tab becomes active
+  // Token refresh strategy:
+  // 1. Supabase auto-refreshes 1/6 before expiry (e.g., 50min for 1hr tokens)
+  // 2. We add proactive checks on visibility changes
+  // 3. We add periodic background checks every 10 minutes
   useEffect(() => {
     if (!session) return;
 
-    console.log('[AUTH-PROVIDER] ⏰ Setting up visibility-based token refresh');
+    // Periodic background check - every 10 minutes
+    const backgroundCheckInterval = setInterval(async () => {
+      try {
+        const { data: { session: currentSession } } = await supabase.auth.getSession();
+
+        if (currentSession?.expires_at) {
+          const timeUntilExpiry = (currentSession.expires_at * 1000) - Date.now();
+          const REFRESH_THRESHOLD = AUTH_CONFIG.tokenRefresh.earlyRefreshThreshold;
+
+          if (timeUntilExpiry < REFRESH_THRESHOLD) {
+            await refreshSessionSafely();
+          }
+        }
+      } catch (error) {
+        console.error('[AUTH-PROVIDER] ❌ Error in background token check:', error);
+      }
+    }, 10 * 60 * 1000); // Check every 10 minutes
 
     const handleVisibilityChange = async () => {
       if (document.visibilityState === 'visible') {
@@ -561,15 +571,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const { data: { session: currentSession } } = await supabase.auth.getSession();
 
           if (currentSession) {
-            // Check if token is close to expiry (within 5 minutes)
+            // Check if token is close to expiry (using configured threshold)
             const expiresAt = currentSession.expires_at;
             if (expiresAt) {
               const timeUntilExpiry = (expiresAt * 1000) - Date.now();
-              const FIVE_MINUTES = 5 * 60 * 1000;
+              const REFRESH_THRESHOLD = AUTH_CONFIG.tokenRefresh.earlyRefreshThreshold;
 
-              if (timeUntilExpiry < FIVE_MINUTES) {
-                console.log('[AUTH-PROVIDER] 🔄 Tab became active, refreshing session (token expiring soon)');
-
+              if (timeUntilExpiry < REFRESH_THRESHOLD) {
                 // Use the shared refresh function to avoid race conditions
                 await refreshSessionSafely();
               }
@@ -584,8 +592,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
+      clearInterval(backgroundCheckInterval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      console.log('[AUTH-PROVIDER] 🛑 Visibility-based token refresh stopped');
     };
   }, [supabase, session, refreshSessionSafely]);
 
