@@ -7,17 +7,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Loader2, TrendingUp, TrendingDown, Minus, Activity, Target, Zap, Award } from "lucide-react";
+import { ProductivitySkeleton } from "./productivity-skeleton";
 
 export default function ProductivityDashboard() {
   const [period, setPeriod] = useState<"week" | "month">("week");
   const { data, loading, error, refetch } = useProductivityDashboard(period);
 
   if (loading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <ProductivitySkeleton />;
   }
 
   if (error) {

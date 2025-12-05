@@ -25,6 +25,7 @@ import { ThinkingModeToggle } from "./thinking-mode-toggle";
 import { ReasoningEffortSelector } from "./reasoning-effort-selector";
 import { SystemInstructionButton } from "./system-instruction-button";
 import { ChatHistorySkeleton } from "./message-skeleton";
+import { ChatSkeleton } from "./chat-skeleton";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -173,6 +174,10 @@ export function EnhancedChatInterface({
     loadModels();
     refreshFiles();
   }, [loadModels, refreshFiles]);
+
+  if (isLoadingConversation) {
+    return <ChatSkeleton />;
+  }
 
   // Show auto-convert warning when input exceeds 10,000 characters
   useEffect(() => {
