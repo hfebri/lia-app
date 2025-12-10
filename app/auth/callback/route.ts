@@ -1,16 +1,29 @@
 import { createServerClient } from "@supabase/ssr";
-import { createOrUpdateUser } from "../../../lib/auth";
+import { createOrUpdateUser } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { AUTH_CONFIG } from "@/lib/auth/config";
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
-  const origin = requestUrl.origin;
+
+  // Determine the correct redirect origin
+  // Priority: production domain > current origin (but allow localhost for development)
+  const productionDomain = "https://lia.leverategroup.asia";
+  const isNetlifyPreview = requestUrl.hostname.includes(
+    "--lia-app.netlify.app"
+  );
+  const redirectOrigin = isNetlifyPreview
+    ? productionDomain
+    : requestUrl.origin;
 
   if (code) {
     const cookieStore = await cookies();
-    const response = NextResponse.redirect(`${origin}/`);
+
+    // We'll create the response AFTER checking onboarding status
+    let finalResponse: NextResponse;
+    const cookiesToSet: Array<{ name: string; value: string; options?: any }> = [];
 
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -20,30 +33,46 @@ export async function GET(request: NextRequest) {
           getAll() {
             return cookieStore.getAll();
           },
-          setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              response.cookies.set(name, value, options)
-            );
+          setAll(cookiesToSetParam) {
+            // Store cookies to set them later on the final response
+            cookiesToSet.push(...cookiesToSetParam);
           },
+        },
+        // IMPORTANT: Use the same cookie options as the browser client
+        // This ensures PKCE verifier cookie is read with the correct name
+        cookieOptions: {
+          name: AUTH_CONFIG.cookies.name,
+          domain: AUTH_CONFIG.cookies.domain,
+          path: AUTH_CONFIG.cookies.path,
+          sameSite: AUTH_CONFIG.cookies.sameSite,
         },
       }
     );
 
     try {
-      console.log("[AUTH-CALLBACK] Starting code exchange");
-
       // Exchange the auth code for a session
       const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
       if (error) {
         console.error("[AUTH-CALLBACK] Exchange failed:", error.message);
-        return NextResponse.redirect(`${origin}/?error=callback_error`);
+        const errorUrl = new URL("/signin", redirectOrigin);
+        errorUrl.searchParams.set("error", "callback_error");
+        finalResponse = NextResponse.redirect(errorUrl);
+
+        // Set cookies on error response
+        cookiesToSet.forEach(({ name, value, options }) => {
+          finalResponse.cookies.set(name, value, {
+            ...options,
+            path: "/",
+            sameSite: "lax",
+            secure: process.env.NODE_ENV === "production",
+          });
+        });
+
+        return finalResponse;
       }
 
       if (data.session?.user) {
-        console.log("[AUTH-CALLBACK] Session obtained for:", data.session.user.email);
-        console.log("[AUTH-CALLBACK] Session ID:", data.session.access_token.substring(0, 20) + "...");
-
         // Create or update user in our database
         const authUser = await createOrUpdateUser({
           email: data.session.user.email!,
@@ -51,30 +80,104 @@ export async function GET(request: NextRequest) {
         });
 
         if (!authUser) {
-          console.error("[AUTH-CALLBACK] Failed to create/update user in database");
-          return NextResponse.redirect(`${origin}/?error=database_error`);
-        }
+          const errorUrl = new URL("/", redirectOrigin);
+          errorUrl.searchParams.set("error", "database_error");
+          finalResponse = NextResponse.redirect(errorUrl);
 
-        console.log("[AUTH-CALLBACK] User created/updated:", authUser.email, "Active:", authUser.isActive);
+          // Set cookies on error response
+          cookiesToSet.forEach(({ name, value, options }) => {
+            finalResponse.cookies.set(name, value, {
+              ...options,
+              path: "/",
+              sameSite: "lax",
+              secure: process.env.NODE_ENV === "production",
+            });
+          });
+
+          return finalResponse;
+        }
 
         if (!authUser.isActive) {
-          console.warn("[AUTH-CALLBACK] Account inactive:", authUser.email);
-          return NextResponse.redirect(`${origin}/?error=account_inactive`);
+          console.warn("[AUTH-CALLBACK] ⚠️ Account inactive:", authUser.email);
+          const errorUrl = new URL("/", redirectOrigin);
+          errorUrl.searchParams.set("error", "account_inactive");
+          finalResponse = NextResponse.redirect(errorUrl);
+
+          // Set cookies on error response
+          cookiesToSet.forEach(({ name, value, options }) => {
+            finalResponse.cookies.set(name, value, {
+              ...options,
+              path: "/",
+              sameSite: "lax",
+              secure: process.env.NODE_ENV === "production",
+            });
+          });
+
+          return finalResponse;
         }
 
-        // Successful authentication - redirect to home page with cookies set
-        console.log("[AUTH-CALLBACK] Success! Redirecting to home with new session");
-        return response;
+        // Determine final redirect based on onboarding status
+        let redirectPath = "/";
+        if (!authUser.hasCompletedOnboarding) {
+          redirectPath = "/onboarding";
+        } else {
+          redirectPath = "/";
+        }
+
+        const successUrl = new URL(redirectPath, redirectOrigin);
+        finalResponse = NextResponse.redirect(successUrl);
+
+        // Set all cookies on the final response
+        cookiesToSet.forEach(({ name, value, options }) => {
+          finalResponse.cookies.set(name, value, {
+            ...options,
+            path: "/",
+            sameSite: "lax",
+            secure: process.env.NODE_ENV === "production",
+          });
+        });
+
+        return finalResponse;
       }
 
-      console.error("[AUTH-CALLBACK] No session or user in exchange response");
-      return NextResponse.redirect(`${origin}/?error=no_session`);
+      const errorUrl = new URL("/", redirectOrigin);
+      errorUrl.searchParams.set("error", "no_session");
+      finalResponse = NextResponse.redirect(errorUrl);
+
+      // Set cookies on error response
+      cookiesToSet.forEach(({ name, value, options }) => {
+        finalResponse.cookies.set(name, value, {
+          ...options,
+          path: "/",
+          sameSite: "lax",
+          secure: process.env.NODE_ENV === "production",
+        });
+      });
+
+      return finalResponse;
     } catch (error) {
       console.error("[AUTH-CALLBACK] Unexpected error:", error);
-      return NextResponse.redirect(`${origin}/?error=unexpected_error`);
+      const errorUrl = new URL("/", redirectOrigin);
+      errorUrl.searchParams.set("error", "unexpected_error");
+      finalResponse = NextResponse.redirect(errorUrl);
+
+      // Set cookies on error response
+      cookiesToSet.forEach(({ name, value, options }) => {
+        finalResponse.cookies.set(name, value, {
+          ...options,
+          path: "/",
+          sameSite: "lax",
+          secure: process.env.NODE_ENV === "production",
+        });
+      });
+
+      return finalResponse;
     }
   }
 
   // No code parameter or other error
-  return NextResponse.redirect(`${origin}/?error=missing_code`);
+  console.error("[AUTH-CALLBACK] No code parameter");
+  const errorUrl = new URL("/", redirectOrigin);
+  errorUrl.searchParams.set("error", "missing_code");
+  return NextResponse.redirect(errorUrl);
 }

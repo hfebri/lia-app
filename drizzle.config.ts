@@ -1,5 +1,6 @@
 import { config } from "dotenv";
 import { defineConfig } from "drizzle-kit";
+import { redirect } from "next/dist/server/api-utils";
 
 config({ path: ".env.local" });
 

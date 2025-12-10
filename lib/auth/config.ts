@@ -1,17 +1,11 @@
 import type { AuthError } from "@supabase/supabase-js";
 
 // Supabase Auth configuration
+// Note: redirectTo should be computed dynamically in client components
 export const AUTH_CONFIG = {
-  redirectTo: `${
-    process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
-  }/auth/callback`,
-
   // Provider-specific options
   google: {
     scopes: "email profile",
-    redirectTo: `${
-      process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
-    }/auth/callback`,
   },
 
   // Session options
@@ -25,10 +19,16 @@ export const AUTH_CONFIG = {
   // Cookie options
   cookies: {
     name: "supabase-auth-token",
-    lifetime: 60 * 60 * 24 * 7, // 7 days
+    lifetime: 60 * 60 * 24 * 30, // 30 days (extended from 7 days to reduce logout frequency)
     domain: undefined,
     path: "/",
     sameSite: "lax" as const,
+  },
+
+  // Token refresh settings
+  tokenRefresh: {
+    // Refresh more aggressively - 15 minutes before expiry instead of 5
+    earlyRefreshThreshold: 15 * 60 * 1000, // 15 minutes
   },
 } as const;
 

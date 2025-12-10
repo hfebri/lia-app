@@ -63,7 +63,7 @@ export async function analyzeDocument(
     }
 
     const {
-      model = "openai/gpt-5",
+      model = "gpt-5",
       includeKeyPoints = true,
       includeInsights = true,
       includeSentiment = true,

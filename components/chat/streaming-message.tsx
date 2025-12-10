@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Markdown } from "@/components/ui/markdown";
@@ -17,6 +16,8 @@ interface StreamingMessageProps {
 
 const getModelIcon = (modelId?: string) => {
   if (!modelId) return <Bot className="h-4 w-4" />;
+  if (modelId.includes("gpt-5-pro"))
+    return <Sparkles className="h-4 w-4 text-purple-600" />;
   if (modelId.includes("gpt-5"))
     return <Sparkles className="h-4 w-4 text-purple-500" />;
   if (modelId.includes("gpt-4"))
@@ -28,6 +29,7 @@ const getModelIcon = (modelId?: string) => {
 
 const getModelName = (modelId?: string) => {
   if (!modelId) return "AI Assistant";
+  if (modelId.includes("gpt-5-pro")) return "GPT-5 Pro";
   if (modelId.includes("gpt-5")) return "GPT-5";
   if (modelId.includes("gpt-4")) return "GPT-4";
   if (modelId.includes("gpt-3.5")) return "GPT-3.5";
@@ -44,33 +46,8 @@ export function StreamingMessage({
   onStop,
   className,
 }: StreamingMessageProps) {
-  const [displayedContent, setDisplayedContent] = useState("");
-  const [currentIndex, setCurrentIndex] = useState(0);
-
-  // Typing animation effect
-  useEffect(() => {
-    if (!isStreaming) {
-      setDisplayedContent(content);
-      return;
-    }
-
-    if (currentIndex < content.length) {
-      const timer = setTimeout(() => {
-        setDisplayedContent(content.slice(0, currentIndex + 1));
-        setCurrentIndex(currentIndex + 1);
-      }, 10); // Adjust speed as needed
-
-      return () => clearTimeout(timer);
-    }
-  }, [content, currentIndex, isStreaming]);
-
-  // Reset when content changes significantly
-  useEffect(() => {
-    if (content.length < displayedContent.length) {
-      setDisplayedContent(content);
-      setCurrentIndex(content.length);
-    }
-  }, [content, displayedContent.length]);
+  // Typing animation removed - show content immediately
+  const displayedContent = content;
 
   return (
     <div

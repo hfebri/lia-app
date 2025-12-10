@@ -1,6 +1,7 @@
 "use client";
 
 import React, { Component, ErrorInfo, ReactNode } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -8,7 +9,6 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -268,13 +268,11 @@ export function ErrorFallback({
               <RefreshCw className="w-4 h-4 mr-2" />
               Try Again
             </Button>
-            <Button
-              variant="outline"
-              onClick={() => (window.location.href = "/")}
-              className="flex-1"
-            >
-              <Home className="w-4 h-4 mr-2" />
-              Go Home
+            <Button variant="outline" asChild className="flex-1">
+              <Link href="/">
+                <Home className="w-4 h-4 mr-2" />
+                Go Home
+              </Link>
             </Button>
           </div>
 

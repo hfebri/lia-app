@@ -2,7 +2,7 @@
 
 import { useAuth } from "../../hooks/use-auth";
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { LoginButton } from "./login-button";
 
 interface ProtectedRouteProps {
@@ -10,6 +10,7 @@ interface ProtectedRouteProps {
   fallback?: React.ReactNode;
   redirectTo?: string;
   requireActive?: boolean;
+  unauthenticatedRedirectTo?: string;
 }
 
 export function ProtectedRoute({
@@ -17,16 +18,37 @@ export function ProtectedRoute({
   fallback,
   redirectTo = "/",
   requireActive = true,
+  unauthenticatedRedirectTo,
 }: ProtectedRouteProps) {
-  const { isAuthenticated, isLoading, user, forceLogout } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-
-      forceLogout();
+    if (isLoading || isAuthenticated) {
+      return;
     }
-  }, [isAuthenticated, isLoading, forceLogout]);
+
+    const resolvedTarget =
+      unauthenticatedRedirectTo ??
+      (redirectTo && redirectTo !== "/" ? redirectTo : "/signin");
+
+    console.debug("[PROTECTED-ROUTE] redirect", {
+      from: pathname,
+      redirectTo: resolvedTarget,
+    });
+
+    if (pathname !== resolvedTarget) {
+      router.replace(resolvedTarget);
+    }
+  }, [
+    isAuthenticated,
+    isLoading,
+    redirectTo,
+    router,
+    pathname,
+    unauthenticatedRedirectTo,
+  ]);
 
   // Show loading state
   if (isLoading) {

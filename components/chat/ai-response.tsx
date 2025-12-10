@@ -32,15 +32,20 @@ interface AIResponseProps {
     completion_tokens: number;
     total_tokens: number;
   };
+  isTruncated?: boolean;
+  stopReason?: string;
   timestamp?: Date;
   onRegenerate?: () => void;
   onCopy?: (content: string) => void;
   onFeedback?: (type: "positive" | "negative") => void;
+  onContinue?: () => void;
   className?: string;
 }
 
 const getModelIcon = (modelId?: string) => {
   if (!modelId) return <Bot className="h-4 w-4" />;
+  if (modelId.includes("gpt-5-pro"))
+    return <Sparkles className="h-4 w-4 text-purple-600" />;
   if (modelId.includes("gpt-5"))
     return <Sparkles className="h-4 w-4 text-purple-500" />;
   if (modelId.includes("gpt-4"))
@@ -50,6 +55,7 @@ const getModelIcon = (modelId?: string) => {
 
 const getModelName = (modelId?: string) => {
   if (!modelId) return "AI Assistant";
+  if (modelId.includes("gpt-5-pro")) return "GPT-5 Pro";
   if (modelId.includes("gpt-5")) return "GPT-5";
   if (modelId.includes("gpt-4")) return "GPT-4";
   if (modelId.includes("gpt-3.5")) return "GPT-3.5";
@@ -68,10 +74,13 @@ export function AIResponse({
   content,
   model,
   usage,
+  isTruncated,
+  stopReason,
   timestamp,
   onRegenerate,
   onCopy,
   onFeedback,
+  onContinue,
   className,
 }: AIResponseProps) {
   const [copied, setCopied] = useState(false);
@@ -145,6 +154,29 @@ export function AIResponse({
         <div className="prose prose-sm max-w-none dark:prose-invert">
           <div className="whitespace-pre-wrap break-words">{content}</div>
         </div>
+
+        {/* Truncation Warning */}
+        {isTruncated && (
+          <div className="flex items-center gap-2 p-2 rounded-md bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800">
+            <Badge variant="outline" className="bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700">
+              ⚠️ Response Truncated
+            </Badge>
+            <span className="text-xs text-yellow-700 dark:text-yellow-300">
+              Response was cut off due to length limit
+              {stopReason && stopReason !== "max_tokens" && ` (${stopReason})`}
+            </span>
+            {onContinue && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onContinue}
+                className="ml-auto h-7 text-xs border-yellow-300 dark:border-yellow-700 hover:bg-yellow-100 dark:hover:bg-yellow-900"
+              >
+                Continue
+              </Button>
+            )}
+          </div>
+        )}
 
         {/* Footer with Actions and Stats */}
         <div className="flex items-center justify-between pt-2 border-t border-border/50">

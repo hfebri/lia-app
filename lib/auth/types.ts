@@ -8,7 +8,9 @@ export interface AuthUser {
   name?: string | null;
   image?: string | null;
   role: UserRole;
+  professionalRole?: string | null;
   isActive: boolean;
+  hasCompletedOnboarding: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -25,11 +27,11 @@ export interface AuthContextType {
   user: AuthUser | null;
   session: Session | null;
   isLoading: boolean;
+  isFetchingUser: boolean;
   isAuthenticated: boolean;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
   refreshSession: () => Promise<void>;
-  forceLogout: () => Promise<void>;
 }
 
 // Sign in result

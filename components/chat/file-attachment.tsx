@@ -4,6 +4,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -22,6 +28,7 @@ import {
   Eye,
   MoreHorizontal,
   ExternalLink,
+  Sparkles,
 } from "lucide-react";
 
 interface FileAttachment {
@@ -36,6 +43,10 @@ interface FileAttachment {
     summary?: string;
     insights?: string[];
   };
+  // Summarization fields for token management
+  summaryTokens?: number;
+  usingSummary?: boolean;
+  extractedText?: string;
 }
 
 interface FileAttachmentProps {
@@ -93,10 +104,13 @@ const formatFileSize = (bytes: number): string => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
 };
 
-const getAnalysisStatusBadge = (status: string) => {
+const getAnalysisStatusBadge = (status: string, usingSummary?: boolean) => {
   switch (status) {
     case "completed":
-      return { variant: "default" as const, text: "Analyzed" };
+      return {
+        variant: "default" as const,
+        text: usingSummary ? "Summarized" : "Analyzed"
+      };
     case "processing":
       return { variant: "secondary" as const, text: "Processing" };
     case "error":
@@ -104,6 +118,30 @@ const getAnalysisStatusBadge = (status: string) => {
     default:
       return { variant: "outline" as const, text: "Pending" };
   }
+};
+
+/**
+ * Calculate token savings percentage and format for display
+ */
+const formatTokenSavings = (
+  originalTokens?: number,
+  summaryTokens?: number
+): { percentage: string; original: string; compressed: string } | null => {
+  if (!originalTokens || !summaryTokens) return null;
+
+  const compressionRatio = ((1 - summaryTokens / originalTokens) * 100).toFixed(0);
+  const formatTokens = (tokens: number) => {
+    if (tokens >= 1000) {
+      return `${(tokens / 1000).toFixed(1)}K`;
+    }
+    return tokens.toString();
+  };
+
+  return {
+    percentage: `${compressionRatio}%`,
+    original: formatTokens(originalTokens),
+    compressed: formatTokens(summaryTokens),
+  };
 };
 
 export function FileAttachment({
@@ -119,8 +157,16 @@ export function FileAttachment({
   const Icon = fileTypeIcons[fileType];
   const iconColor = fileTypeColors[fileType];
   const analysisStatus = getAnalysisStatusBadge(
-    file.analysis?.status || "pending"
+    file.analysis?.status || "pending",
+    file.usingSummary
   );
+
+  // Calculate token savings if using summary
+  const estimateTokenCount = (text: string) => Math.ceil(text.length / 3.5);
+  const originalTokens = file.extractedText
+    ? estimateTokenCount(file.extractedText)
+    : undefined;
+  const tokenSavings = formatTokenSavings(originalTokens, file.summaryTokens);
 
   if (compact) {
     return (
@@ -175,6 +221,37 @@ export function FileAttachment({
                 <Badge variant={analysisStatus.variant} className="text-xs">
                   {analysisStatus.text}
                 </Badge>
+                {/* Token savings badge when using summary */}
+                {file.usingSummary && tokenSavings && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Badge
+                          variant="secondary"
+                          className="text-xs flex items-center gap-1"
+                        >
+                          <Sparkles className="h-3 w-3" />
+                          {tokenSavings.percentage} smaller
+                        </Badge>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <div className="text-xs">
+                          <div className="font-medium mb-1">
+                            Using AI Summary in Context
+                          </div>
+                          <div className="text-muted-foreground">
+                            {tokenSavings.original} → {tokenSavings.compressed}{" "}
+                            tokens
+                          </div>
+                          <div className="text-muted-foreground mt-1">
+                            Full content available, AI summary used to reduce
+                            context size
+                          </div>
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
               </div>
 
               {/* Analysis Preview */}

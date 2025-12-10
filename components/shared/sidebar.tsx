@@ -24,13 +24,16 @@ import {
   Home,
   Plus,
   Clock,
-  MoreHorizontal,
   Edit2,
   Trash2,
   User,
   LogOut,
   RefreshCw,
   Bug,
+  Star,
+  MoreVertical,
+  TrendingUp,
+  Cpu,
 } from "lucide-react";
 import { SimpleThemeToggle } from "@/components/ui/theme-toggle";
 import {
@@ -62,6 +65,7 @@ interface SidebarProps {
 
 // Helper function to get friendly model names
 const getModelDisplayName = (modelId: string): string => {
+  if (modelId.includes("gpt-5-pro")) return "GPT-5 Pro";
   if (modelId.includes("gpt-5")) return "GPT-5";
   if (modelId.includes("gpt-4")) return "GPT-4";
   if (modelId.includes("gemini")) return "Gemini";
@@ -86,13 +90,15 @@ interface NavItem {
   icon: React.ComponentType<{ className?: string }>;
   badge?: string;
   adminOnly?: boolean;
+  matchPath?: string;
 }
 
 const navigationItems: NavItem[] = [
   {
-    title: "Chat",
-    href: "/",
+    title: "New Chat",
+    href: "/?newChat=1",
     icon: MessageSquare,
+    matchPath: "/",
   },
 ];
 
@@ -101,6 +107,12 @@ const adminItems: NavItem[] = [
     title: "Dashboard",
     href: "/dashboard",
     icon: BarChart3,
+    adminOnly: true,
+  },
+  {
+    title: "Model Usage",
+    href: "/admin/model-usage",
+    icon: Cpu,
     adminOnly: true,
   },
   {
@@ -120,7 +132,13 @@ function SidebarComponent({ className }: SidebarProps) {
   // Memoize navigation hooks to prevent unnecessary updates
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { theme } = useTheme();
+  const { resolvedTheme } = useTheme();
+  const [mounted, setMounted] = React.useState(false);
+
+  // Wait for client-side hydration to complete
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Destructure hooks with stable references
   const auth = useAuth();
@@ -129,15 +147,21 @@ function SidebarComponent({ className }: SidebarProps) {
 
   // Extract specific values to track changes more precisely
   const { user, isAuthenticated, checkRole } = auth;
-  const { conversations, createConversation, deleteConversation, isLoading } =
-    conversations_hook;
+  const {
+    conversations,
+    createConversation,
+    deleteConversation,
+    toggleFavorite,
+    isLoading,
+  } = conversations_hook;
 
   // Memoize expensive computations with more granular dependencies
   const isAdmin = useMemo(() => user && checkRole("admin"), [user, checkRole]);
-  const recentConversations = useMemo(
-    () => conversations.slice(0, 10),
-    [conversations]
-  );
+  const recentConversations = useMemo(() => {
+    // Conversations are already sorted by the provider
+    // Just take the first 10
+    return conversations.slice(0, 10);
+  }, [conversations]);
 
   // Create stable callback references
   const stableCreateConversation = useCallback(
@@ -188,6 +212,13 @@ function SidebarComponent({ className }: SidebarProps) {
     [stableDeleteConversation]
   );
 
+  const handleToggleFavorite = useCallback(
+    async (id: string, nextState: boolean) => {
+      await toggleFavorite(id, nextState);
+    },
+    [toggleFavorite]
+  );
+
   return (
     <div className={cn("h-full w-64 flex flex-col", className)}>
       {/* Sticky Logo and Theme Toggle */}
@@ -199,15 +230,23 @@ function SidebarComponent({ className }: SidebarProps) {
             onClick={(event) => handleLinkNavigation(event, "/")}
             prefetch={false}
           >
-            <Image
-              src={theme === "dark" ? "/logo-dark.svg" : "/logo-light.svg"}
-              alt="LIA Logo"
-              width={32}
-              height={32}
-              className="rounded"
-            />
+            {mounted && (
+              <Image
+                src={
+                  resolvedTheme === "dark"
+                    ? "/logo-dark.svg"
+                    : "/logo-light.svg"
+                }
+                alt="LIA Logo"
+                width={32}
+                height={32}
+                className="h-8 w-auto rounded"
+              />
+            )}
             <h1 className="text-xl font-bold">LIA</h1>
-            <Badge variant="secondary" className="text-xs">Beta</Badge>
+            {/* <Badge variant="secondary" className="text-xs">
+              Beta
+            </Badge> */}
           </Link>
           <SimpleThemeToggle />
         </div>
@@ -215,7 +254,6 @@ function SidebarComponent({ className }: SidebarProps) {
 
       <div className="flex-1 overflow-y-auto overflow-x-hidden">
         <div className="space-y-4 py-4">
-
           {/* Navigation */}
           <div className="px-3 py-2">
             <h2 className="mb-2 px-4 text-lg font-semibold tracking-tight">
@@ -224,7 +262,8 @@ function SidebarComponent({ className }: SidebarProps) {
             <div className="space-y-1">
               {navigationItems.map((item) => {
                 const Icon = item.icon;
-                const isActive = pathname === item.href;
+                const matchPath = item.matchPath || item.href.split("?")[0];
+                const isActive = pathname === matchPath;
 
                 return (
                   <Button
@@ -262,7 +301,7 @@ function SidebarComponent({ className }: SidebarProps) {
               </h2>
             </div>
 
-            <ScrollArea className="h-48">
+            <ScrollArea className="h-72">
               <div className="space-y-1">
                 {isLoading ? (
                   <div className="space-y-2 px-4 py-2">
@@ -290,11 +329,11 @@ function SidebarComponent({ className }: SidebarProps) {
                     return (
                       <div
                         key={conversation.id}
-                        className="flex items-center gap-1 group"
+                        className="flex items-center gap-1 group pr-3"
                       >
                         <Button
                           variant="ghost"
-                          className="flex-1 justify-start h-auto p-2 text-left"
+                          className="flex-1 justify-start h-auto p-2 text-left min-w-0"
                           asChild
                         >
                           <Link
@@ -303,13 +342,24 @@ function SidebarComponent({ className }: SidebarProps) {
                               handleLinkNavigation(event, conversationHref)
                             }
                             prefetch={false}
+                            className="min-w-0"
                           >
-                            <div className="flex items-start gap-2 w-full">
+                            <div className="flex items-start gap-2 w-full min-w-0">
                               <Clock className="h-3 w-3 mt-1 text-muted-foreground flex-shrink-0" />
                               <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium truncate">
-                                  {conversation.title || "Untitled Chat"}
-                                </p>
+                                <div className="flex items-center gap-1">
+                                  <p className="text-sm font-medium truncate flex-1 min-w-0">
+                                    {conversation.title || "Untitled Chat"}
+                                  </p>
+                                  {conversation.isFavorite && (
+                                    <Star
+                                      className="h-3 w-3 text-amber-500 flex-shrink-0"
+                                      fill="currentColor"
+                                      strokeWidth={1.5}
+                                      aria-label="Favorite conversation"
+                                    />
+                                  )}
+                                </div>
                                 <div className="flex items-center gap-2 mt-1">
                                   <p className="text-xs text-muted-foreground">
                                     {new Date(
@@ -341,10 +391,40 @@ function SidebarComponent({ className }: SidebarProps) {
                               size="sm"
                               className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
                             >
-                              <MoreHorizontal className="h-3 w-3" />
+                              <MoreVertical className="h-3 w-3" />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onSelect={(e) => {
+                                e.preventDefault();
+                                handleToggleFavorite(
+                                  conversation.id,
+                                  !conversation.isFavorite
+                                );
+                              }}
+                            >
+                              <Star
+                                className={cn(
+                                  "h-3 w-3 mr-2",
+                                  conversation.isFavorite
+                                    ? "text-amber-500"
+                                    : "text-muted-foreground"
+                                )}
+                                fill={
+                                  conversation.isFavorite
+                                    ? "currentColor"
+                                    : "none"
+                                }
+                                strokeWidth={1.5}
+                              />
+                              <span className="text-xs">
+                                {conversation.isFavorite
+                                  ? "Remove Favorite"
+                                  : "Add to Favorites"}
+                              </span>
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
                                 <DropdownMenuItem

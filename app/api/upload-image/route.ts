@@ -18,11 +18,8 @@ const STORAGE_BUCKET = "user-files";
  */
 export async function POST(request: NextRequest) {
   try {
-    console.log("[API /api/upload-image] Upload request received");
-
     // Require authentication
     const { userId, user } = await requireAuthenticatedUser();
-    console.log("[API /api/upload-image] User authenticated:", userId);
 
     if (!supabase) {
       console.error("[API /api/upload-image] Supabase not configured");
@@ -38,11 +35,6 @@ export async function POST(request: NextRequest) {
     // Parse form data
     const formData = await request.formData();
     const file = formData.get("file") as File;
-    console.log("[API /api/upload-image] File received:", {
-      name: file?.name,
-      type: file?.type,
-      size: file?.size,
-    });
 
     if (!file) {
       return NextResponse.json(
@@ -82,13 +74,6 @@ export async function POST(request: NextRequest) {
     const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_");
     const filePath = `${userId}/${timestamp}_${safeName}`;
 
-    console.log("[API /api/upload-image] Preparing upload:", {
-      userId,
-      filePath,
-      fileName: file.name,
-      fileSize: file.size,
-    });
-
     // Convert File to Buffer
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
@@ -117,12 +102,6 @@ export async function POST(request: NextRequest) {
     const { data: urlData } = supabase.storage
       .from(STORAGE_BUCKET)
       .getPublicUrl(filePath);
-
-    console.log("[API /api/upload-image] Upload successful:", {
-      fileName: file.name,
-      filePath,
-      url: urlData.publicUrl,
-    });
 
     return NextResponse.json({
       success: true,

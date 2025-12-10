@@ -10,17 +10,19 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
   const supabase = await createServerClient();
 
   try {
+    // Use getUser() instead of getSession() for proper server-side authentication
+    // This validates the session with the Supabase Auth server
     const {
-      data: { session },
+      data: { user },
       error,
-    } = await supabase.auth.getSession();
+    } = await supabase.auth.getUser();
 
-    if (error || !session?.user?.email) {
+    if (error || !user?.email) {
       return null;
     }
 
     // Get user data from our database
-    const dbUser = await getUserFromDatabase(session.user.email);
+    const dbUser = await getUserFromDatabase(user.email);
 
     if (!dbUser || !dbUser.isActive) {
       return null;
@@ -86,7 +88,9 @@ export async function getUserFromDatabase(
       name: user.name,
       image: user.image,
       role: user.role,
+      professionalRole: user.professionalRole,
       isActive: user.isActive,
+      hasCompletedOnboarding: user.hasCompletedOnboarding,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     };
@@ -249,7 +253,9 @@ export async function createOrUpdateUser(supabaseUser: {
             name: updatedUser.name,
             image: updatedUser.image,
             role: updatedUser.role,
+            professionalRole: updatedUser.professionalRole,
             isActive: updatedUser.isActive,
+            hasCompletedOnboarding: updatedUser.hasCompletedOnboarding,
             createdAt: updatedUser.createdAt,
             updatedAt: updatedUser.updatedAt,
           };
@@ -284,7 +290,9 @@ export async function createOrUpdateUser(supabaseUser: {
         name: result[0].name,
         image: result[0].image,
         role: result[0].role,
+        professionalRole: result[0].professionalRole,
         isActive: result[0].isActive,
+        hasCompletedOnboarding: result[0].hasCompletedOnboarding,
         createdAt: result[0].createdAt,
         updatedAt: result[0].updatedAt,
       };

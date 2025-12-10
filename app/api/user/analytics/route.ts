@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ConversationService } from "@/lib/services/conversation";
 import { requireAuthenticatedUser } from "@/lib/auth/session";
+import { AIService, type AIMessage } from "@/lib/ai/service";
 
 const analyticsCache = new Map<string, { data: any; timestamp: number }>();
 const CACHE_DURATION = 5 * 60 * 1000;
@@ -8,14 +9,72 @@ const CACHE_DURATION = 5 * 60 * 1000;
 // GET /api/user/analytics - Get user's dashboard analytics
 export async function GET(request: NextRequest) {
   try {
-    const { userId } = await requireAuthenticatedUser();
+    const { userId: currentUserId, user } = await requireAuthenticatedUser();
 
     const { searchParams } = new URL(request.url);
     const period = searchParams.get("period") || "30"; // days
-    const periodDays = parseInt(period);
+    const requestedUserId = searchParams.get("userId");
+    const startDateParam = searchParams.get("startDate");
+    const endDateParam = searchParams.get("endDate");
 
-    // Check cache first
-    const cacheKey = `${userId}_${period}`;
+    // Determine which user's analytics to fetch
+    let targetUserId: string | null = currentUserId;
+
+    // Check if userId parameter was sent
+    if (searchParams.has("userId")) {
+      const userIdValue = requestedUserId?.trim();
+
+      // Empty string or no value means "all users"
+      if (!userIdValue || userIdValue === "") {
+        // Check if user is admin
+        if (user?.role !== "admin") {
+          return NextResponse.json(
+            { success: false, error: "Admin access required to view all users' analytics" },
+            { status: 403 }
+          );
+        }
+        targetUserId = null; // null means fetch all users
+      } else if (userIdValue !== currentUserId) {
+        // Specific user ID provided (different from current user)
+        if (user?.role !== "admin") {
+          return NextResponse.json(
+            { success: false, error: "Admin access required to view other users' analytics" },
+            { status: 403 }
+          );
+        }
+        targetUserId = userIdValue;
+      } else {
+        // Same as current user
+        targetUserId = currentUserId;
+      }
+    }
+
+    // Calculate date range
+    let startDate: Date;
+    let endDate: Date;
+
+    if (startDateParam && endDateParam) {
+      // Use custom date range
+      startDate = new Date(startDateParam);
+      endDate = new Date(endDateParam);
+
+      // Validate dates
+      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+        return NextResponse.json(
+          { success: false, error: "Invalid date format" },
+          { status: 400 }
+        );
+      }
+    } else {
+      // Use period-based date range
+      const periodDays = parseInt(period);
+      endDate = new Date();
+      startDate = new Date();
+      startDate.setDate(endDate.getDate() - periodDays);
+    }
+
+    // Check cache first (include all params in cache key)
+    const cacheKey = `${targetUserId || 'all-users'}_${period}_${startDateParam || 'none'}_${endDateParam || 'none'}`;
     const cached = analyticsCache.get(cacheKey);
     if (cached && (Date.now() - cached.timestamp) < CACHE_DURATION) {
       return NextResponse.json({
@@ -24,47 +83,86 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Get user's conversations for analytics (limit to recent ones for performance)
-    const conversations = await ConversationService.getUserConversations(
-      userId,
-      {
-        page: 1,
-        limit: 20,
-      }
-    );
+    // Get conversations for analytics
+    // Use higher limits when filtering by date range for accuracy
+    const conversationLimit = (startDateParam && endDateParam) ? 200 : 50;
+    // Process more conversations for accurate message/conversation ratio in charts
+    const messageProcessLimit = (startDateParam && endDateParam) ? 100 : 50;
 
-    // Calculate date range
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setDate(endDate.getDate() - periodDays);
+    // Fetch conversations based on whether we're showing all users or a specific user
+    const conversations = targetUserId === null
+      ? await ConversationService.getAllConversations({
+          page: 1,
+          limit: conversationLimit,
+        })
+      : await ConversationService.getUserConversations(
+          targetUserId,
+          {
+            page: 1,
+            limit: conversationLimit,
+          }
+        );
+
+    // Filter conversations by date range
+    const filteredConversations = conversations.conversations.filter((conv) => {
+      const convDate = new Date(conv.createdAt);
+      return convDate >= startDate && convDate <= endDate;
+    });
 
     // Get messages for analytics
     let totalMessages = 0;
     let totalFiles = 0;
+    const fileTypeCount: Record<string, number> = {
+      pdf: 0,
+      docx: 0,
+      doc: 0,
+      txt: 0,
+      csv: 0,
+      xlsx: 0,
+      xls: 0,
+      png: 0,
+      jpg: 0,
+      jpeg: 0,
+      gif: 0,
+      other: 0,
+    };
     const dailyActivity: Record<
       string,
       { messages: number; conversations: number }
     > = {};
     const recentConversations = [];
 
-    // Process conversations in parallel for better performance
-    const conversationPromises = conversations.conversations
-      .slice(0, 5)
-      .map(async (conversation) => {
-        try {
-          const messages = await ConversationService.getMessages(
-            conversation.id,
-            {
-              page: 1,
-              limit: 50,
-              sortOrder: "desc",
-            }
-          );
-          return { conversation, messages };
-        } catch (error) {
-          return { conversation, messages: { messages: [] } };
-        }
-      });
+    // First, count ALL conversations per day for accurate chart visualization
+    // This ensures the chart shows all days with activity, not just the processed subset
+    for (const conversation of filteredConversations) {
+      const convDate = new Date(conversation.createdAt);
+      const dateKey = convDate.toISOString().split("T")[0];
+      if (!dailyActivity[dateKey]) {
+        dailyActivity[dateKey] = { messages: 0, conversations: 0 };
+      }
+      dailyActivity[dateKey].conversations += 1;
+    }
+
+    // Process a subset of conversations for detailed message analysis
+    // Trade-off: We fetch messages from the first N conversations for performance,
+    // while conversation counts include ALL filtered conversations for accuracy.
+    // This means message bars represent a sample, but all conversation activity days are shown.
+    const conversationsToProcess = filteredConversations.slice(0, messageProcessLimit);
+    const conversationPromises = conversationsToProcess.map(async (conversation) => {
+      try {
+        const messages = await ConversationService.getMessages(
+          conversation.id,
+          {
+            page: 1,
+            limit: 50,
+            sortOrder: "desc",
+          }
+        );
+        return { conversation, messages };
+      } catch (error) {
+        return { conversation, messages: { messages: [] } };
+      }
+    });
 
     const conversationResults = await Promise.allSettled(conversationPromises);
 
@@ -75,15 +173,41 @@ export async function GET(request: NextRequest) {
 
         totalMessages += messages.messages.length;
 
-        // Count files in messages
+        // Count files in messages and track file types
         for (const message of messages.messages) {
           if (message.metadata && (message.metadata as any).files) {
-            totalFiles +=
-              ((message.metadata as any).files as any[]).length || 0;
+            const files = ((message.metadata as any).files as any[]) || [];
+            totalFiles += files.length;
+
+            // Count file types by extension
+            for (const file of files) {
+              if (file.name || file.fileName) {
+                const fileName = file.name || file.fileName;
+                const extension = fileName.split('.').pop()?.toLowerCase();
+
+                if (extension && fileTypeCount[extension] !== undefined) {
+                  fileTypeCount[extension]++;
+                } else {
+                  fileTypeCount.other++;
+                }
+              } else {
+                fileTypeCount.other++;
+              }
+            }
+          }
+
+          // Calculate daily activity for messages
+          const messageDate = new Date(message.createdAt);
+          if (messageDate >= startDate && messageDate <= endDate) {
+            const dateKey = messageDate.toISOString().split("T")[0];
+            if (!dailyActivity[dateKey]) {
+              dailyActivity[dateKey] = { messages: 0, conversations: 0 };
+            }
+            dailyActivity[dateKey].messages += 1;
           }
         }
 
-        // Add to recent conversations with message data
+        // Add to recent conversations with message data (limit to first 5)
         if (recentConversations.length < 5) {
           const lastMessage = messages.messages[messages.messages.length - 1];
           recentConversations.push({
@@ -96,44 +220,27 @@ export async function GET(request: NextRequest) {
             updatedAt: conversation.updatedAt,
           });
         }
-
-        // Calculate daily activity
-        for (const message of messages.messages) {
-          const messageDate = new Date(message.createdAt);
-          if (messageDate >= startDate && messageDate <= endDate) {
-            const dateKey = messageDate.toISOString().split("T")[0];
-            if (!dailyActivity[dateKey]) {
-              dailyActivity[dateKey] = { messages: 0, conversations: 0 };
-            }
-            dailyActivity[dateKey].messages += 1;
-          }
-        }
-
-        // Count conversations per day
-        const convDate = new Date(conversation.createdAt);
-        if (convDate >= startDate && convDate <= endDate) {
-          const dateKey = convDate.toISOString().split("T")[0];
-          if (!dailyActivity[dateKey]) {
-            dailyActivity[dateKey] = { messages: 0, conversations: 0 };
-          }
-          dailyActivity[dateKey].conversations += 1;
-        }
       }
     }
 
+    // Add 1 to include both start and end dates (inclusive range)
+    const periodDays = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+
     const trendsAnalysis = generateFastInsights(
-      conversations.conversations,
+      filteredConversations,
       totalMessages,
       totalFiles,
       periodDays
     );
     const messagesTrend = trendsAnalysis.messagesTrend;
 
-    // Generate activity chart data for the last 7 days
+    // Generate activity chart data based on the actual date range
     const chartData = [];
-    for (let i = 6; i >= 0; i--) {
-      const date = new Date();
-      date.setDate(date.getDate() - i);
+    const chartDays = Math.min(periodDays, 90); // Limit to 90 days for chart display
+
+    for (let i = chartDays - 1; i >= 0; i--) {
+      const date = new Date(endDate);
+      date.setDate(endDate.getDate() - i);
       const dateKey = date.toISOString().split("T")[0];
       const activity = dailyActivity[dateKey] || {
         messages: 0,
@@ -152,7 +259,7 @@ export async function GET(request: NextRequest) {
 
     const analyticsData = {
       stats: {
-        totalConversations: conversations.total,
+        totalConversations: filteredConversations.length,
         totalMessages,
         filesProcessed: totalFiles,
         averageResponseTime: avgResponseTime,
@@ -173,13 +280,16 @@ export async function GET(request: NextRequest) {
       fileAnalytics: {
         totalFiles: totalFiles,
         types: {
-          pdf: Math.floor(totalFiles * 0.4),
-          docx: Math.floor(totalFiles * 0.3),
-          txt: Math.floor(totalFiles * 0.2),
-          other: Math.floor(totalFiles * 0.1),
+          pdf: fileTypeCount.pdf,
+          docx: fileTypeCount.docx + fileTypeCount.doc,
+          txt: fileTypeCount.txt,
+          csv: fileTypeCount.csv,
+          xlsx: fileTypeCount.xlsx + fileTypeCount.xls,
+          images: fileTypeCount.png + fileTypeCount.jpg + fileTypeCount.jpeg + fileTypeCount.gif,
+          other: fileTypeCount.other,
         },
       },
-      popularTopics: getFastPopularTopics(conversations.conversations),
+      popularTopics: await extractPopularTopicsWithAI(filteredConversations),
     };
 
     analyticsCache.set(cacheKey, {
@@ -212,46 +322,100 @@ export async function GET(request: NextRequest) {
   }
 }
 
-function getFastPopularTopics(conversations: any[]) {
-  const topics = [
-    {
-      topic: "General Conversations",
-      count: Math.max(1, Math.floor(conversations.length * 0.4)),
-      percentage: 40.0,
-      trend: "stable" as const,
-      examples: ["General discussions", "Help requests", "Q&A sessions"],
-    },
-    {
-      topic: "Technical Support",
-      count: Math.max(1, Math.floor(conversations.length * 0.3)),
-      percentage: 30.0,
-      trend: "up" as const,
-      examples: ["Code assistance", "Debugging help", "Technical queries"],
-    },
-    {
-      topic: "Creative Writing",
-      count: Math.max(1, Math.floor(conversations.length * 0.2)),
-      percentage: 20.0,
-      trend: "stable" as const,
-      examples: ["Story writing", "Content creation", "Ideas brainstorming"],
-    },
-    {
-      topic: "Analysis & Research",
-      count: Math.max(1, Math.floor(conversations.length * 0.1)),
-      percentage: 10.0,
-      trend: "up" as const,
-      examples: ["Data analysis", "Research assistance", "Document review"],
-    },
-  ];
+async function extractPopularTopicsWithAI(conversations: any[]) {
+  if (conversations.length === 0) {
+    return [];
+  }
 
-  return topics.slice(0, Math.min(4, conversations.length || 1));
+  try {
+    // Prepare conversation titles for AI analysis
+    const titles = conversations
+      .map((conv, idx) => `${idx + 1}. ${conv.title || "Untitled Chat"}`)
+      .join("\n");
+
+    const prompt = `Analyze these conversation titles and categorize them into meaningful topics. The titles may be in English, Bahasa Indonesia, or other languages.
+
+Conversation titles:
+${titles}
+
+Please categorize these ${conversations.length} conversations into 3-5 main topic categories. For each category:
+1. Create a clear, descriptive category name
+2. Count how many conversations belong to that category
+3. List 2-3 example conversation titles from that category
+
+Return ONLY a valid JSON array in this exact format, no other text:
+[
+  {
+    "topic": "Category Name",
+    "count": 5,
+    "percentage": 33.3,
+    "examples": ["Example 1", "Example 2", "Example 3"]
+  }
+]
+
+Important:
+- Make sure percentages add up to 100
+- Sort by count (highest first)
+- Keep example titles short (max 50 characters)
+- Return ONLY the JSON array, nothing else`;
+
+    const aiService = new AIService();
+
+    // Use the fastest model for analysis (Claude 4.5 Haiku via Replicate)
+    const messages: AIMessage[] = [{
+      role: "user",
+      content: prompt,
+      timestamp: new Date(),
+    }];
+
+    const response = await aiService.generateResponse(messages, {
+      model: "anthropic/claude-4.5-haiku",
+      provider: "replicate",
+      temperature: 0.3,
+      max_tokens: 2000,
+    });
+
+    const content = response.content;
+
+    // Extract JSON from response (handle markdown code blocks)
+    let jsonStr = content.trim();
+    if (jsonStr.startsWith("```json")) {
+      jsonStr = jsonStr.replace(/```json\n?/g, "").replace(/```\n?/g, "");
+    } else if (jsonStr.startsWith("```")) {
+      jsonStr = jsonStr.replace(/```\n?/g, "");
+    }
+
+    const topics = JSON.parse(jsonStr);
+
+    // Add stable trend and ensure proper format
+    return topics.map((topic: any) => ({
+      topic: topic.topic,
+      count: topic.count,
+      percentage: parseFloat(topic.percentage.toFixed(1)),
+      trend: "stable" as const,
+      examples: topic.examples.slice(0, 3),
+    }));
+
+  } catch (error) {
+    console.error("Failed to extract topics with AI:", error);
+    // Fallback: return simple categorization
+    return [{
+      topic: "All Conversations",
+      count: conversations.length,
+      percentage: 100,
+      trend: "stable" as const,
+      examples: conversations
+        .slice(0, 3)
+        .map(c => (c.title || "Untitled Chat").substring(0, 50)),
+    }];
+  }
 }
 
 function generateFastInsights(
   conversations: any[],
   totalMessages: number,
   totalFiles: number,
-  periodDays: number
+  _periodDays: number
 ) {
   const veryHighActivity = totalMessages > 50;
   const highActivity = totalMessages > 20;

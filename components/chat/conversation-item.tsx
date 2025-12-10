@@ -1,10 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import { Conversation } from "@/lib/types/chat";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { MessageCircle, Clock, MoreHorizontal } from "lucide-react";
+import { MessageCircle, Clock, MoreHorizontal, Star } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,6 +19,7 @@ interface ConversationItemProps {
   onClick: () => void;
   onDelete?: () => void;
   onRename?: () => void;
+  onToggleFavorite?: () => void;
 }
 
 export function ConversationItem({
@@ -26,7 +28,9 @@ export function ConversationItem({
   onClick,
   onDelete,
   onRename,
+  onToggleFavorite,
 }: ConversationItemProps) {
+  const [dropdownOpen, setDropdownOpen] = useState(false);
   const formatDate = (date: Date) => {
     try {
       const now = new Date();
@@ -69,7 +73,7 @@ export function ConversationItem({
     <div
       onClick={onClick}
       className={cn(
-        "group relative flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors",
+        "group relative flex items-center gap-2 p-3 rounded-lg cursor-pointer transition-colors",
         "hover:bg-muted/50",
         isActive && "bg-muted border border-border"
       )}
@@ -88,14 +92,22 @@ export function ConversationItem({
 
       {/* Conversation Details */}
       <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between mb-1">
+        <div className="flex items-center justify-between mb-1 min-w-0">
           <h4
             className={cn(
-              "text-sm font-medium truncate",
+              "text-sm font-medium truncate flex-1",
               isActive ? "text-foreground" : "text-foreground/80"
             )}
           >
             {truncateTitle(conversation.title)}
+            {conversation.isFavorite && (
+              <Star
+                className="ml-1 inline h-3 w-3 text-amber-500"
+                fill="currentColor"
+                strokeWidth={1.5}
+                aria-label="Favorite conversation"
+              />
+            )}
           </h4>
 
           {conversation.messageCount > 0 && (
@@ -126,26 +138,61 @@ export function ConversationItem({
       </div>
 
       {/* Actions Menu */}
-      <DropdownMenu>
+      <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
         <DropdownMenuTrigger asChild onClick={handleMenuClick}>
           <Button
             variant="ghost"
             size="sm"
             className={cn(
-              "h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity shrink-0",
+              "h-8 w-8 p-0 shrink-0 transition-all duration-200",
+              "opacity-20 group-hover:opacity-100",
+              "text-muted-foreground hover:text-foreground",
               isActive && "opacity-100"
             )}
           >
             <MoreHorizontal className="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-36">
+        <DropdownMenuContent align="end" className="w-48">
+          {onToggleFavorite && (
+            <DropdownMenuItem
+              onSelect={(e) => {
+                e.preventDefault();
+                onToggleFavorite();
+                setDropdownOpen(false);
+              }}
+            >
+              <Star
+                className={cn(
+                  "mr-2 h-4 w-4",
+                  conversation.isFavorite
+                    ? "text-amber-500"
+                    : "text-muted-foreground"
+                )}
+                fill={conversation.isFavorite ? "currentColor" : "none"}
+                strokeWidth={1.5}
+              />
+              {conversation.isFavorite ? "Remove Favorite" : "Add to Favorites"}
+            </DropdownMenuItem>
+          )}
           {onRename && (
-            <DropdownMenuItem onClick={onRename}>Rename</DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={(e) => {
+                e.preventDefault();
+                onRename();
+                setDropdownOpen(false);
+              }}
+            >
+              Rename
+            </DropdownMenuItem>
           )}
           {onDelete && (
             <DropdownMenuItem
-              onClick={onDelete}
+              onSelect={(e) => {
+                e.preventDefault();
+                onDelete();
+                setDropdownOpen(false);
+              }}
               className="text-destructive focus:text-destructive"
             >
               Delete

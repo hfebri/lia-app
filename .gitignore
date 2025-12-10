@@ -41,5 +41,8 @@ yarn-error.log*
 next-env.d.ts
 
 .cursorignore
-CLAUDE.md
 *.md
+.claude/
+.cursor/
+tasks/
+docs/

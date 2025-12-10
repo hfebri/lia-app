@@ -2,13 +2,13 @@
 
 import { db } from "@/db/db";
 import { users, files, conversations } from "@/db/schema";
-import type { User, NewUser } from "@/db/types";
+import type { User } from "@/db/types";
 import { ActionState } from "@/types";
-import { eq, and, or, desc, count, sql } from "drizzle-orm";
+import { eq, desc, count, sql } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth/session";
 
 export async function getUsersWithCountsAction(): Promise<
-  ActionState<(User & { messageCount: number; fileCount: number })[]>
+  ActionState<(User & { conversationCount: number; messageCount: number; fileCount: number })[]>
 > {
   try {
     const currentUser = await getCurrentUser();
@@ -26,6 +26,15 @@ export async function getUsersWithCountsAction(): Promise<
       .select()
       .from(users)
       .orderBy(desc(users.createdAt));
+
+    // Get conversation counts for each user
+    const conversationCounts = await db
+      .select({
+        userId: conversations.userId,
+        count: sql<number>`COUNT(${conversations.id})`.as("conversationCount"),
+      })
+      .from(conversations)
+      .groupBy(conversations.userId);
 
     // Get message counts for each user from conversations JSONB
     const messageCounts = await db
@@ -48,6 +57,8 @@ export async function getUsersWithCountsAction(): Promise<
 
     // Combine the data
     const usersWithCounts = allUsers.map((user) => {
+      const conversationCount =
+        conversationCounts.find((cc) => cc.userId === user.id)?.count || 0;
       const messageCount =
         messageCounts.find((mc) => mc.userId === user.id)?.count || 0;
       const fileCount =
@@ -55,6 +66,7 @@ export async function getUsersWithCountsAction(): Promise<
 
       return {
         ...user,
+        conversationCount: Number(conversationCount),
         messageCount: Number(messageCount),
         fileCount: Number(fileCount),
       };

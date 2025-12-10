@@ -1,11 +1,17 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import {
+  useEffect,
+  useState,
+  useCallback,
+  useRef,
+  type ClipboardEvent as ReactClipboardEvent,
+} from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useAiChat } from "@/hooks/use-ai-chat";
 import { useConversations } from "@/hooks/use-conversations";
 import { useFileUpload, type FileItem } from "@/hooks/use-file-upload";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { ModelSelector } from "./model-selector";
 import { StreamingMessage } from "./streaming-message";
 import { MessageItem } from "./message-item";
@@ -14,22 +20,18 @@ import { TypingIndicator } from "./typing-indicator";
 import { FileAttachment } from "./file-attachment";
 import { ContextWarning } from "./context-warning";
 import { ExtendedThinkingToggle } from "./extended-thinking-toggle";
+import { WebSearchToggle } from "./web-search-toggle";
 import { ThinkingModeToggle } from "./thinking-mode-toggle";
 import { ReasoningEffortSelector } from "./reasoning-effort-selector";
 import { SystemInstructionButton } from "./system-instruction-button";
 import { ChatHistorySkeleton } from "./message-skeleton";
+import { ChatSkeleton } from "./chat-skeleton";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-
 import {
   Brain,
   Send,
@@ -42,17 +44,9 @@ import {
   X,
   Edit2,
   Check,
-  Plus,
-  Library,
-  Image,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import {
-  processFileForAI,
-  validateFileForAI,
-} from "@/lib/utils/file-processing";
-
-// FileItem interface is now imported from the hook
+import { toastError, toastSuccess } from "@/components/providers/toast-provider";
 
 interface EnhancedChatInterfaceProps {
   className?: string;
@@ -63,11 +57,11 @@ export function EnhancedChatInterface({
 }: EnhancedChatInterfaceProps) {
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
 
-  // Render count tracking
   const [inputValue, setInputValue] = useState("");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [attachedFiles, setAttachedFiles] = useState<FileItem[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [showAutoConvertWarning, setShowAutoConvertWarning] = useState(false);
   const [currentConversationId, setCurrentConversationId] = useState<
     string | null
   >(null);
@@ -76,8 +70,8 @@ export function EnhancedChatInterface({
   const [isLoadingConversation, setIsLoadingConversation] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [tempTitle, setTempTitle] = useState("");
-  const [showFilePicker, setShowFilePicker] = useState(false);
   const [preventModelOverride, setPreventModelOverride] = useState(false);
+  const [convertingFileKey, setConvertingFileKey] = useState<string | null>(null);
 
   // Ref for auto-scrolling to bottom
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -87,18 +81,13 @@ export function EnhancedChatInterface({
   // Ref to track if we just created a conversation (to skip fetch)
   const justCreatedConversationRef = useRef<string | null>(null);
 
-  // Get conversation ID from URL
   const searchParams = useSearchParams();
   const router = useRouter();
+  const pathname = usePathname();
 
-  // Use real file upload hook
-  const {
-    files: userFiles,
-    isUploading,
-    uploadFiles,
-    refreshFiles,
-    error: fileError,
-  } = useFileUpload();
+  const { isUploading, refreshFiles, error: fileError } = useFileUpload();
+
+  const { refreshConversations, createConversation } = useConversations();
 
   const {
     messages,
@@ -115,6 +104,8 @@ export function EnhancedChatInterface({
     changeModel,
     extendedThinking,
     toggleExtendedThinking,
+    webSearch,
+    toggleWebSearch,
     thinkingMode,
     toggleThinkingMode,
     reasoningEffort,
@@ -130,10 +121,24 @@ export function EnhancedChatInterface({
     canSend,
     currentModel,
     isClaudeModel,
-    isGeminiModel,
     isOpenAIModel,
     setConversationModel,
   } = useAiChat({
+    preCreateConversation: async ({ title, aiModel }) => {
+      const created = await createConversation({
+        title,
+        aiModel,
+      });
+
+      if (!created) {
+        return null;
+      }
+
+      return {
+        id: created.id,
+        title: created.title,
+      };
+    },
     onConversationCreated: (conversationData: {
       id: string;
       title: string | null;
@@ -151,18 +156,84 @@ export function EnhancedChatInterface({
 
       // Then update URL using Next.js router (this properly updates searchParams)
       router.push(`/?conversation=${conversationData.id}`, { scroll: false });
+
+      // Ensure the chat history/sidebar reflects the newly saved conversation
+      refreshConversations().catch((refreshError) => {
+        console.warn(
+          "Failed to refresh conversations after creation:",
+          refreshError
+        );
+      });
     },
   });
 
-  const { createConversation } = useConversations();
-
-  // We'll just save conversations to database, not display them
+  const isGpt5Pro = selectedModel === "gpt-5-pro";
 
   // Load models and files on mount
   useEffect(() => {
     loadModels();
     refreshFiles();
   }, [loadModels, refreshFiles]);
+
+  if (isLoadingConversation) {
+    return <ChatSkeleton />;
+  }
+
+  // Show auto-convert warning when input exceeds 10,000 characters
+  useEffect(() => {
+    if (inputValue.length > 10000) {
+      setShowAutoConvertWarning(true);
+    } else {
+      setShowAutoConvertWarning(false);
+    }
+  }, [inputValue]);
+
+  // Handle global "new chat" navigation signal via query param
+  useEffect(() => {
+    if (searchParams.get("newChat") !== "1") {
+      return;
+    }
+
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    // Ensure any active streaming stops before clearing
+    stopStreaming();
+    startNewConversation();
+    justCreatedConversationRef.current = null;
+
+    // Reset local UI state
+    setCurrentConversationId(null);
+    setConversationTitle("AI Assistant");
+    setInputValue("");
+    setSelectedFiles([]);
+    setAttachedFiles([]);
+    setPreventModelOverride(false);
+
+    // Clean up query params so the URL reflects the reset state
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("newChat");
+    params.delete("conversation");
+    const cleanedSearch = params.toString();
+    const destination = cleanedSearch
+      ? `${pathname}?${cleanedSearch}`
+      : pathname;
+
+    router.replace(destination, { scroll: false });
+  }, [
+    searchParams,
+    router,
+    pathname,
+    startNewConversation,
+    stopStreaming,
+    setPreventModelOverride,
+    setCurrentConversationId,
+    setConversationTitle,
+    setInputValue,
+    setSelectedFiles,
+    setAttachedFiles,
+  ]);
 
   // Scroll to bottom function
   const scrollToBottom = useCallback(() => {
@@ -276,7 +347,6 @@ export function EnhancedChatInterface({
         // But only if we're not in the middle of a manual model change
         if (!preventModelOverride) {
           setMessages(aiMessages);
-        } else {
         }
 
         // Clear system instruction for loaded conversation (fresh start per conversation)
@@ -365,7 +435,7 @@ export function EnhancedChatInterface({
         setIsEditingTitle(false);
         setTempTitle("");
       }
-    } catch (error) {
+    } catch {
       setIsEditingTitle(false);
       setTempTitle("");
     }
@@ -389,61 +459,6 @@ export function EnhancedChatInterface({
     }
   };
 
-  // Save conversation to database when sending message
-  const saveToDatabase = async (content: string) => {
-    try {
-      if (currentConversationId) {
-        // If we have a current conversation ID, add message to that conversation
-
-        const response = await fetch(
-          `/api/conversations/${currentConversationId}/messages`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              content: content,
-              model: selectedModel, // Pass the selected model to ensure proper routing
-            }),
-          }
-        );
-
-        if (!response.ok) {
-          const errorText = await response.text();
-        }
-      } else {
-        // Create a new conversation
-
-        const response = await fetch("/api/conversations", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title: content.slice(0, 30) + (content.length > 30 ? "..." : ""),
-            initialMessage: content,
-            aiModel: selectedModel, // Pass the current selected model
-          }),
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          // Handle error silently
-        } else {
-          // Get the new conversation ID and set it
-          const result = await response.json();
-
-          if (result.success && result.data) {
-            setCurrentConversationId(result.data.id);
-            setConversationTitle(result.data.title);
-
-            // Update the URL with the new conversation ID without page reload
-            const url = new URL(window.location.href);
-            url.searchParams.set("conversation", result.data.id);
-            window.history.pushState({}, "", url);
-          }
-        }
-      }
-    } catch (error) {}
-  };
-
   const handleSendMessage = async () => {
     // Prevent sending messages if not authenticated
     if (!isAuthenticated) {
@@ -463,254 +478,52 @@ export function EnhancedChatInterface({
     }
 
     const messageContent = inputValue.trim();
-    let messageFiles = [...attachedFiles];
+
+    // Process files: convert to base64 for images
+    const filesToProcess: File[] = [];
+
+    // Process selectedFiles (raw File objects from file input)
+    for (const file of selectedFiles) {
+      if (file.type.startsWith("image/")) {
+        // Convert image to base64
+        const reader = new FileReader();
+        const base64Promise = new Promise<string>((resolve) => {
+          reader.onload = () => {
+            const base64 = (reader.result as string).split(",")[1];
+            resolve(base64);
+          };
+          reader.readAsDataURL(file);
+        });
+
+        const base64Data = await base64Promise;
+        (file as any).data = base64Data;
+        filesToProcess.push(file);
+      } else {
+        filesToProcess.push(file);
+      }
+    }
+
+    // Process attachedFiles (FileItem objects from hook)
+    for (const f of attachedFiles) {
+      const file = new File([], f.originalName, { type: f.mimeType });
+      if (f.url) (file as any).url = f.url;
+      if (f.metadata?.data) (file as any).data = f.metadata.data;
+      filesToProcess.push(file);
+    }
 
     // Clear input immediately to show user the message was received
     setInputValue("");
     setAttachedFiles([]);
-    setSelectedFiles([]); // Also clear selected files
+    setSelectedFiles([]); // Clear selected files from UI
 
     // Reset textarea height
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
 
-    // Handle file processing based on model type
-    const isGeminiModel = selectedModel.startsWith("gemini");
-    const isClaudeModelForUpload = selectedModel.includes("claude");
-
-    if (selectedFiles.length > 0) {
-      if (isClaudeModelForUpload) {
-        // For Claude models: Upload images to Supabase and use URLs
-        try {
-          const processedFiles = [];
-
-          for (const file of selectedFiles) {
-            // Validate file before processing
-            const validation = validateFileForAI(file);
-            if (!validation.isValid) {
-              // You could show a toast/error message here
-              continue;
-            }
-
-            // For Claude: Upload image files to Supabase, use base64 for non-images
-            if (file.type.startsWith("image/")) {
-              // Upload image to Supabase using direct API call
-              const formData = new FormData();
-              formData.append("files", file);
-              formData.append("extractText", "false"); // Don't extract text from images
-              formData.append("analyzeWithAI", "false"); // Don't analyze with AI
-
-              const uploadResponse = await fetch("/api/files/upload", {
-                method: "POST",
-                body: formData,
-              });
-
-              const uploadResult = await uploadResponse.json();
-
-              if (uploadResult.success && uploadResult.data.file) {
-                const uploadedFile = uploadResult.data.file;
-                processedFiles.push({
-                  id: uploadedFile.id,
-                  filename: uploadedFile.filename,
-                  originalName: uploadedFile.originalName,
-                  mimeType: uploadedFile.mimeType,
-                  size: uploadedFile.size,
-                  url: uploadedFile.url, // Supabase URL for Claude
-                  uploadStatus: uploadedFile.uploadStatus,
-                  analysisStatus: uploadedFile.analysisStatus,
-                  uploadedAt: new Date(uploadedFile.createdAt),
-                  metadata: {
-                    type: file.type,
-                    isUrl: true, // Flag to indicate this is a URL
-                  },
-                });
-              }
-            } else {
-              // For non-image files, use base64
-              const fileData = await processFileForAI(file);
-              processedFiles.push({
-                id: `temp-${Date.now()}-${Math.random()}`,
-                filename: file.name,
-                originalName: file.name,
-                mimeType: file.type,
-                size: file.size,
-                url: undefined,
-                uploadStatus: "completed" as const,
-                analysisStatus: "completed" as const,
-                uploadedAt: new Date(),
-                metadata: {
-                  data: fileData.data,
-                  type: file.type,
-                  isBase64: true,
-                },
-              });
-            }
-          }
-
-          // Add processed files to message
-          messageFiles = [...messageFiles, ...processedFiles];
-        } catch (error) {
-          return;
-        }
-      } else if (isGeminiModel) {
-        // For Gemini models: Process files directly to base64 (no Supabase upload)
-        try {
-          const processedFiles = [];
-
-          for (const file of selectedFiles) {
-            // Validate file before processing
-            const validation = validateFileForAI(file);
-            if (!validation.isValid) {
-              // You could show a toast/error message here
-              continue;
-            }
-
-            // Convert file to base64 for Gemini
-            const fileData = await processFileForAI(file);
-            processedFiles.push({
-              id: `temp-${Date.now()}-${Math.random()}`, // Temporary ID
-              filename: file.name, // For FileItem compatibility
-              originalName: file.name,
-              mimeType: file.type,
-              size: file.size,
-              url: undefined, // No URL for base64 files
-              uploadStatus: "completed" as const, // For FileItem compatibility
-              analysisStatus: "completed" as const, // For FileItem compatibility
-              uploadedAt: new Date(), // For FileItem compatibility
-              metadata: {
-                data: fileData.data, // Base64 data for AI processing
-                type: file.type, // For compatibility with AI message format
-                isBase64: true, // Flag to indicate this is base64 data
-              },
-            });
-          }
-
-          // Add processed files to message
-          messageFiles = [...messageFiles, ...processedFiles];
-        } catch (error) {
-          return;
-        }
-      } else {
-        // For other non-Gemini, non-Claude models: Process files to base64 for AI analysis
-        try {
-          const processedFiles = [];
-
-          for (const file of selectedFiles) {
-            // Validate file before processing
-            const validation = validateFileForAI(file);
-            if (!validation.isValid) {
-              // You could show a toast/error message here
-              continue;
-            }
-
-            // Convert file to base64 for AI processing
-            const fileData = await processFileForAI(file);
-            processedFiles.push({
-              id: `temp-${Date.now()}-${Math.random()}`, // Temporary ID
-              filename: file.name, // For FileItem compatibility
-              originalName: file.name,
-              mimeType: file.type,
-              size: file.size,
-              url: undefined, // No URL for base64 files
-              uploadStatus: "completed" as const, // For FileItem compatibility
-              analysisStatus: "completed" as const, // For FileItem compatibility
-              uploadedAt: new Date(), // For FileItem compatibility
-              metadata: {
-                data: fileData.data, // Base64 data for AI processing
-                type: file.type, // For compatibility with AI message format
-                isBase64: true, // Flag to indicate this is base64 data
-              },
-            });
-          }
-
-          // Add processed files to message
-          messageFiles = [...messageFiles, ...processedFiles];
-        } catch (error) {
-          return; // Don't send message if file processing fails
-        }
-      }
-    }
-
-    // For messages with files, let Dolphin analysis handle the file content
-    // Don't add manual file context since Dolphin provides better analysis
-
-    // Send message to AI - pass files for all models
-    if (messageFiles.length > 0) {
-      // For all models, pass files with their data
-      const allFiles: File[] = [];
-
-      // Process message files
-      if (messageFiles.length > 0) {
-        for (const fileItem of messageFiles) {
-          if (fileItem.metadata?.isBase64 && fileItem.metadata?.data) {
-            // File has base64 data (processed directly for Gemini and non-Claude models)
-            // Convert base64 back to File object for sendMessage compatibility
-            const binaryString = atob(fileItem.metadata.data);
-            const bytes = new Uint8Array(binaryString.length);
-            for (let i = 0; i < binaryString.length; i++) {
-              bytes[i] = binaryString.charCodeAt(i);
-            }
-            const blob = new Blob([bytes], { type: fileItem.metadata.type });
-            const file = new File([blob], fileItem.originalName, {
-              type: fileItem.metadata.type,
-            });
-            // Attach the base64 data to the file for AI processing
-            (file as any).data = fileItem.metadata.data;
-            allFiles.push(file);
-          } else if (
-            fileItem.metadata?.isUrl &&
-            fileItem.url &&
-            isClaudeModelForUpload
-          ) {
-            // For Claude models: Use URL directly, don't fetch the file
-            const file = new File([], fileItem.originalName, {
-              type: fileItem.mimeType,
-            });
-            // Attach the URL to the file for Claude processing
-            (file as any).url = fileItem.url;
-            allFiles.push(file);
-          } else if (fileItem.url) {
-            // File has URL (from Supabase) - for OpenAI models, attach URL to file
-            // For image files, we can pass URL directly without fetching blob
-            if (fileItem.mimeType.startsWith("image/")) {
-              const file = new File([], fileItem.originalName, {
-                type: fileItem.mimeType,
-              });
-              // Attach the URL to the file for OpenAI processing
-              (file as any).url = fileItem.url;
-              allFiles.push(file);
-            } else {
-              // For non-image files, fetch and convert to File
-              const response = await fetch(fileItem.url);
-              const blob = await response.blob();
-              const file = new File([blob], fileItem.originalName, {
-                type: fileItem.mimeType,
-              });
-              allFiles.push(file);
-            }
-          }
-        }
-      }
-
-      console.log(
-        "📤 Sending message with files:",
-        allFiles.length,
-        allFiles.map((f) => ({
-          name: f.name,
-          type: f.type,
-          hasUrl: !!(f as any).url,
-          hasData: !!(f as any).data,
-        }))
-      );
-      await sendMessage(messageContent, allFiles);
-    } else {
-      console.log("📤 Sending message without files");
-      await sendMessage(messageContent);
-    }
-
-    // Save to database after AI response is received
-    // Note: We'll implement this in the useAiChat hook to avoid duplicate AI calls
+    // Send message immediately - file processing will happen in useAiChat hook
+    // The placeholder message will appear in UI while files are being processed
+    await sendMessage(messageContent, filesToProcess);
 
     // Scroll to bottom after sending message
     setTimeout(scrollToBottom, 100);
@@ -736,6 +549,177 @@ export function EnhancedChatInterface({
     }
   };
 
+  const handlePaste = async (
+    event: ReactClipboardEvent<HTMLTextAreaElement>
+  ) => {
+    const clipboardData = event.clipboardData;
+    if (!clipboardData) {
+      return;
+    }
+
+    const items = Array.from(clipboardData.items || []);
+    const imageItems = items.filter((item) => item.type.startsWith("image/"));
+
+    if (imageItems.length === 0) {
+      return;
+    }
+
+    event.preventDefault();
+
+    const filesFromClipboard: File[] = [];
+
+    imageItems.forEach((item, index) => {
+      const file = item.getAsFile();
+      if (!file) {
+        return;
+      }
+
+      const extension = (() => {
+        switch (file.type) {
+          case "image/jpeg":
+          case "image/jpg":
+            return "jpg";
+          case "image/png":
+            return "png";
+          case "image/gif":
+            return "gif";
+          case "image/webp":
+            return "webp";
+          case "image/bmp":
+            return "bmp";
+          case "image/svg+xml":
+            return "svg";
+          case "image/tiff":
+            return "tiff";
+          case "image/avif":
+            return "avif";
+          case "image/heic":
+            return "heic";
+          case "image/heif":
+            return "heif";
+          default:
+            return file.type.split("/")[1] || "png";
+        }
+      })();
+
+      const originalName = file.name?.trim();
+      let fileName =
+        originalName && originalName.length > 0
+          ? originalName
+          : `clipboard-image-${Date.now()}-${index}`;
+
+      if (!fileName.toLowerCase().includes(".")) {
+        fileName = `${fileName}.${extension}`;
+      }
+
+      const normalizedFile =
+        file.name === fileName
+          ? file
+          : new File([file], fileName, {
+              type: file.type,
+              lastModified: file.lastModified,
+            });
+
+      filesFromClipboard.push(normalizedFile);
+    });
+
+    if (filesFromClipboard.length === 0) {
+      return;
+    }
+
+    const plainText = clipboardData.getData("text/plain");
+
+    if (plainText) {
+      const target = event.target as HTMLTextAreaElement;
+      const start = target.selectionStart ?? inputValue.length;
+      const end = target.selectionEnd ?? inputValue.length;
+      const newValue =
+        inputValue.slice(0, start) + plainText + inputValue.slice(end);
+
+      handleInputChange(newValue);
+
+      requestAnimationFrame(() => {
+        if (textareaRef.current) {
+          const cursor = start + plainText.length;
+          textareaRef.current.selectionStart = cursor;
+          textareaRef.current.selectionEnd = cursor;
+        }
+      });
+    }
+
+    const { validateMultipleFiles } = await import("@/lib/utils/file-processing");
+    const allFiles = [...selectedFiles, ...filesFromClipboard];
+    const validation = validateMultipleFiles(allFiles);
+
+    if (!validation.isValid) {
+      const errorMessage = validation.errors
+        .map((e) =>
+          e.fileName === "general" ? e.error : `${e.fileName}: ${e.error}`
+        )
+        .join("\n");
+      alert(`File validation failed:\n\n${errorMessage}`);
+      return;
+    }
+
+    setAttachedFiles([]);
+    setSelectedFiles((prev) => [...prev, ...filesFromClipboard]);
+  };
+
+  const handleConvertSrtToDocx = useCallback(
+    async (file: File) => {
+      const signature = `${file.name}-${file.size}-${file.lastModified}`;
+
+      try {
+        setConvertingFileKey(signature);
+
+        const formData = new FormData();
+        formData.append("file", file, file.name);
+
+        const response = await fetch("/api/files/convert/srt-to-docx", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!response.ok) {
+          let message = "Failed to convert subtitle.";
+          try {
+            const errorData = await response.json();
+            if (errorData?.error) {
+              message = errorData.error;
+            }
+          } catch (jsonError) {
+            console.debug("Conversion error payload not JSON:", jsonError);
+          }
+          throw new Error(message);
+        }
+
+        const blob = await response.blob();
+        const downloadUrl = URL.createObjectURL(blob);
+        const baseName = file.name.replace(/\.[^/.]+$/, "") || "subtitle";
+        const link = document.createElement("a");
+        link.href = downloadUrl;
+        link.download = `${baseName}.docx`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(downloadUrl);
+
+        toastSuccess("Word file ready", "We saved the converted captions to your downloads.");
+      } catch (error) {
+        console.error("SRT to DOCX conversion failed:", error);
+        toastError(
+          "Conversion failed",
+          error instanceof Error ? error.message : "Please try again in a moment."
+        );
+      } finally {
+        setConvertingFileKey((current) =>
+          current === signature ? null : current
+        );
+      }
+    },
+    [toastError, toastSuccess]
+  );
+
   const handleFileRemove = (index: number) => {
     setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
   };
@@ -751,41 +735,35 @@ export function EnhancedChatInterface({
     setIsDragOver(false);
   };
 
-  const handleDrop = (e: React.DragEvent) => {
+  const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
 
-    const files = Array.from(e.dataTransfer.files).filter((file) => {
-      const allowedTypes = [
-        ".pdf",
-        ".doc",
-        ".docx",
-        ".txt",
-        ".rtf",
-        ".xls",
-        ".xlsx",
-        ".csv",
-      ];
-      return allowedTypes.some((type) =>
-        file.name.toLowerCase().endsWith(type)
-      );
-    });
+    const files = Array.from(e.dataTransfer.files);
 
     if (files.length > 0) {
+      // Validate files using new utilities
+      const { validateMultipleFiles } = await import("@/lib/utils/file-processing");
+      const allFiles = [...selectedFiles, ...files];
+      const validation = validateMultipleFiles(allFiles);
+
+      if (!validation.isValid) {
+        // Show validation errors
+        const errorMessage = validation.errors
+          .map((e) => e.fileName === "general" ? e.error : `${e.fileName}: ${e.error}`)
+          .join("\n");
+        alert(`File validation failed:\n\n${errorMessage}`);
+        return;
+      }
+
+      // All providers now support multiple files (Anthropic + OpenAI)
+      setAttachedFiles([]);
       setSelectedFiles((prev) => [...prev, ...files]);
     }
   };
 
   const handleFileDetach = (fileId: string) => {
     setAttachedFiles((prev) => prev.filter((f) => f.id !== fileId));
-  };
-
-  const handleAttachExistingFile = (file: FileItem) => {
-    // Check if file is already attached
-    if (!attachedFiles.some((f) => f.id === file.id)) {
-      setAttachedFiles((prev) => [...prev, file]);
-    }
-    setShowFilePicker(false);
   };
 
   if (error) {
@@ -828,10 +806,11 @@ export function EnhancedChatInterface({
           <div className="text-center">
             <Upload className="h-12 w-12 text-blue-500 mx-auto mb-4" />
             <p className="text-lg font-medium text-blue-700 dark:text-blue-300">
-              Drop files here to upload
+              Drop {selectedModel.startsWith("gpt-") ? "files" : "a file"} here
+              to upload
             </p>
             <p className="text-sm text-blue-600 dark:text-blue-400">
-              Supports PDF, Word, Excel, and text files
+              Supports PDF, Word, Excel, and image files
             </p>
           </div>
         </div>
@@ -845,7 +824,6 @@ export function EnhancedChatInterface({
           <div className="hidden xl:flex items-center justify-between p-4 gap-3">
             <div className="flex items-center space-x-4 min-w-0 flex-1">
               <div className="flex items-center space-x-2">
-                <Brain className="h-6 w-6 text-primary shrink-0" />
                 <div>
                   <div className="flex items-center gap-2">
                     {isEditingTitle && currentConversationId ? (
@@ -923,6 +901,15 @@ export function EnhancedChatInterface({
                 />
               )}
 
+              {/* Web Search Toggle - Show for both Claude and OpenAI models */}
+              {(isClaudeModel || isOpenAIModel) && (
+                <WebSearchToggle
+                  enabled={webSearch}
+                  onToggle={toggleWebSearch}
+                  disabled={isLoading || isStreaming}
+                />
+              )}
+
               {/* Thinking Mode Toggle - Show only for Gemini models */}
               <ThinkingModeToggle
                 enabled={thinkingMode}
@@ -936,7 +923,12 @@ export function EnhancedChatInterface({
                 <ReasoningEffortSelector
                   value={reasoningEffort}
                   onValueChange={setReasoningEffort}
-                  disabled={isLoading || isStreaming}
+                  disabled={isLoading || isStreaming || isGpt5Pro}
+                  disabledTooltip={
+                    isGpt5Pro
+                      ? "GPT-5 Pro requires high reasoning effort"
+                      : undefined
+                  }
                 />
               )}
 
@@ -956,9 +948,10 @@ export function EnhancedChatInterface({
                     setPreventModelOverride(true);
 
                     // Clear current conversation and URL - new conversation will be created when user sends first message
-                    const url = new URL(window.location.href);
-                    url.searchParams.delete("conversation");
-                    window.history.pushState({}, "", url);
+                    const params = new URLSearchParams(searchParams.toString());
+                    params.delete("conversation");
+                    const newUrl = params.toString() ? `${pathname}?${params}` : pathname;
+                    router.replace(newUrl, { scroll: false });
 
                     // Update local state immediately
                     setCurrentConversationId(null);
@@ -1063,6 +1056,15 @@ export function EnhancedChatInterface({
                 />
               )}
 
+              {/* Web Search Toggle - Show for both Claude and OpenAI models */}
+              {(isClaudeModel || isOpenAIModel) && (
+                <WebSearchToggle
+                  enabled={webSearch}
+                  onToggle={toggleWebSearch}
+                  disabled={isLoading || isStreaming}
+                />
+              )}
+
               {/* Thinking Mode Toggle - Show only for Gemini models */}
               <ThinkingModeToggle
                 enabled={thinkingMode}
@@ -1076,7 +1078,12 @@ export function EnhancedChatInterface({
                 <ReasoningEffortSelector
                   value={reasoningEffort}
                   onValueChange={setReasoningEffort}
-                  disabled={isLoading || isStreaming}
+                  disabled={isLoading || isStreaming || isGpt5Pro}
+                  disabledTooltip={
+                    isGpt5Pro
+                      ? "GPT-5 Pro requires high reasoning effort"
+                      : undefined
+                  }
                 />
               )}
 
@@ -1096,9 +1103,10 @@ export function EnhancedChatInterface({
                     setPreventModelOverride(true);
 
                     // Clear current conversation and URL - new conversation will be created when user sends first message
-                    const url = new URL(window.location.href);
-                    url.searchParams.delete("conversation");
-                    window.history.pushState({}, "", url);
+                    const params = new URLSearchParams(searchParams.toString());
+                    params.delete("conversation");
+                    const newUrl = params.toString() ? `${pathname}?${params}` : pathname;
+                    router.replace(newUrl, { scroll: false });
 
                     // Update local state immediately
                     setCurrentConversationId(null);
@@ -1134,8 +1142,10 @@ export function EnhancedChatInterface({
                       Start a conversation
                     </h3>
                     <p className="text-muted-foreground mb-4">
-                      Ask questions, upload files for analysis using the
-                      paperclip button, or start typing below
+                      Ask questions, upload{" "}
+                      {selectedModel.startsWith("gpt-") ? "files" : "a file"}{" "}
+                      for analysis using the paperclip button, or start typing
+                      below
                     </p>
                   </div>
                 </div>
@@ -1147,9 +1157,10 @@ export function EnhancedChatInterface({
                     onStartNew={() => {
                       startNewConversation();
                       // Clear URL to indicate new conversation
-                      const url = new URL(window.location.href);
-                      url.searchParams.delete("conversation");
-                      window.history.pushState({}, "", url);
+                      const params = new URLSearchParams(searchParams.toString());
+                      params.delete("conversation");
+                      const newUrl = params.toString() ? `${pathname}?${params}` : pathname;
+                      router.replace(newUrl, { scroll: false });
                       setCurrentConversationId(null);
                       setConversationTitle("AI Assistant");
                     }}
@@ -1169,10 +1180,20 @@ export function EnhancedChatInterface({
                           role: message.role,
                           conversationId: "temp-conversation",
                           timestamp: new Date(),
+                          model: message.model,
+                          usage: message.usage,
                           metadata: {
                             model: message.model,
+                            isTruncated: message.metadata?.isTruncated,
+                            stopReason: message.metadata?.stopReason,
+                            usage: message.usage,
                           },
                         }}
+                        onContinue={
+                          message.role === "assistant" && message.metadata?.isTruncated
+                            ? () => sendMessage("Please continue from where you left off.")
+                            : undefined
+                        }
                       />
                     );
                   })}
@@ -1182,7 +1203,10 @@ export function EnhancedChatInterface({
                   )}
 
                   {isLoading && !isStreaming && !isProcessingFiles && (
-                    <TypingIndicator />
+                    <TypingIndicator
+                      status={webSearch ? "searching" : attachedFiles.length > 0 ? "processing-files" : "thinking"}
+                      isProcessingFiles={attachedFiles.length > 0}
+                    />
                   )}
 
                   {isStreaming && streamingContent && (
@@ -1254,53 +1278,151 @@ export function EnhancedChatInterface({
             <div className="space-y-3">
               {/* Selected Files Preview - Will upload when message is sent */}
               {selectedFiles.length > 0 && (
-                <div className="flex flex-wrap gap-2 px-4">
-                  {selectedFiles.map((file, index) => {
-                    const isImage = file.type.startsWith("image/");
-                    const isPDF = file.type === "application/pdf";
-                    const imageUrl = isImage ? URL.createObjectURL(file) : null;
+                <div className="space-y-2 px-4">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <div className="flex items-center gap-1">
+                      <Upload className="h-3 w-3" />
+                      Will process when message is sent
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span>{selectedFiles.length} / 10 files</span>
+                      <span>•</span>
+                      <span>
+                        {(selectedFiles.reduce((sum, f) => sum + f.size, 0) / (1024 * 1024)).toFixed(1)} / 50 MB
+                      </span>
+                    </div>
+                  </div>
 
-                    return (
-                      <div
-                        key={index}
-                        className="flex items-center gap-2 bg-background border border-border rounded-lg px-3 py-2 text-sm"
-                      >
-                        {isImage && imageUrl ? (
-                          <img
-                            src={imageUrl}
-                            alt={file.name}
-                            className="h-8 w-8 rounded object-cover border border-border/50"
-                            onLoad={() => {
-                              // Clean up object URL after image loads
-                              setTimeout(
-                                () => URL.revokeObjectURL(imageUrl),
-                                1000
-                              );
-                            }}
-                          />
-                        ) : isPDF ? (
-                          <div className="h-8 w-8 rounded border border-border/50 bg-red-50 dark:bg-red-950/20 flex items-center justify-center">
-                            <FileText className="h-4 w-4 text-red-500" />
+                  {/* Model Recommendation Banner for Large Documents */}
+                  {(() => {
+                    // Estimate tokens from file sizes (rough: 1KB ≈ 285 tokens)
+                    const totalBytes = selectedFiles.reduce((sum, f) => sum + f.size, 0);
+                    const estimatedTokens = Math.round((totalBytes / 1024) * 285);
+
+                    // Show recommendation if estimated tokens > 150K
+                    if (estimatedTokens > 150000) {
+                      const isGpt5 = selectedModel.startsWith("gpt-5");
+                      const needsGpt5 = estimatedTokens > 190000;
+
+                      if (needsGpt5 && !isGpt5) {
+                        return (
+                          <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg text-xs">
+                            <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                            <div className="flex-1">
+                              <p className="font-medium text-amber-900 dark:text-amber-100 mb-1">
+                                Large Document Detected (~{Math.round(estimatedTokens / 1000)}K tokens)
+                              </p>
+                              <p className="text-amber-700 dark:text-amber-300">
+                                Switch to <span className="font-semibold">GPT-5</span> for documents over 190K tokens.
+                                Claude 4.5 supports up to 200K tokens and may truncate your content.
+                              </p>
+                            </div>
                           </div>
-                        ) : (
-                          <FileText className="h-4 w-4 text-muted-foreground" />
-                        )}
-                        <span className="max-w-32 truncate">{file.name}</span>
+                        );
+                      } else if (!needsGpt5 && !isGpt5 && estimatedTokens > 150000) {
+                        const hasPDF = selectedFiles.some(f => f.type === "application/pdf");
+                        return (
+                          <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg text-xs">
+                            <Brain className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+                            <div className="flex-1">
+                              <p className="text-blue-700 dark:text-blue-300">
+                                Large document (~{Math.round(estimatedTokens / 1000)}K tokens).
+                                {hasPDF ? (
+                                  <> Claude supports <span className="font-semibold">native PDF processing</span> (no OCR needed). GPT-5 offers more token capacity (272K vs 200K).</>
+                                ) : (
+                                  <> Consider <span className="font-semibold">GPT-5</span> for more headroom (272K limit vs Claude's 200K).</>
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      }
+                    }
+                    return null;
+                  })()}
+                  <div className="flex flex-wrap gap-2">
+                    {selectedFiles.map((file, index) => {
+                      const isImage = file.type.startsWith("image/");
+                      const isPreviewableImage =
+                        file.type === "image/jpeg" ||
+                        file.type === "image/jpg" ||
+                        file.type === "image/png" ||
+                        file.type === "image/gif" ||
+                        file.type === "image/webp" ||
+                        file.type === "image/bmp" ||
+                        file.type === "image/svg+xml";
+                      const isPDF = file.type === "application/pdf";
+                      const extension = file.name.split(".").pop()?.toLowerCase();
+                      const isSrtFile =
+                        extension === "srt" ||
+                        (file.type && file.type.toLowerCase().includes("subrip"));
+                      const fileSignature = `${file.name}-${file.size}-${file.lastModified}`;
+                      const isConverting = convertingFileKey === fileSignature;
+                      const imageUrl =
+                        isImage && isPreviewableImage
+                          ? URL.createObjectURL(file)
+                          : null;
 
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleFileRemove(index)}
-                          className="h-5 w-5 p-0 hover:bg-destructive/10 hover:text-destructive"
+                      return (
+                        <div
+                          key={index}
+                          className="flex items-center gap-2 bg-background border border-border rounded-lg px-3 py-2 text-sm"
                         >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    );
-                  })}
-                  <div className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Upload className="h-3 w-3" />
-                    Will upload when message is sent
+                          {isImage && imageUrl ? (
+                            <img
+                              src={imageUrl}
+                              alt={file.name}
+                              className="h-8 w-8 rounded object-cover border border-border/50"
+                              onLoad={() => {
+                                // Clean up object URL after image loads
+                                setTimeout(
+                                  () => URL.revokeObjectURL(imageUrl),
+                                  1000
+                                );
+                              }}
+                            />
+                          ) : isPDF ? (
+                            <div className="h-8 w-8 rounded border border-border/50 bg-red-50 dark:bg-red-950/20 flex items-center justify-center">
+                              <FileText className="h-4 w-4 text-red-500" />
+                            </div>
+                          ) : (
+                            <FileText className="h-4 w-4 text-muted-foreground" />
+                          )}
+                          <span className="max-w-32 truncate">{file.name}</span>
+
+                          {isSrtFile && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleConvertSrtToDocx(file)}
+                              disabled={isConverting}
+                              className="h-7 gap-1 px-2 text-xs"
+                            >
+                              {isConverting ? (
+                                <>
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                  Converting
+                                </>
+                              ) : (
+                                <>
+                                  <FileText className="h-3 w-3" />
+                                  Word
+                                </>
+                              )}
+                            </Button>
+                          )}
+
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleFileRemove(index)}
+                            className="h-5 w-5 p-0 hover:bg-destructive/10 hover:text-destructive"
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -1312,18 +1434,38 @@ export function EnhancedChatInterface({
                   ref={(ref) => {
                     if (ref) {
                       ref.style.display = "none";
-                      ref.onchange = (e) => {
+                      ref.onchange = async (e) => {
                         const target = e.target as HTMLInputElement;
                         if (target.files) {
                           const newFiles = Array.from(target.files);
-                          setSelectedFiles((prev) => [...prev, ...newFiles]);
+
+                          if (newFiles.length > 0) {
+                            // Validate files using new utilities
+                            const { validateMultipleFiles } = await import("@/lib/utils/file-processing");
+                            const allFiles = [...selectedFiles, ...newFiles];
+                            const validation = validateMultipleFiles(allFiles);
+
+                            if (!validation.isValid) {
+                              // Show validation errors
+                              const errorMessage = validation.errors
+                                .map((e) => e.fileName === "general" ? e.error : `${e.fileName}: ${e.error}`)
+                                .join("\n");
+                              alert(`File validation failed:\n\n${errorMessage}`);
+                              target.value = ""; // Reset input
+                              return;
+                            }
+
+                            // All providers now support multiple files (Anthropic + OpenAI)
+                            setAttachedFiles([]);
+                            setSelectedFiles((prev) => [...prev, ...newFiles]);
+                          }
                           target.value = ""; // Reset input
                         }
                       };
                     }
                   }}
-                  multiple
-                  accept=".pdf,.doc,.docx,.pptx,.ppt,.txt,.rtf,.csv,.md,.xls,.xlsx,.xlsm,.jpg,.jpeg,.png,.gif,.bmp,.webp,.svg"
+                  accept=".pdf,.doc,.docx,.pptx,.ppt,.txt,.rtf,.csv,.md,.srt,.xls,.xlsx,.xlsm,.odt,.ods,.odp,.jpg,.jpeg,.png,.gif,.bmp,.webp,.svg,.tiff,.tif,.heic,.heif,.avif"
+                  multiple={true}
                 />
                 <Button
                   variant="ghost"
@@ -1341,73 +1483,41 @@ export function EnhancedChatInterface({
                   <Paperclip className="h-4 w-4 text-muted-foreground" />
                 </Button>
 
-                {/* Attach existing files button */}
-                {/* <DropdownMenu
-                  open={showFilePicker}
-                  onOpenChange={setShowFilePicker}
-                >
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      disabled={isLoading || isStreaming}
-                      className="shrink-0 h-10 w-10 hover:bg-background/80 transition-colors"
-                      title="Attach existing files"
-                    >
-                      <Library className="h-4 w-4 text-muted-foreground" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent className="w-80 p-4" align="start">
-                    <div className="space-y-3">
-                      <h4 className="font-medium text-sm">Attach Files</h4>
-                      {userFiles.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">
-                          No files uploaded yet. Use the paperclip button to
-                          upload files first.
-                        </p>
-                      ) : (
-                        <ScrollArea className="max-h-48">
-                          <div className="space-y-2">
-                            {userFiles
-                              .filter(
-                                (file) =>
-                                  !attachedFiles.some(
-                                    (attached) => attached.id === file.id
-                                  )
-                              )
-                              .map((file) => (
-                                <div
-                                  key={file.id}
-                                  className="flex items-center justify-between p-2 hover:bg-accent rounded-md cursor-pointer"
-                                  onClick={() => handleAttachExistingFile(file)}
-                                >
-                                  <div className="flex items-center space-x-2 min-w-0 flex-1">
-                                    <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
-                                    <div className="min-w-0">
-                                      <p className="text-sm font-medium truncate">
-                                        {file.originalName}
-                                      </p>
-                                      <p className="text-xs text-muted-foreground">
-                                        {Math.round(file.size / 1024)} KB
-                                      </p>
-                                    </div>
-                                  </div>
-                                  <Plus className="h-4 w-4 text-muted-foreground shrink-0" />
-                                </div>
-                              ))}
-                          </div>
-                        </ScrollArea>
-                      )}
-                    </div>
-                  </DropdownMenuContent>
-                </DropdownMenu> */}
-
                 <div className="flex-1 min-w-0">
+                  {/* Auto-convert warning */}
+                  {showAutoConvertWarning && (
+                    <div className="mb-2 flex items-center gap-2 p-2 rounded-md bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
+                      <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                      <span className="text-xs text-blue-700 dark:text-blue-300 flex-1">
+                        Text is {inputValue.length.toLocaleString()} characters. Click &quot;Convert Now&quot; to attach as file, then add your prompt.
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          // Manually convert to file now
+                          const textFile = new File(
+                            [inputValue],
+                            'long-message.txt',
+                            { type: 'text/plain' }
+                          );
+                          setSelectedFiles((prev) => [...prev, textFile]);
+                          setInputValue(''); // Clear input - user will type their prompt
+                          setShowAutoConvertWarning(false);
+                        }}
+                        className="h-6 text-xs border-blue-300 dark:border-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900"
+                      >
+                        Convert Now
+                      </Button>
+                    </div>
+                  )}
+
                   <Textarea
                     ref={textareaRef}
                     value={inputValue}
                     onChange={(e) => handleInputChange(e.target.value)}
                     onKeyDown={handleKeyPress}
+                    onPaste={handlePaste}
                     placeholder={
                       !isAuthenticated
                         ? "Please sign in to chat..."

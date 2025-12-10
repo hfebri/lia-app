@@ -11,10 +11,12 @@ import {
 } from "react";
 import { Conversation } from "@/lib/types/chat";
 import { useAuth } from "@/hooks/use-auth";
+import { toast } from "sonner";
 
 // Cache configuration
 const CACHE_KEY = "lia-conversations-cache";
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const FAVORITE_LIMIT = 5;
 
 interface ConversationCache {
   conversations: Conversation[];
@@ -44,6 +46,10 @@ interface ConversationsContextType extends ConversationsState {
     updates: { title?: string; metadata?: any }
   ) => Promise<Conversation | null>;
   deleteConversation: (conversationId: string) => Promise<boolean>;
+  toggleFavorite: (
+    conversationId: string,
+    shouldFavorite?: boolean
+  ) => Promise<void>;
   searchConversations: (searchTerm: string) => Promise<void>;
   clearError: () => void;
 }
@@ -77,7 +83,13 @@ function saveToCache(data: ConversationCache): void {
   if (typeof window === "undefined") return;
 
   try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+    localStorage.setItem(
+      CACHE_KEY,
+      JSON.stringify({
+        ...data,
+        conversations: sortConversationsList(data.conversations), // No previous needed for cache save
+      })
+    );
   } catch (error) {
     console.warn("Failed to cache conversations:", error);
   }
@@ -91,6 +103,56 @@ function clearCache(): void {
   if (typeof window === "undefined") return;
   localStorage.removeItem(CACHE_KEY);
 }
+
+const getComparableDate = (value?: string | Date | null) => {
+  if (!value) return 0;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+};
+
+// Helper to check if two conversation arrays are deeply equal (same conversations in same order)
+const areConversationsEqual = (a: Conversation[], b: Conversation[]): boolean => {
+  if (a.length !== b.length) return false;
+
+  for (let i = 0; i < a.length; i++) {
+    if (a[i].id !== b[i].id ||
+        a[i].title !== b[i].title ||
+        a[i].isFavorite !== b[i].isFavorite ||
+        a[i].updatedAt !== b[i].updatedAt ||
+        a[i].favoritedAt !== b[i].favoritedAt) {
+      return false;
+    }
+  }
+
+  return true;
+};
+
+const sortConversationsList = (items: Conversation[], previousSorted?: Conversation[]): Conversation[] => {
+  const sorted = [...items].sort((a, b) => {
+    const aFav = Boolean(a.isFavorite);
+    const bFav = Boolean(b.isFavorite);
+
+    if (aFav !== bFav) {
+      return aFav ? -1 : 1;
+    }
+
+    const aTime = getComparableDate(
+      aFav ? a.favoritedAt ?? a.updatedAt : a.updatedAt
+    );
+    const bTime = getComparableDate(
+      bFav ? b.favoritedAt ?? b.updatedAt : b.updatedAt
+    );
+
+    return bTime - aTime;
+  });
+
+  // Return previous reference if sorting didn't actually change anything
+  if (previousSorted && areConversationsEqual(sorted, previousSorted)) {
+    return previousSorted;
+  }
+
+  return sorted;
+};
 
 export function ConversationsProvider({
   children,
@@ -151,14 +213,19 @@ export function ConversationsProvider({
           throw new Error(result.message || "Failed to load conversations");
         }
 
-        setState((prev) => ({
-          ...prev,
-          conversations:
-            page === 1 ? result.data : [...prev.conversations, ...result.data],
-          isLoading: false,
-          hasMore: result.pagination.page < result.pagination.totalPages,
-          currentPage: result.pagination.page,
-        }));
+        setState((prev) => {
+          const newConversations = page === 1
+            ? result.data
+            : [...prev.conversations, ...result.data];
+
+          return {
+            ...prev,
+            conversations: sortConversationsList(newConversations, prev.conversations),
+            isLoading: false,
+            hasMore: result.pagination.page < result.pagination.totalPages,
+            currentPage: result.pagination.page,
+          };
+        });
 
         isRequestInProgressRef.current = false;
       } catch (error: any) {
@@ -232,7 +299,10 @@ export function ConversationsProvider({
         const newConversation = result.data;
 
         setState((prev) => {
-          const updated = [newConversation, ...prev.conversations];
+          const updated = sortConversationsList([
+            newConversation,
+            ...prev.conversations,
+          ], prev.conversations);
 
           // Immediately save to cache
           if (user) {
@@ -291,8 +361,11 @@ export function ConversationsProvider({
 
         setState((prev) => ({
           ...prev,
-          conversations: prev.conversations.map((conv) =>
-            conv.id === conversationId ? updatedConversation : conv
+          conversations: sortConversationsList(
+            prev.conversations.map((conv) =>
+              conv.id === conversationId ? updatedConversation : conv
+            ),
+            prev.conversations
           ),
         }));
 
@@ -329,8 +402,9 @@ export function ConversationsProvider({
       }
 
       setState((prev) => {
-        const updated = prev.conversations.filter(
-          (conv) => conv.id !== conversationId
+        const updated = sortConversationsList(
+          prev.conversations.filter((conv) => conv.id !== conversationId),
+          prev.conversations
         );
 
         // Immediately save to cache
@@ -360,6 +434,97 @@ export function ConversationsProvider({
       return false;
     }
   }, [user]);
+
+  const toggleFavorite = useCallback(
+    async (conversationId: string, shouldFavorite?: boolean) => {
+      const target = state.conversations.find(
+        (conv) => conv.id === conversationId
+      );
+
+      if (!target) return;
+
+      const nextState =
+        typeof shouldFavorite === "boolean"
+          ? shouldFavorite
+          : !Boolean(target.isFavorite);
+
+      if (nextState && !target.isFavorite) {
+        const favoriteCount = state.conversations.filter(
+          (conv) => conv.isFavorite
+        ).length;
+
+        if (favoriteCount >= FAVORITE_LIMIT) {
+          toast.error(`You can only favorite up to ${FAVORITE_LIMIT} chats.`);
+          return;
+        }
+      }
+
+      const previousSnapshot = { ...target };
+
+      setState((prev) => ({
+        ...prev,
+        conversations: sortConversationsList(
+          prev.conversations.map((conv) =>
+            conv.id === conversationId
+              ? {
+                  ...conv,
+                  isFavorite: nextState,
+                  favoritedAt: nextState
+                    ? new Date().toISOString()
+                    : null,
+                }
+              : conv
+          ),
+          prev.conversations
+        ),
+      }));
+
+      try {
+        const response = await fetch(`/api/conversations/${conversationId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ isFavorite: nextState }),
+        });
+
+        const result = await response.json().catch(() => ({}));
+
+        if (!response.ok || !result.success) {
+          throw new Error(result?.error || result?.message || "Failed to update favorite");
+        }
+
+        setState((prev) => ({
+          ...prev,
+          conversations: sortConversationsList(
+            prev.conversations.map((conv) =>
+              conv.id === conversationId ? result.data : conv
+            ),
+            prev.conversations
+          ),
+        }));
+      } catch (error) {
+        setState((prev) => ({
+          ...prev,
+          conversations: sortConversationsList(
+            prev.conversations.map((conv) =>
+              conv.id === conversationId ? previousSnapshot : conv
+            ),
+            prev.conversations
+          ),
+          error:
+            error instanceof Error
+              ? error.message
+              : "Failed to update favorite",
+        }));
+
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Failed to update favorite"
+        );
+      }
+    },
+    [state.conversations]
+  );
 
   // Search conversations
   const searchConversations = useCallback(
@@ -391,13 +556,13 @@ export function ConversationsProvider({
       // Try to load from cache first (instant, non-blocking)
       const cached = loadFromCache();
 
-      if (cached && cached.userId === user.id) {
-        // Load from cache immediately
-        setState((prev) => ({
-          ...prev,
-          conversations: cached.conversations,
-          isLoading: false,
-        }));
+        if (cached && cached.userId === user.id) {
+          // Load from cache immediately
+          setState((prev) => ({
+            ...prev,
+            conversations: sortConversationsList(cached.conversations, prev.conversations),
+            isLoading: false,
+          }));
 
         // If cache is stale, fetch fresh data in background
         if (isCacheStale(cached)) {
@@ -460,6 +625,7 @@ export function ConversationsProvider({
       createConversation,
       updateConversation,
       deleteConversation,
+      toggleFavorite,
       searchConversations,
       clearError,
     }),
@@ -471,6 +637,7 @@ export function ConversationsProvider({
       createConversation,
       updateConversation,
       deleteConversation,
+      toggleFavorite,
       searchConversations,
       clearError,
     ]

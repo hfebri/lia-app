@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { authFetchJSON } from "@/lib/utils/auth-fetch";
 
 interface PopularTopic {
   topic: string;
@@ -49,6 +50,13 @@ interface UserAnalytics {
   popularTopics?: PopularTopic[];
 }
 
+interface UseUserAnalyticsParams {
+  period?: string;
+  userId?: string | null;
+  startDate?: Date | null;
+  endDate?: Date | null;
+}
+
 interface UseUserAnalyticsReturn {
   data: UserAnalytics | null;
   isLoading: boolean;
@@ -56,7 +64,8 @@ interface UseUserAnalyticsReturn {
   refetch: () => Promise<void>;
 }
 
-export function useUserAnalytics(period: string = "30"): UseUserAnalyticsReturn {
+export function useUserAnalytics(params: UseUserAnalyticsParams = {}): UseUserAnalyticsReturn {
+  const { period = "30", userId = null, startDate = null, endDate = null } = params;
   const [data, setData] = useState<UserAnalytics | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -66,12 +75,27 @@ export function useUserAnalytics(period: string = "30"): UseUserAnalyticsReturn 
       setIsLoading(true);
       setError(null);
 
-      const response = await fetch(`/api/user/analytics?period=${period}`);
-      const result = await response.json();
+      // Build query parameters
+      const queryParams = new URLSearchParams();
+      queryParams.append("period", period);
 
-      if (!response.ok) {
-        throw new Error(result.message || "Failed to fetch analytics");
+      // Always send userId parameter - use empty string for "all users"
+      if (userId !== null && userId !== undefined) {
+        queryParams.append("userId", userId);
+      } else if (userId === null) {
+        // Explicitly send empty string to indicate "all users" mode
+        queryParams.append("userId", "");
       }
+
+      if (startDate && endDate) {
+        queryParams.append("startDate", startDate.toISOString().split("T")[0]);
+        queryParams.append("endDate", endDate.toISOString().split("T")[0]);
+      }
+
+      // Use authFetchJSON which handles 401 and auto-refreshes session
+      const result = await authFetchJSON<{ success: boolean; data: UserAnalytics; message?: string }>(
+        `/api/user/analytics?${queryParams.toString()}`
+      );
 
       if (!result.success) {
         throw new Error(result.message || "Failed to fetch analytics");
@@ -87,7 +111,8 @@ export function useUserAnalytics(period: string = "30"): UseUserAnalyticsReturn 
 
   useEffect(() => {
     fetchAnalytics();
-  }, [period]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [period, userId, startDate?.toISOString(), endDate?.toISOString()]);
 
   return {
     data,

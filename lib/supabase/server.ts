@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { AUTH_CONFIG } from "../auth/config";
 
 export async function createClient() {
   const cookieStore = await cookies();
@@ -23,6 +24,14 @@ export async function createClient() {
             // user sessions.
           }
         },
+      },
+      // IMPORTANT: Use the same cookie options as the browser client
+      // This ensures session cookies are read with the correct name
+      cookieOptions: {
+        name: AUTH_CONFIG.cookies.name,
+        domain: AUTH_CONFIG.cookies.domain,
+        path: AUTH_CONFIG.cookies.path,
+        sameSite: AUTH_CONFIG.cookies.sameSite,
       },
     }
   );

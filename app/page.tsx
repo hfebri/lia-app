@@ -11,14 +11,16 @@ import { useRouter } from "next/navigation";
 export const dynamic = "force-dynamic";
 
 export default function HomePage() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.push("/signin");
+    } else if (!isLoading && isAuthenticated && user && !user.hasCompletedOnboarding) {
+      router.push("/onboarding");
     }
-  }, [isAuthenticated, isLoading, router]);
+  }, [isAuthenticated, isLoading, user, router]);
 
   if (isLoading) {
     return <LoadingPage message="Checking authentication..." />;

@@ -193,7 +193,7 @@ export function getUserFriendlyMessage(error: AppError): string {
   if (error.statusCode) {
     switch (error.statusCode) {
       case 400:
-        return "Invalid request. Please check your input.";
+        return "Invalid request. Please check your input. Or try different model";
       case 401:
         return "Authentication required. Please log in.";
       case 403:
@@ -260,7 +260,6 @@ function generateErrorId(): string {
  */
 export function logError(error: AppError, context?: Record<string, any>): void {
   const report = createErrorReport(error, context);
-
 }
 
 /**

@@ -5,6 +5,7 @@ import {
   getConversationById,
   getConversationWithMessages,
   getConversationsWithLastMessage,
+  getAllConversationsWithLastMessage,
   updateConversationTitle,
   getConversationsCountByUser,
   searchConversations,
@@ -13,6 +14,7 @@ import {
   getLatestMessageInConversation,
   getConversationMessageCount,
   addMessagesToConversation,
+  getFavoriteConversationCount,
 } from "@/lib/db/queries/conversations";
 
 import type {
@@ -25,6 +27,13 @@ import type {
 } from "@/db/types";
 
 import { CreateConversationParams, SendMessageParams } from "@/lib/types/chat";
+
+export class FavoriteLimitError extends Error {
+  constructor() {
+    super("You can only favorite up to 5 conversations.");
+    this.name = "FavoriteLimitError";
+  }
+}
 
 // Generate a conversation title from the first message
 function generateConversationTitle(firstMessage: string): string {
@@ -58,7 +67,7 @@ export class ConversationService {
         (initialMessage
           ? generateConversationTitle(initialMessage)
           : "New Conversation"),
-      aiModel: aiModel || "openai/gpt-5", // Use provided model or default
+      aiModel: aiModel || "gpt-5", // Use provided model or default
       messages: [] as any, // Start with empty messages array
       metadata: null,
     };
@@ -103,6 +112,13 @@ export class ConversationService {
     return getConversationsWithLastMessage(userId, params);
   }
 
+  // Get all conversations (for admin analytics)
+  static async getAllConversations(
+    params: PaginationParams = {}
+  ) {
+    return getAllConversationsWithLastMessage(params);
+  }
+
   // Update conversation
   static async updateConversation(
     conversationId: string,
@@ -122,6 +138,34 @@ export class ConversationService {
   // Delete conversation
   static async deleteConversation(conversationId: string): Promise<boolean> {
     return dbDeleteConversation(conversationId);
+  }
+
+  // Toggle favorite status
+  static async setFavoriteStatus(
+    conversationId: string,
+    userId: string,
+    isFavorite: boolean
+  ): Promise<Conversation | null> {
+    const conversation = await this.getConversation(conversationId);
+    if (!conversation) {
+      return null;
+    }
+
+    if (conversation.userId !== userId) {
+      throw new Error("Forbidden");
+    }
+
+    if (isFavorite && !conversation.isFavorite) {
+      const favoriteCount = await getFavoriteConversationCount(userId);
+      if (favoriteCount >= 5) {
+        throw new FavoriteLimitError();
+      }
+    }
+
+    return dbUpdateConversation(conversationId, {
+      isFavorite,
+      favoritedAt: isFavorite ? new Date() : null,
+    });
   }
 
   // Add message to conversation
@@ -288,6 +332,8 @@ export class ConversationService {
           ? conversation.lastMessage
           : (messageCount > 0 ? messages[messages.length - 1] : undefined),
       metadata: conversation.metadata,
+      isFavorite: Boolean(conversation.isFavorite),
+      favoritedAt: conversation.favoritedAt || undefined,
     };
   }
 

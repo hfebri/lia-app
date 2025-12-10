@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
         userId,
         {
           title: conversationTitle || "New Chat",
-          aiModel: aiModel || "openai/gpt-5", // Use provided model or default
+          aiModel: aiModel || "gpt-5", // Use provided model or default
         }
       );
       currentConversationId = conversation.id;

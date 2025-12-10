@@ -66,8 +66,8 @@ export async function seedAnalytics() {
             { topic: "writing", count: Math.floor(Math.random() * 6) + 1 },
           ],
           modelUsage: {
-            "openai/gpt-5": Math.floor(Math.random() * 50) + 10,
-            "openai/gpt-5-mini": Math.floor(Math.random() * 30) + 5,
+            "gpt-5": Math.floor(Math.random() * 50) + 10,
+            "gpt-5-mini": Math.floor(Math.random() * 30) + 5,
             "anthropic/claude-4-sonnet": Math.floor(Math.random() * 20) + 2,
           },
           createdAt: new Date(),

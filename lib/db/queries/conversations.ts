@@ -190,6 +190,8 @@ export async function getConversationsByUserId(
     userId: conversations.userId,
     createdAt: conversations.createdAt,
     updatedAt: conversations.updatedAt,
+    isFavorite: conversations.isFavorite,
+    favoritedAt: conversations.favoritedAt,
   };
 
   const sortColumn =
@@ -198,12 +200,24 @@ export async function getConversationsByUserId(
 
   const orderBy = sortOrder === "asc" ? asc(sortColumn) : desc(sortColumn);
 
+  // Build sort expression that matches client-side logic
+  const dateSortColumn = sql`CASE
+    WHEN ${conversations.isFavorite} = true
+    THEN COALESCE(${conversations.favoritedAt}, ${conversations.updatedAt})
+    ELSE ${conversations.updatedAt}
+  END`;
+
   const [conversationList, totalCount] = await Promise.all([
     db
       .select()
       .from(conversations)
       .where(eq(conversations.userId, userId))
-      .orderBy(orderBy)
+      .orderBy(
+        desc(conversations.isFavorite), // Favorites first
+        sortBy === "updatedAt" || sortBy === "createdAt" || sortBy === "favoritedAt"
+          ? (sortOrder === "asc" ? asc(dateSortColumn) : desc(dateSortColumn))
+          : orderBy // Use custom sort if specified
+      )
       .limit(limit)
       .offset(offset),
     db
@@ -236,14 +250,22 @@ export async function getConversationsWithLastMessage(
   const offset = (page - 1) * limit;
 
   // Get conversations
+  // Sort order: favorites first, then by date descending
+  // For favorites, use favoritedAt if available, otherwise updatedAt
+  // For non-favorites, use updatedAt
+  const sortColumn = sql`CASE
+    WHEN ${conversations.isFavorite} = true
+    THEN COALESCE(${conversations.favoritedAt}, ${conversations.updatedAt})
+    ELSE ${conversations.updatedAt}
+  END`;
+
   const conversationsList = await db
     .select()
     .from(conversations)
     .where(eq(conversations.userId, userId))
     .orderBy(
-      sortOrder === "asc"
-        ? asc(conversations.updatedAt)
-        : desc(conversations.updatedAt)
+      desc(conversations.isFavorite), // Favorites first
+      sortOrder === "asc" ? asc(sortColumn) : desc(sortColumn) // Then by date
     )
     .limit(limit)
     .offset(offset);
@@ -310,6 +332,60 @@ export async function getRecentConversations(
   });
 }
 
+// Get all conversations with pagination (for admin analytics)
+export async function getAllConversationsWithLastMessage(
+  params: PaginationParams = {}
+): Promise<{
+  conversations: ConversationWithLastMessage[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}> {
+  const { page = 1, limit = 20, sortOrder = "desc" } = params;
+  const offset = (page - 1) * limit;
+
+  // Get conversations across all users
+  const conversationsList = await db
+    .select()
+    .from(conversations)
+    .orderBy(
+      sortOrder === "asc"
+        ? asc(conversations.updatedAt)
+        : desc(conversations.updatedAt)
+    )
+    .limit(limit)
+    .offset(offset);
+
+  // Transform to include last message and message count
+  const conversationsWithLastMessage: ConversationWithLastMessage[] =
+    conversationsList.map((conv) => {
+      const messages = (conv.messages as any) || [];
+      const messageCount = Array.isArray(messages) ? messages.length : 0;
+      const lastMessage =
+        messageCount > 0 ? messages[messages.length - 1] : undefined;
+
+      return {
+        ...conv,
+        lastMessage,
+        messageCount,
+      };
+    });
+
+  // Get total count
+  const totalCount = await db
+    .select({ count: count() })
+    .from(conversations);
+
+  return {
+    conversations: conversationsWithLastMessage,
+    total: totalCount[0].count,
+    page,
+    limit,
+    totalPages: Math.ceil(totalCount[0].count / limit),
+  };
+}
+
 // Search conversations by title
 export async function searchConversations(
   userId: string,
@@ -366,3 +442,17 @@ export async function clearConversationMessages(
 ): Promise<Conversation | null> {
   return replaceConversationMessages(conversationId, []);
 }
+
+// Count favorite conversations for a user
+export async function getFavoriteConversationCount(
+  userId: string
+): Promise<number> {
+  const result = await db
+    .select({ count: count() })
+    .from(conversations)
+    .where(and(eq(conversations.userId, userId), eq(conversations.isFavorite, true)));
+
+  return Number(result[0]?.count ?? 0);
+}
+
+// Get favorite conversations for a user (sorted by favoritedAt)

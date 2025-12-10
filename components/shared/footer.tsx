@@ -3,7 +3,6 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useTheme } from "next-themes";
-import { Badge } from "@/components/ui/badge";
 
 export function Footer() {
   const { theme } = useTheme();
@@ -19,7 +18,7 @@ export function Footer() {
               height={16}
             />
             <span className="font-bold">LIA</span>
-            <Badge variant="secondary" className="ml-2">Beta</Badge>
+            {/* <Badge variant="secondary" className="ml-2">Beta</Badge> */}
           </div>
           <p className="text-center text-sm leading-loose text-muted-foreground md:text-left">
             Powered by Leverate Group.

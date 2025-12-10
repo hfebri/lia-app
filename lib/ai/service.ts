@@ -10,8 +10,8 @@ import type {
 } from "./types";
 
 import { ReplicateProvider } from "./providers/replicate";
-import { GeminiProvider } from "./providers/gemini";
-import { MockProvider } from "./providers/mock";
+import { OpenAIProvider } from "./providers/openai";
+import { AnthropicProvider } from "./providers/anthropic";
 
 export class AIService {
   private providers: Map<string, AIProvider> = new Map();
@@ -19,17 +19,27 @@ export class AIService {
 
   constructor(config?: Partial<AIServiceConfig>) {
     this.config = {
-      defaultProvider: "replicate",
+      defaultProvider: "openai",
       providers: {
+        openai: {
+          apiKey: process.env.OPENAI_API_KEY || "",
+          models: ["gpt-5", "gpt-5-mini", "gpt-5-nano", "gpt-5-pro"],
+          defaultModel: "gpt-5",
+        },
+        anthropic: {
+          apiKey: process.env.ANTHROPIC_API_KEY || "",
+          models: ["claude-sonnet-4-5-20250929", "claude-haiku-4-5-20251001", "claude-opus-4-1-20250805"],
+          defaultModel: "claude-sonnet-4-5-20250929",
+        },
         replicate: {
           apiKey: process.env.REPLICATE_API_TOKEN || "",
-          models: ["openai/gpt-5"],
-          defaultModel: "openai/gpt-5",
-        },
-        gemini: {
-          apiKey: process.env.GEMINI_API_KEY || "",
-          models: ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.5-flash-lite"],
-          defaultModel: "gemini-2.5-flash",
+          models: [
+            "anthropic/claude-4-sonnet",
+            "anthropic/claude-4.5-sonnet",
+            "anthropic/claude-4.5-haiku",
+            "deepseek-ai/deepseek-r1",
+          ],
+          defaultModel: "anthropic/claude-4.5-sonnet",
         },
       },
       ...config,
@@ -40,6 +50,28 @@ export class AIService {
   }
 
   private initializeProviders() {
+    // Initialize OpenAI provider
+    if (this.config.providers.openai?.apiKey) {
+      try {
+        const openaiProvider = OpenAIProvider.create();
+        this.providers.set("openai", openaiProvider);
+
+      } catch (error) {
+        console.error("Failed to initialize OpenAI provider:", error);
+      }
+    }
+
+    // Initialize Anthropic provider
+    if (this.config.providers.anthropic?.apiKey) {
+      try {
+        const anthropicProvider = AnthropicProvider.create();
+        this.providers.set("anthropic", anthropicProvider);
+
+      } catch (error) {
+        console.error("Failed to initialize Anthropic provider:", error);
+      }
+    }
+
     // Initialize Replicate provider
     if (this.config.providers.replicate?.apiKey) {
       try {
@@ -47,20 +79,7 @@ export class AIService {
         this.providers.set("replicate", replicateProvider);
 
       } catch (error) {
-      }
-    } else {
-      // Initialize mock provider for testing when no API key is available
-      const mockProvider = new MockProvider();
-      this.providers.set("replicate", mockProvider);
-    }
-
-    // Initialize Gemini provider
-    if (this.config.providers.gemini?.apiKey) {
-      try {
-        const geminiProvider = GeminiProvider.create();
-        this.providers.set("gemini", geminiProvider);
-
-      } catch (error) {
+        console.error("Failed to initialize Replicate provider:", error);
       }
     }
   }
@@ -152,9 +171,13 @@ export class AIService {
     // Strict provider routing - always throw error if requested provider is not available
     if (!provider) {
 
-      if (providerName === "gemini") {
+      if (providerName === "openai") {
         throw new Error(
-          "Gemini provider not initialized. Please check your GEMINI_API_KEY configuration."
+          "OpenAI provider not initialized. Please check your OPENAI_API_KEY configuration."
+        );
+      } else if (providerName === "anthropic") {
+        throw new Error(
+          "Anthropic provider not initialized. Please check your ANTHROPIC_API_KEY configuration."
         );
       } else if (providerName === "replicate") {
         throw new Error(

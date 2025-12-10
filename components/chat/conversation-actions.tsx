@@ -50,6 +50,7 @@ export function ConversationActions({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [newTitle, setNewTitle] = useState(conversation.title);
   const [isLoading, setIsLoading] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
 
   const handleRename = async () => {
     if (!onRename || !newTitle.trim() || isLoading) return;
@@ -103,7 +104,7 @@ export function ConversationActions({
 
   return (
     <>
-      <DropdownMenu>
+      <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
         <DropdownMenuTrigger asChild>
           <Button
             variant="ghost"
@@ -116,21 +117,39 @@ export function ConversationActions({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-48">
           {onRename && (
-            <DropdownMenuItem onClick={() => setShowRenameDialog(true)}>
+            <DropdownMenuItem
+              onSelect={(e) => {
+                e.preventDefault();
+                setShowRenameDialog(true);
+                setDropdownOpen(false);
+              }}
+            >
               <Edit className="mr-2 h-4 w-4" />
               Rename
             </DropdownMenuItem>
           )}
 
           {onDuplicate && (
-            <DropdownMenuItem onClick={handleDuplicate}>
+            <DropdownMenuItem
+              onSelect={(e) => {
+                e.preventDefault();
+                handleDuplicate();
+                setDropdownOpen(false);
+              }}
+            >
               <Copy className="mr-2 h-4 w-4" />
               Duplicate
             </DropdownMenuItem>
           )}
 
           {onExport && (
-            <DropdownMenuItem onClick={handleExport}>
+            <DropdownMenuItem
+              onSelect={(e) => {
+                e.preventDefault();
+                handleExport();
+                setDropdownOpen(false);
+              }}
+            >
               <Download className="mr-2 h-4 w-4" />
               Export
             </DropdownMenuItem>
@@ -142,7 +161,11 @@ export function ConversationActions({
 
           {onDelete && (
             <DropdownMenuItem
-              onClick={() => setShowDeleteDialog(true)}
+              onSelect={(e) => {
+                e.preventDefault();
+                setShowDeleteDialog(true);
+                setDropdownOpen(false);
+              }}
               className="text-destructive focus:text-destructive"
             >
               <Trash2 className="mr-2 h-4 w-4" />

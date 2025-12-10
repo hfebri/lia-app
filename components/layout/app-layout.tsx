@@ -18,6 +18,7 @@ import { LoadingPage } from "@/components/shared/loading";
 import { cn } from "@/lib/utils";
 import { Bot, Menu } from "lucide-react";
 import { NavigationLoaderProvider } from "@/components/providers/navigation-loader-provider";
+import { PatchNotesModal } from "@/components/patch-notes/patch-notes-modal";
 import { usePathname, useSearchParams } from "next/navigation";
 
 interface AppLayoutProps {
@@ -91,6 +92,7 @@ export function AppLayout({
   );
 
   if (isLoading) {
+    console.debug("[APP-LAYOUT] waiting for auth");
     return <LoadingPage message="Initializing application..." />;
   }
 
@@ -166,6 +168,7 @@ export function AppLayout({
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <AppLayout showSidebar={true} showFooter={false}>
+      <PatchNotesModal />
       {children}
     </AppLayout>
   );

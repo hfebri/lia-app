@@ -73,7 +73,9 @@ export async function getUserFromDatabase(
       name: user.name,
       image: user.image,
       role: user.role,
+      professionalRole: user.professionalRole,
       isActive: user.isActive,
+      hasCompletedOnboarding: user.hasCompletedOnboarding,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     };
@@ -151,7 +153,9 @@ export async function createOrUpdateUser(supabaseUser: {
         name: result[0].name,
         image: result[0].image,
         role: result[0].role,
+        professionalRole: result[0].professionalRole,
         isActive: result[0].isActive,
+        hasCompletedOnboarding: result[0].hasCompletedOnboarding,
         createdAt: result[0].createdAt,
         updatedAt: result[0].updatedAt,
       };

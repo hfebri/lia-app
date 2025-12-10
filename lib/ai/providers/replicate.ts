@@ -11,10 +11,9 @@ import type {
 export class ReplicateProvider implements AIProvider {
   public readonly name = "replicate";
   public readonly models = [
-    "openai/gpt-5",
-    "openai/gpt-5-mini",
-    "openai/gpt-5-nano",
     "anthropic/claude-4-sonnet",
+    "anthropic/claude-4.5-sonnet",
+    "anthropic/claude-4.5-haiku",
     "deepseek-ai/deepseek-r1",
   ];
   private client: Replicate;
@@ -31,7 +30,7 @@ export class ReplicateProvider implements AIProvider {
   ): Promise<AIResponse> {
     try {
       const {
-        model = "openai/gpt-5",
+        model = "anthropic/claude-4.5-sonnet",
         temperature = 0.7,
         max_tokens = 1000,
         top_p = 1,
@@ -42,110 +41,32 @@ export class ReplicateProvider implements AIProvider {
         reasoning_effort = "medium",
       } = options;
 
-      console.log('🔍 [REPLICATE] generateResponse called with:', {
-        messageCount: messages.length,
-        model,
-        messagesWithFiles: messages.filter(m => m.files && m.files.length > 0).length
-      });
-
-      messages.forEach((msg, idx) => {
-        if (msg.files && msg.files.length > 0) {
-          console.log(`📎 [REPLICATE] Message ${idx} has files:`, msg.files.map(f => ({
-            name: (f as any).name,
-            type: (f as any).type,
-            hasUrl: !!(f as any).url,
-            hasData: !!(f as any).data,
-            dataLength: (f as any).data?.length || 0
-          })));
-        }
-      });
 
       // Build input based on model type
       let input: any;
 
       if (this.isClaudeModel(model)) {
-        // For Claude models, use single prompt format (no conversation history)
-        const userMessage = messages[messages.length - 1];
-        const hasImage = userMessage?.files && userMessage.files.length > 0;
+        const latestUserMessage = messages.filter(
+          (msg) => msg.role === "user"
+        ).pop();
+        const hasImage =
+          latestUserMessage?.files && latestUserMessage.files.length > 0;
 
         input = {
-          prompt: userMessage?.content || "",
+          prompt: this.buildClaudePrompt(messages),
           max_tokens,
           system_prompt: system_prompt || "You are a helpful assistant",
           extended_thinking,
           thinking_budget_tokens,
         };
 
-        // Add image if present
-        if (hasImage && userMessage.files?.[0]) {
-          const file = userMessage.files[0];
-          // For Claude, check if file has URL (uploaded to Supabase) or base64 data
-          input.image = (file as any).url || file.data; // Use URL first, fallback to base64
+        if (hasImage && latestUserMessage?.files?.[0]) {
+          const file = latestUserMessage.files[0];
+          input.image = (file as any).url || file.data;
           input.max_image_resolution = max_image_resolution;
         }
-      } else if (this.isOpenAIModel(model)) {
-        // Extract model variant: "openai/gpt-5-nano" → "gpt-5-nano"
-        const modelVariant = model.split("/")[1] || "gpt-5";
-
-        // For OpenAI models, use messages array format (supports conversation history)
-        // Include system prompt as first message if provided
-        const formattedMessages = [];
-
-        // Add system message first if system_prompt is provided
-        if (system_prompt) {
-          formattedMessages.push({
-            role: "system",
-            content: system_prompt,
-          });
-        }
-
-        // Add conversation messages
-        messages.forEach((msg) => {
-          formattedMessages.push({
-            role: msg.role,
-            content: msg.content,
-          });
-        });
-
-        // Get images ONLY from the LATEST user message (not from conversation history)
-        // This prevents sending base64 data from old messages
-        const latestUserMessage = messages.filter(m => m.role === 'user').pop();
-        const hasImages = latestUserMessage?.files && latestUserMessage.files.length > 0;
-        const imageUrls = hasImages && latestUserMessage.files
-          ? latestUserMessage.files
-              .map((file) => {
-                const fileUrl = (file as any).url;
-                console.log('🖼️ Processing file for image_input (latest message only):', {
-                  name: (file as any).name,
-                  hasUrl: !!fileUrl,
-                  url: fileUrl?.substring(0, 100)
-                });
-                // Only return URL, ignore base64 data (Replicate requires URLs)
-                return fileUrl;
-              })
-              .filter(Boolean)
-          : [];
-
-        console.log('📦 Final image_input array:', {
-          count: imageUrls.length,
-          urls: imageUrls.map(url => url.substring(0, 150))
-        });
-
-        input = {
-          model: modelVariant,
-          prompt: "", // Empty when using messages array
-          messages: formattedMessages, // Full conversation history with system message
-          verbosity: options.verbosity || "medium",
-          reasoning_effort: reasoning_effort || "medium",
-          enable_web_search: options.enable_web_search !== false,
-          image_input: imageUrls,
-          tools: [],
-          json_schema: {},
-          simple_schema: [],
-          input_item_list: [],
-        };
       } else {
-        // For other models, use the original format
+        // For other models (DeepSeek), use the original format
         const formattedMessages = this.formatMessages(messages, system_prompt);
         input = {
           messages: formattedMessages,
@@ -154,14 +75,6 @@ export class ReplicateProvider implements AIProvider {
           top_p,
         };
       }
-
-      console.log('🚀 [REPLICATE] About to call Replicate API with input:', {
-        model,
-        hasImageInput: !!input.image_input,
-        imageInputCount: input.image_input?.length || 0,
-        imageInputSample: input.image_input?.[0]?.substring(0, 100),
-        inputKeys: Object.keys(input)
-      });
 
       const output = await this.client.run(model as any, { input });
 
@@ -189,7 +102,7 @@ export class ReplicateProvider implements AIProvider {
   ): AsyncGenerator<AIStreamChunk> {
     try {
       const {
-        model = "openai/gpt-5",
+        model = "anthropic/claude-4.5-sonnet",
         temperature = 0.7,
         max_tokens = 1000,
         top_p = 1,
@@ -200,110 +113,31 @@ export class ReplicateProvider implements AIProvider {
         reasoning_effort = "medium",
       } = options;
 
-      console.log('🔍 [REPLICATE] generateStream called with:', {
-        messageCount: messages.length,
-        model,
-        messagesWithFiles: messages.filter(m => m.files && m.files.length > 0).length
-      });
-
-      messages.forEach((msg, idx) => {
-        if (msg.files && msg.files.length > 0) {
-          console.log(`📎 [REPLICATE] Message ${idx} has files:`, msg.files.map(f => ({
-            name: (f as any).name,
-            type: (f as any).type,
-            hasUrl: !!(f as any).url,
-            hasData: !!(f as any).data,
-            dataLength: (f as any).data?.length || 0
-          })));
-        }
-      });
-
       // Build input based on model type
       let input: any;
 
       if (this.isClaudeModel(model)) {
-        // For Claude models, use the format from the user's example
-        const userMessage = messages[messages.length - 1];
-        const hasImage = userMessage?.files && userMessage.files.length > 0;
+        const latestUserMessage = messages.filter(
+          (msg) => msg.role === "user"
+        ).pop();
+        const hasImage =
+          latestUserMessage?.files && latestUserMessage.files.length > 0;
 
         input = {
-          prompt: userMessage?.content || "",
+          prompt: this.buildClaudePrompt(messages),
           max_tokens,
           system_prompt: system_prompt || "You are a helpful assistant",
           extended_thinking,
           thinking_budget_tokens,
         };
 
-        // Add image if present
-        if (hasImage && userMessage.files?.[0]) {
-          const file = userMessage.files[0];
-          // For Claude, check if file has URL (uploaded to Supabase) or base64 data
-          input.image = (file as any).url || file.data; // Use URL first, fallback to base64
+        if (hasImage && latestUserMessage?.files?.[0]) {
+          const file = latestUserMessage.files[0];
+          input.image = (file as any).url || file.data;
           input.max_image_resolution = max_image_resolution;
         }
-      } else if (this.isOpenAIModel(model)) {
-        // Extract model variant: "openai/gpt-5-nano" → "gpt-5-nano"
-        const modelVariant = model.split("/")[1] || "gpt-5";
-
-        // For OpenAI models, use messages array format (supports conversation history)
-        // Include system prompt as first message if provided
-        const formattedMessages = [];
-
-        // Add system message first if system_prompt is provided
-        if (system_prompt) {
-          formattedMessages.push({
-            role: "system",
-            content: system_prompt,
-          });
-        }
-
-        // Add conversation messages
-        messages.forEach((msg) => {
-          formattedMessages.push({
-            role: msg.role,
-            content: msg.content,
-          });
-        });
-
-        // Get images ONLY from the LATEST user message (not from conversation history)
-        // This prevents sending base64 data from old messages
-        const latestUserMessage = messages.filter(m => m.role === 'user').pop();
-        const hasImages = latestUserMessage?.files && latestUserMessage.files.length > 0;
-        const imageUrls = hasImages && latestUserMessage.files
-          ? latestUserMessage.files
-              .map((file) => {
-                const fileUrl = (file as any).url;
-                console.log('🖼️ Processing file for image_input (latest message only):', {
-                  name: (file as any).name,
-                  hasUrl: !!fileUrl,
-                  url: fileUrl?.substring(0, 100)
-                });
-                // Only return URL, ignore base64 data (Replicate requires URLs)
-                return fileUrl;
-              })
-              .filter(Boolean)
-          : [];
-
-        console.log('📦 Final image_input array:', {
-          count: imageUrls.length,
-          urls: imageUrls.map(url => url.substring(0, 150))
-        });
-
-        input = {
-          model: modelVariant,
-          prompt: "", // Empty when using messages array
-          messages: formattedMessages, // Full conversation history with system message
-          verbosity: options.verbosity || "medium",
-          reasoning_effort: reasoning_effort || "medium",
-          enable_web_search: options.enable_web_search !== false,
-          image_input: imageUrls,
-          tools: [],
-          json_schema: {},
-          simple_schema: [],
-          input_item_list: [],
-        };
       } else {
-        // For other models, use the original format
+        // For other models (DeepSeek), use the original format
         const formattedMessages = this.formatMessages(messages, system_prompt);
         input = {
           messages: formattedMessages,
@@ -312,15 +146,6 @@ export class ReplicateProvider implements AIProvider {
           top_p,
         };
       }
-
-      console.log('🚀 [REPLICATE] About to call Replicate stream API with input:', {
-        model,
-        hasImageInput: !!input.image_input,
-        imageInputCount: input.image_input?.length || 0,
-        imageInputSample: input.image_input?.[0]?.substring(0, 150),
-        inputKeys: Object.keys(input),
-        fullInput: JSON.stringify(input, null, 2).substring(0, 500)
-      });
 
       // For streaming, we use the stream method
       const stream = await this.client.stream(model as any, { input });
@@ -370,8 +195,21 @@ export class ReplicateProvider implements AIProvider {
     return model.includes("claude");
   }
 
-  private isOpenAIModel(model: string): boolean {
-    return model.includes("openai");
+  private buildClaudePrompt(messages: AIMessage[]) {
+    const segments: string[] = [];
+
+    messages.forEach((message) => {
+      if (message.role === "system") {
+        return;
+      }
+
+      const roleLabel = message.role === "assistant" ? "Assistant" : "Human";
+      segments.push(`${roleLabel}: ${message.content}`);
+    });
+
+    segments.push("Assistant:");
+
+    return segments.join("\n\n");
   }
 
   private formatMessages(messages: AIMessage[], systemPrompt?: string) {

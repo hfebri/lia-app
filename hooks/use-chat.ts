@@ -258,6 +258,71 @@ export function useChat() {
     }
   }, []);
 
+  // Toggle favorite status
+  const toggleFavorite = useCallback(
+    async (conversationId: string, shouldFavorite?: boolean) => {
+      // Find the conversation to toggle
+      const conversation = state.conversations.find(
+        (c) => c.id === conversationId
+      );
+      if (!conversation) return;
+
+      const newFavoriteStatus =
+        shouldFavorite !== undefined
+          ? shouldFavorite
+          : !conversation.isFavorite;
+
+      // Optimistic update
+      setState((prev) => ({
+        ...prev,
+        conversations: prev.conversations.map((c) =>
+          c.id === conversationId
+            ? {
+                ...c,
+                isFavorite: newFavoriteStatus,
+                favoritedAt: newFavoriteStatus ? new Date() : null,
+              }
+            : c
+        ),
+      }));
+
+      try {
+        const response = await fetch(`/api/conversations/${conversationId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ isFavorite: newFavoriteStatus }),
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || "Failed to update favorite status");
+        }
+
+        // Reload conversations to ensure correct sorting
+        await loadConversations();
+      } catch (error) {
+        // Revert optimistic update on error
+        setState((prev) => ({
+          ...prev,
+          conversations: prev.conversations.map((c) =>
+            c.id === conversationId
+              ? {
+                  ...c,
+                  isFavorite: !newFavoriteStatus,
+                  favoritedAt: conversation.favoritedAt,
+                }
+              : c
+          ),
+          error:
+            error instanceof Error
+              ? error.message
+              : "Failed to update favorite status",
+        }));
+      }
+    },
+    [state.conversations, loadConversations]
+  );
+
   // Clear error
   const clearError = useCallback(() => {
     setState((prev) => ({ ...prev, error: null }));
@@ -279,6 +344,7 @@ export function useChat() {
     createConversation,
     sendMessage,
     deleteConversation,
+    toggleFavorite,
     clearError,
   };
 }

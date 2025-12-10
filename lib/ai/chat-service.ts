@@ -3,13 +3,6 @@
 import type { AIMessage, AIResponse } from "./types";
 import type { FileMetadata } from "@/lib/services/client-file-processor";
 
-const isDev = process.env.NODE_ENV !== "production";
-const debugLog = (...args: unknown[]) => {
-  if (isDev) {
-    console.log(...args);
-  }
-};
-
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant" | "system";
@@ -30,6 +23,8 @@ export interface ChatMessage {
   metadata?: {
     files?: FileMetadata[]; // NEW: Persistent file metadata with extracted text
     model?: string;
+    isTruncated?: boolean;
+    stopReason?: string;
     usage?: {
       prompt_tokens: number;
       completion_tokens: number;
@@ -41,11 +36,14 @@ export interface ChatMessage {
 export interface StreamingChatResponse {
   content: string;
   isComplete: boolean;
+  isTruncated?: boolean;
+  stopReason?: string;
   usage?: {
     prompt_tokens: number;
     completion_tokens: number;
     total_tokens: number;
   };
+  fileValidationWarnings?: Array<{ fileName: string; reason: string }>;
 }
 
 export interface ChatServiceOptions {
@@ -59,6 +57,8 @@ export interface ChatServiceOptions {
   max_image_resolution?: number;
   reasoning_effort?: "minimal" | "low" | "medium" | "high";
   systemInstruction?: string; // Custom system instruction for conversation
+  enable_web_search?: boolean;
+  enable_file_search?: boolean;
 }
 
 export class ChatService {
@@ -86,7 +86,7 @@ export class ChatService {
     options: ChatServiceOptions = {}
   ): Promise<AIResponse> {
     const {
-      model = "openai/gpt-5",
+      model = "gpt-5",
       temperature = 0.7,
       maxTokens = 8192,
       extended_thinking = false,
@@ -101,34 +101,6 @@ export class ChatService {
       files: msg.files, // Include files for multimodal support
     }));
 
-    // DEBUG: Log what we're sending to the API
-    debugLog("🚀 FRONTEND DEBUG - Sending to API (non-streaming):");
-    debugLog("- Messages count:", aiMessages.length);
-    debugLog("- Model:", model);
-
-    // Debug each message separately
-    aiMessages.forEach((msg, index) => {
-      debugLog(`Message ${index + 1}:`, {
-        role: msg.role,
-        contentLength: msg.content.length,
-        hasFiles: !!msg.files,
-        filesCount: msg.files?.length || 0,
-      });
-
-      if (msg.files && msg.files.length > 0) {
-        debugLog(
-          `  📎 Files in message ${index + 1}:`,
-          msg.files.map((f) => ({
-            name: f.name,
-            type: f.type,
-            size: f.size,
-            hasData: !!f.data,
-            dataLength: f.data?.length || 0,
-          }))
-        );
-      }
-    });
-
     const response = await fetch(`${this.baseUrl}/chat`, {
       method: "POST",
       headers: {
@@ -141,9 +113,13 @@ export class ChatService {
         temperature,
         maxTokens,
         extended_thinking,
+        thinking_mode: options.thinking_mode,
         thinking_budget_tokens,
         max_image_resolution,
         reasoning_effort,
+        enable_web_search: options.enable_web_search,
+        enable_file_search: options.enable_file_search,
+        systemInstruction: options.systemInstruction,
       }),
     });
 
@@ -160,7 +136,11 @@ export class ChatService {
       throw new Error(data.error || "Failed to get AI response");
     }
 
-    return data.data;
+    // Return both data and warnings (if any)
+    return {
+      ...data.data,
+      fileValidationWarnings: data.fileValidationWarnings,
+    };
   }
 
   /**
@@ -171,7 +151,7 @@ export class ChatService {
     options: ChatServiceOptions = {}
   ): AsyncGenerator<StreamingChatResponse> {
     const {
-      model = "openai/gpt-5",
+      model = "gpt-5",
       temperature = 0.7,
       maxTokens = 8192,
       extended_thinking = false,
@@ -188,19 +168,6 @@ export class ChatService {
       files: msg.files, // Include files for multimodal support
     }));
 
-    // Add system instruction to debug log if present
-    if (systemInstruction) {
-      debugLog(
-        "🎯 System instruction:",
-        systemInstruction.substring(0, 100) + "..."
-      );
-    }
-
-    debugLog("🚀 CHAT-SERVICE - About to make streaming fetch request");
-    debugLog("- URL:", `${this.baseUrl}/chat`);
-    debugLog("- Messages count:", aiMessages.length);
-    debugLog("- Model:", model);
-
     const response = await fetch(`${this.baseUrl}/chat`, {
       method: "POST",
       headers: {
@@ -213,18 +180,15 @@ export class ChatService {
         temperature,
         maxTokens,
         extended_thinking,
+        thinking_mode: options.thinking_mode,
         thinking_budget_tokens,
         max_image_resolution,
         reasoning_effort,
+        enable_web_search: options.enable_web_search,
+        enable_file_search: options.enable_file_search,
         systemInstruction: systemInstruction || undefined, // Only include if not empty
       }),
     });
-
-    debugLog(
-      "✅ CHAT-SERVICE - Fetch response received:",
-      response.status,
-      response.statusText
-    );
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -236,16 +200,26 @@ export class ChatService {
       throw new Error("No response body available");
     }
 
-    debugLog("🔄 CHAT-SERVICE - Starting streaming loop...");
-
     const decoder = new TextDecoder();
     let buffer = "";
+
+    let hasReceivedCompletion = false;
 
     try {
       while (true) {
         const { done, value } = await reader.read();
 
-        if (done) break;
+        if (done) {
+          // If stream ended without completion signal, send one
+          if (!hasReceivedCompletion) {
+            yield {
+              content: "",
+              isComplete: true,
+              usage: undefined,
+            };
+          }
+          break;
+        }
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
@@ -256,6 +230,13 @@ export class ChatService {
             const data = line.slice(6);
 
             if (data === "[DONE]") {
+              if (!hasReceivedCompletion) {
+                yield {
+                  content: "",
+                  isComplete: true,
+                  usage: undefined,
+                };
+              }
               return;
             }
 
@@ -266,6 +247,7 @@ export class ChatService {
               if (parsed.error) {
                 // If it's already marked as error, just yield it as content
                 if (parsed.content) {
+                  hasReceivedCompletion = true;
                   yield {
                     content: parsed.content,
                     isComplete: true,
@@ -280,6 +262,13 @@ export class ChatService {
               // Only yield if there's actual content or if it's the completion marker
               const content = parsed.content || "";
               const isComplete = parsed.isComplete || false;
+              const isTruncated = parsed.isTruncated;
+              const stopReason = parsed.stopReason;
+              const fileValidationWarnings = parsed.fileValidationWarnings;
+
+              if (isComplete) {
+                hasReceivedCompletion = true;
+              }
 
               // Filter out empty content and content that's just "{}"
               const trimmedContent = content.trim();
@@ -287,7 +276,8 @@ export class ChatService {
                 (trimmedContent &&
                   trimmedContent !== "{}" &&
                   trimmedContent !== '""') ||
-                isComplete;
+                isComplete ||
+                fileValidationWarnings; // Also yield if we have warnings
 
               if (shouldYield) {
                 yield {
@@ -296,7 +286,10 @@ export class ChatService {
                       ? ""
                       : content,
                   isComplete,
+                  isTruncated,
+                  stopReason,
                   usage: parsed.usage,
+                  fileValidationWarnings,
                 };
               }
 
@@ -342,7 +335,7 @@ export class ChatService {
     // Generate a more robust unique ID
     this.messageCounter += 1;
     const timestamp = Date.now();
-    const random = Math.random().toString(36).substr(2, 9);
+    const random = Math.random().toString(36).slice(2, 11);
     const counter = this.messageCounter.toString(36);
 
     return {
@@ -362,12 +355,8 @@ export class ChatService {
       return { isValid: false, error: "Message content cannot be empty" };
     }
 
-    if (content.length > 10000) {
-      return {
-        isValid: false,
-        error: "Message content is too long (max 10,000 characters)",
-      };
-    }
+    // Length validation removed - auto-convert to .txt file handles long messages
+    // See hooks/use-ai-chat.ts for auto-conversion logic
 
     return { isValid: true };
   }
