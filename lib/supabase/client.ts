@@ -20,12 +20,11 @@ export function createClient() {
       persistSession: AUTH_CONFIG.session.persistSession,
       autoRefreshToken: AUTH_CONFIG.session.autoRefreshToken,
       // IMPORTANT: PKCE is the secure flow for OAuth
-      flowType: 'pkce',
+      flowType: "pkce",
     },
     // Ensure cookies persist properly
     cookieOptions: {
       name: AUTH_CONFIG.cookies.name,
-      lifetime: AUTH_CONFIG.cookies.lifetime,
       domain: AUTH_CONFIG.cookies.domain, // undefined for current domain
       path: AUTH_CONFIG.cookies.path, // '/' for all paths
       sameSite: AUTH_CONFIG.cookies.sameSite, // 'lax' for OAuth
