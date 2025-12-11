@@ -310,24 +310,31 @@ export async function getUsageMetrics(): Promise<UsageMetrics> {
       return Math.round(((current - previous) / previous) * 100);
     };
 
+    // Query actual active users based on updatedAt timestamps
+    const [activeUsersToday, activeUsersWeek, activeUsersMonth] = await Promise.all([
+      db.select({ count: count() }).from(users).where(gte(users.updatedAt, todayStart)),
+      db.select({ count: count() }).from(users).where(gte(users.updatedAt, weekStart)),
+      db.select({ count: count() }).from(users).where(gte(users.updatedAt, monthStart)),
+    ]);
+
     return {
       today: {
         messages: parseInt((todayMetrics[0][0] as any)?.count) || 0,
         conversations: todayMetrics[1][0]?.count || 0,
         files: todayMetrics[2][0]?.count || 0,
-        activeUsers: Math.floor(Math.random() * 100) + 50,
+        activeUsers: activeUsersToday[0]?.count || 0,
       },
       thisWeek: {
         messages: parseInt((weekMetrics[0][0] as any)?.count) || 0,
         conversations: weekMetrics[1][0]?.count || 0,
         files: weekMetrics[2][0]?.count || 0,
-        activeUsers: Math.floor(Math.random() * 500) + 200,
+        activeUsers: activeUsersWeek[0]?.count || 0,
       },
       thisMonth: {
         messages: parseInt((monthMetrics[0][0] as any)?.count) || 0,
         conversations: monthMetrics[1][0]?.count || 0,
         files: monthMetrics[2][0]?.count || 0,
-        activeUsers: Math.floor(Math.random() * 1000) + 500,
+        activeUsers: activeUsersMonth[0]?.count || 0,
       },
       growth: {
         messages: calculateGrowth(

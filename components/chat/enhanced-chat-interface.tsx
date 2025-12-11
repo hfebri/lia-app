@@ -175,10 +175,6 @@ export function EnhancedChatInterface({
     refreshFiles();
   }, [loadModels, refreshFiles]);
 
-  if (isLoadingConversation) {
-    return <ChatSkeleton />;
-  }
-
   // Show auto-convert warning when input exceeds 10,000 characters
   useEffect(() => {
     if (inputValue.length > 10000) {
@@ -800,24 +796,29 @@ export function EnhancedChatInterface({
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      {/* Drag Overlay */}
-      {isDragOver && (
-        <div className="absolute inset-0 z-50 bg-blue-50/90 dark:bg-blue-950/90 flex items-center justify-center border-2 border-dashed border-blue-500 rounded-lg">
-          <div className="text-center">
-            <Upload className="h-12 w-12 text-blue-500 mx-auto mb-4" />
-            <p className="text-lg font-medium text-blue-700 dark:text-blue-300">
-              Drop {selectedModel.startsWith("gpt-") ? "files" : "a file"} here
-              to upload
-            </p>
-            <p className="text-sm text-blue-600 dark:text-blue-400">
-              Supports PDF, Word, Excel, and image files
-            </p>
-          </div>
-        </div>
-      )}
+      {/* Loading skeleton for conversation load */}
+      {isLoadingConversation ? (
+        <ChatSkeleton />
+      ) : (
+        <>
+          {/* Drag Overlay */}
+          {isDragOver && (
+            <div className="absolute inset-0 z-50 bg-blue-50/90 dark:bg-blue-950/90 flex items-center justify-center border-2 border-dashed border-blue-500 rounded-lg">
+              <div className="text-center">
+                <Upload className="h-12 w-12 text-blue-500 mx-auto mb-4" />
+                <p className="text-lg font-medium text-blue-700 dark:text-blue-300">
+                  Drop {selectedModel.startsWith("gpt-") ? "files" : "a file"} here
+                  to upload
+                </p>
+                <p className="text-sm text-blue-600 dark:text-blue-400">
+                  Supports PDF, Word, Excel, and image files
+                </p>
+              </div>
+            </div>
+          )}
 
-      {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col min-w-0 w-full h-full">
+          {/* Main Chat Area */}
+          <div className="flex-1 flex flex-col min-w-0 w-full h-full">
         {/* Header - Fixed at top */}
         <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shrink-0 z-10">
           {/* Desktop layout - single row */}
@@ -1578,6 +1579,8 @@ export function EnhancedChatInterface({
           </div>
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 }

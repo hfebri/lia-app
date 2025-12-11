@@ -38,11 +38,13 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // This will refresh session if expired - required for Server Components
+  // SECURITY: Use getUser() instead of getSession() 
+  // getSession() reads from cookies which could be tampered with
+  // getUser() validates the JWT on every call
   const {
-    data: { session },
+    data: { user },
     error,
-  } = await supabase.auth.getSession();
+  } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
 
@@ -77,35 +79,37 @@ export async function middleware(request: NextRequest) {
     return supabaseResponse;
   }
 
-  // If no session and trying to access protected route, redirect to home
-  if (!session && isProtectedRoute) {
+  // If no user and trying to access protected route, redirect to home
+  if (!user && isProtectedRoute) {
     const redirectUrl = new URL("/", request.url);
     redirectUrl.searchParams.set("redirectTo", pathname);
     return NextResponse.redirect(redirectUrl);
   }
 
   // If trying to access admin routes, check user role
-  if (session && isAdminRoute) {
+  if (user && isAdminRoute) {
     try {
       // Get user role from database
+      // Note: This API call is kept for Edge runtime compatibility
+      // The overhead is acceptable since admin routes are accessed infrequently
       const response = await fetch(`${request.nextUrl.origin}/api/auth/user`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ email: session.user.email }),
+        body: JSON.stringify({ email: user.email }),
       });
 
       if (response.ok) {
-        const user = await response.json();
+        const dbUser = await response.json();
 
-        if (!user.isActive) {
+        if (!dbUser.isActive) {
           return NextResponse.redirect(
             new URL("/?error=account_inactive", request.url)
           );
         }
 
-        if (user.role !== "admin") {
+        if (dbUser.role !== "admin") {
           return NextResponse.redirect(new URL("/unauthorized", request.url));
         }
       } else {
@@ -118,7 +122,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // If authenticated and trying to access sign-in page, redirect to home
-  if (session && pathname.startsWith("/auth/signin")) {
+  if (user && pathname.startsWith("/auth/signin")) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 
