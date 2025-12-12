@@ -8,15 +8,9 @@ export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
 
-  // Determine the correct redirect origin
-  // Priority: production domain > current origin (but allow localhost for development)
-  const productionDomain = "https://lia.leverategroup.asia";
-  const isNetlifyPreview = requestUrl.hostname.includes(
-    "--lia-app.netlify.app"
-  );
-  const redirectOrigin = isNetlifyPreview
-    ? productionDomain
-    : requestUrl.origin;
+  // Redirect to the configured site URL (set per environment)
+  // Falls back to request origin for local development if not configured
+  const redirectOrigin = process.env.NEXT_PUBLIC_SITE_URL || requestUrl.origin;
 
   if (code) {
     const cookieStore = await cookies();
