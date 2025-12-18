@@ -12,7 +12,8 @@
     "db:studio": "npx drizzle-kit studio",
     "db:seed": "tsx lib/db/seed.ts",
     "db:dedupe": "tsx scripts/dedupe-daily-metrics.ts",
-    "db:check-duplicates": "tsx scripts/check-daily-metrics-duplicates.ts"
+    "db:check-duplicates": "tsx scripts/check-daily-metrics-duplicates.ts",
+    "test:production": "tsx scripts/test-production-readiness.ts"
   },
   "dependencies": {
     "@anthropic-ai/claude-code": "^2.0.37",
